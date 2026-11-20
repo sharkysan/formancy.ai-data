@@ -830,9 +830,9 @@ version after the one it made; a moved key's two column names are told
 apart by a space set in proportional type; and the studio's preview loses a
 field's required marker where the renderer cannot fill its options, which
 is upstream's renderer and themes. Accepted for the README's *How it
-works*: its pictures are drawn at 400 CSS px, under half the size the
-studio's were taken at, and nothing measures whether one reads at
-GitHub's width; a reader opens it whole. Its Publish step pictures a
+works*: its pictures are drawn at 0.7 of the size they were taken at,
+which was read at that scale but not at GitHub's width, which nothing
+measures; a reader opens one whole. Its Publish step pictures a
 publish, not 0065's review, which the studio's pictures plane does not run
 ([0168](../decisions/0168-the-readme-pictures-the-workspace-a-buyer-meets-and-each-step-of-how-it-works.md)).
 

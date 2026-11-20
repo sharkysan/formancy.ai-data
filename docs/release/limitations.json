@@ -1307,7 +1307,7 @@
       ]
     },
     "0047": {
-      "reviewed": "sha256:0bd393b5229f6323d94bb6c21445497357f9cedee44673ecb1714447619b65fb",
+      "reviewed": "sha256:74bef7b37ae18478fff11dff2bf897114e429d03f9142b662f43598720be265c",
       "limitations": [
         {
           "area": "host",
@@ -1354,7 +1354,7 @@
         },
         {
           "area": "operations",
-          "says": "The composed stack's order form account may not read sales.order_line, so the getting-started guide and the README's pictures show no child grid."
+          "says": "The composed stack's order form account may not read sales.order_line, so the getting-started guide shows no child grid, and the README's pictures show an order's deliveries but never its lines."
         }
       ]
     },
@@ -4456,7 +4456,7 @@
       ]
     },
     "0154": {
-      "reviewed": "sha256:b78615ad660c9e4c793b9c62233c4800cccad90bdce3442e7590ceef1500e54e",
+      "reviewed": "sha256:58b76a63d96b7c5474fe9099d9ff134562278d5130f0533cd886d5edb8f3ef7f",
       "none": "Its costs -- two places to keep in step, a README that shows less at once, and a link from outside to a README anchor that moved, which now opens the README at its top -- fall on the documentation's readers and its maintainer; nothing a user, integrator or operator of the module installs, runs or configures changed."
     },
     "0155": {
@@ -5135,8 +5135,8 @@
       ]
     },
     "0168": {
-      "reviewed": "sha256:9de916e999237134f578650c0a309d5fe7140c4194a8abb9aaf99bd7fac3e9ad",
-      "none": "Its costs are the repository's and CI's: six more pictures to retake when a pictured sentence or the look changes, two of them needing Docker, their bytes, a longer host walk in the pictures job, and small pictures a reader may have to open to read. Nobody who installs, integrates or operates the module meets them."
+      "reviewed": "sha256:7f92093fedb2908e9c1452c3ba2f09548db74f809c8ef0f19d6b7d0c5ebde1da",
+      "none": "Its costs are the repository's and CI's: six more pictures to retake when a pictured sentence or the look changes, two of them needing Docker, their bytes, a longer host walk in the pictures job, and step pictures drawn at 0.7 of their size that a reader may have to open to read. Nobody who installs, integrates or operates the module meets them."
     }
   }
 }

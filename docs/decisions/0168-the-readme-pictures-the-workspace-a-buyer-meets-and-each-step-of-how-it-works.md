@@ -2,12 +2,16 @@
 
 - **Status:** accepted; extends
   [0038](0038-readme-pictures-are-taken-by-a-script-and-held-to-the-text-they-show.md):
-  a scene may be placed in a step of the README's *How it works*, the host
-  page's walk inserts invented rows through the owner's connection and
-  publishes a list view and the deliveries' form, and the camera's bench
-  stops short of what a pseudo-element draws; extends
+  a scene may be placed under a step of the README's *How it works*, the
+  host page's walk inserts invented rows through the owner's connection
+  and publishes a list view and the deliveries' form, and the camera's
+  bench stops short of what a pseudo-element draws; extends
   [0154](0154-the-readme-speaks-to-a-buyer-first-and-the-detail-lives-in-the-guide.md):
-  README.md holds a second generated region, in *How it works*
+  README.md holds a generated region under each step of *How it works*;
+  narrows
+  [0047](0047-a-hosts-workspace-lists-opens-and-edits-records-in-linked-grids.md):
+  its cost that the README's pictures show no child grid holds for order
+  lines alone, since the hero shows an order's deliveries
 - **Date:** 2026-11-20
 - **Deciders:** Daniel Bacher
 - **Verified by:** `scripts/pictures/readme.test.mjs`, in `pnpm test:repo`,
@@ -16,19 +20,19 @@
   failing on 2026-11-20 with its rule taken out of
   `scripts/pictures/readme.mjs`, the file put back and its checksum
   compared after:
-  - *picture every step of How it works, one each, as its list names
-    them* -- the repository's own README.md and scenes.json, by
+  - *picture every step of How it works, one each, under its item, as its
+    list names them* -- the repository's own README.md and scenes.json, by
     `stepProblems`;
-  - *renders one table on README.md, each step small, linked to itself
-    and led by its step, and in no other region* -- watched failing with
-    every step drawn at `STEP_WIDTH`, its recorded width unread (the
-    small repository's 320 drawn at 400), and with `regionOf` left
-    without `step` ("README.md must hold the pictures regions hero, ...;
-    how-it-works not drawn on this page");
-  - *regions: How it works missing from README.md, and planted on a page
-    of the guide*, and *links: a step whose picture does not exist, aimed
-    from README.md* -- each watched failing with `pageOf` left without
-    `STEPS`;
+  - *renders each step in a region of its own on README.md, at 0.7 of its
+    size, linked to itself, and in no other region* -- watched failing
+    with every step drawn at its recorded width (the small repository's
+    842 drawn at 842, not 589), and with `regionOf` left without `step`
+    ("README.md must hold the pictures regions hero, ...; how-it-works-1,
+    how-it-works-2 not drawn on this page");
+  - *regions: a step missing from README.md, and planted on a page of the
+    guide*, and *links: a step whose picture does not exist, aimed from
+    README.md* -- each watched failing with `pageOf` left without the
+    steps' regions;
   - *quotes: a step's caption quoting what its part does not say* --
     watched failing with `quoteProblems` left to the scenes that are not
     `step` ("expected [] to deeply equal [ Array(1) ]");
@@ -38,29 +42,57 @@
     the placements;
   - *steps: How it works' list and the step scenes disagree* -- watched
     failing with `stepProblems` answering nothing, and with its second
-    half, a scene's step the list does not have, taken out.
+    half, a scene's step the list does not have, taken out;
+  - *steps: How it works listing steps and no scene picturing any* --
+    watched failing with `stepProblems` answering nothing when scenes.json
+    has no step scene, as it first did: with every step scene and its
+    region taken out, every check had passed while the list still named
+    five steps;
+  - *steps: a region under another step than its own* -- watched failing
+    with the placement check taken out of `stepProblems`.
 
-  The small repository those cases share now gives each of its fixtures
-  its own copy of the recorded text: a case that appends a line to one
+  The small repository those cases share gives each of its fixtures its
+  own copy of the recorded text: a case that appends a line to one
   record's text had edited every fixture made after it, which no case
   before these met.
 
   CI's `pictures` job, `pnpm test:pictures` in Chromium, runs each app's
   `pictures.mjs --check` over the new scenes as over the others, with
-  their holds: that tenant 1's orders in group Online are the invented
-  ones, newest first, and the grid draws a row for each; that the open
-  order's Delivery tab lists its two deliveries; that `pg` is discovered
-  as `formancy_writer`; and that the server's latest version of
-  `pg-order` is 1 once the studio says it published it. host-delete's
-  and host-drift's checks hold that the walk's new acts leave their
-  pictures' text as it was.
+  their holds, each watched failing on 2026-11-20 in the
+  `mcr.microsoft.com/playwright:v1.63.0-noble` container below, with one
+  hold changed in the act, `pnpm pictures --check --app <app>` run, and
+  the file put back and compared by sha256:
+  - that tenant 1's orders in group Online are the invented ones, newest
+    first -- with them expected oldest first, "host-record-tabs: tenant
+    1's online orders are
+    ["10423","10422","10421","10420","10419","10418"], not the
+    invented ["10418","10419","10420","10421","10422","10423"]";
+  - that the grid draws a row for each -- with a row 10417 waited for, a
+    20 s timeout naming the row;
+  - that the open order's Delivery tab lists its two deliveries -- with
+    "Rows 1–3." waited for, a 20 s timeout;
+  - that the deliveries' grid shows Carrier and Shipped at alone once
+    their keys are hidden -- with the id left shown, a 20 s timeout naming
+    the header row;
+  - that `pg` is discovered as `formancy_writer` -- with `formancy_reader`
+    waited for, a 30 s timeout;
+  - and that the server's latest version of `pg-order` is 1 once the
+    studio says it published it -- with 2 expected, the act's own refusal,
+    "studio-publish: the latest version of pg-order answered 200 with
+    version 1".
 
-  **Held by review alone:** the bench, which only a capture reads. Watched
+  host-delete's and host-drift's checks hold that the walk's new acts
+  leave their pictures' text as it was.
+
+  **Held by review alone:** the bench, which no check compares: `--check`
+  measures it for the intrusion check and holds nothing it gives. Watched
   on 2026-11-20 in the real script: host-record-tabs was taken at 527 CSS
   px wide with Side by side's separator, a `::before`'s 2 px border, at
-  its left edge; with the pseudo-element read, at 513 px with none. And,
-  as 0038 says, what a picture looks like, and whether a small one can be
-  read at GitHub's width.
+  its left edge; with the pseudo-element read, at 513 px with none; and
+  host-delete, taken on 2026-11-19 with Stacked's line, a `::before`'s
+  border too, 6 px under its Records panel, was retaken at 550 CSS px high
+  rather than 564, with none. And, as 0038 says, what a picture looks
+  like, and whether one can be read at GitHub's width.
 
 ## Context
 
@@ -96,19 +128,29 @@ by testcontainers. The pictures, at DPR 2:
 
 | Scene | CSS px | Bytes |
 | --- | --- | --- |
-| host-workspace | 1425×1472 | 220,968 |
+| host-workspace | 1425×1472 | 208,868 |
 | studio-connect-pg | 874×687 | 60,282 |
 | studio-choose-generate | 916×1295 | 233,786 |
 | studio-policy-roles | 874×431 | 35,668 |
 | studio-publish | 916×371 | 55,376 |
 | host-record-tabs | 513×1060 | 50,558 |
 
-Together 656,638 bytes, and `captured.json` holds the current numbers. The
-two host pictures came out the same bytes in two takes, before and after
-the bench's code was shortened, and the studio's four the same bytes
-before and after the bench change. Not measured:
-how long the two apps' checks take now, and GitHub's README column, which
-0038 could not reach either.
+Together 644,538 bytes, and `captured.json` holds the current numbers.
+host-record-tabs and the studio's four came out the same bytes before and
+after the bench change; host-workspace was retaken once its customer 1003
+was renamed and its deliveries' keys hidden, 220,968 bytes before. The
+bench change retook host-delete too: 1165×564 CSS px and 81,454 bytes
+before, 1165×550 and 82,370 after. `pnpm pictures --check --app host` took
+21.1 s and `--app studio` 15.6 s, once each, in that container, starting
+PostgreSQL included.
+
+**What a step's picture can be drawn at** was read by eye, on the same
+day: the studio's Generate step, decoded from its WebP and resized with
+Lanczos to its drawn width at one device pixel per CSS pixel. At 400 CSS
+px, 0.44 of its size, its notes could not be read; at 0.6, its grey lines
+and code names blurred; at 0.7 they read. Not measured: GitHub's README
+column, which 0038 could not reach either, and so how far GitHub scales a
+picture down past what the README draws.
 
 ## Decision
 
@@ -118,15 +160,19 @@ and "Linked to Order"; the Records grid of `pg-order` opened on "Online
 orders", a list view an administrator named, its condition a chip, six
 orders of October and November 2026 for four customers, drafted, placed
 and shipped, amounts in `numeric(18,4)`'s exact digits; and the open
-order's deliveries in a tab beside it. The scene, `host-workspace`, is
-`apps/host/scripts/pictures-workspace.mjs`'s:
+order's deliveries in a tab beside it, their own id and the tenant hidden
+in the section's Columns, as a person may (0106). The scene,
+`host-workspace`, is `apps/host/scripts/pictures-workspace.mjs`'s:
 
 - **The rows are invented and inserted by the pictures script**, through
   the owner's connection it already opens, as it already induces its
   states: three customers beside the fixture's Muster AG, the orders, and
   two deliveries, every key given so every walk draws the same ones. The
-  names are generic and fictional. The caption says the script inserted
-  them. `undo`, which host-delete's act calls first, deletes them again.
+  names are generic and fictional, one series of placeholders -- Muster,
+  Beispiel, Vorlage, Entwurf: sample, example, template, draft. The
+  caption says which rows the script inserted, and that Muster AG is the
+  fixture's. `undo`, which host-delete's act calls first, deletes them
+  again.
 - **The view and the child form are published by ada** through the
   administrator plane, as host-delete publishes its form
   (`pictures-forms.mjs`): `pg-order` again as version 2 with the view in
@@ -135,6 +181,8 @@ order's deliveries in a tab beside it. The scene, `host-workspace`, is
 - **Stacked, with the line moved to its end from the keyboard**, so the
   six rows are whole in the camera's 900 px window, which shares its
   height between the records and the record (0145).
+- **The order is open on its Delivery tab**, so the hero shows a child
+  record; its form is Run's picture, and the caption says so.
 - **The scenes walk before host-delete**, so no picture before them lists
   a second order form and host-delete's grid holds the fixture's order
   alone, as its caption says.
@@ -143,18 +191,23 @@ order's deliveries in a tab beside it. The scene, `host-workspace`, is
 page's guide.** Its record and picture are unchanged: the record holds no
 placement, so moving a scene needs no retake.
 
-**Each step of *How it works* has a small picture**, a `step` scene drawn
-in README.md's region `how-it-works` (`scripts/pictures/readme.mjs`). A
-scene names its step in `step`, as the list numbers and names it -- "2.
+**Each step of *How it works* has its picture under it.** A `step` scene
+names its step in `step`, as the list numbers and names it -- "2.
 Generate" for `2. **Generate.**` -- the key a studio scene uses for the
-studio's step, here the step of the page it is drawn on. The region is a
-table, a row per step, the picture at `STEP_WIDTH`, 400 CSS px, or less
-where it was taken narrower, linked to itself, beside its caption led by
-the step. It is held as the hero is: the region is the render, a step scene
-is drawn in that region alone, its caption quotes only what its parts say,
-its links resolve from README.md, the shape check knows the placement and
-wants one scene per step in step order, and `stepProblems` holds the
-scenes to the list.
+studio's step, here the step of the page it is drawn on, and is drawn in
+README.md's region `how-it-works-2`, which opens right after the list's
+item 2 (`scripts/pictures/readme.mjs`). So the list is five one-item lists,
+each followed by its step's picture, drawn at `STEP_SCALE`, 0.7 of the
+width it was taken at, linked to itself, then its caption, led by nothing:
+the item above says the step, and the caption says what the picture
+shows. A reader reads each step once, with its picture. Every step's text
+is drawn at one size, 0.7 of the page's, which the measurement above read.
+It is held as the hero is: each region is the render, a step scene is
+drawn in its step's region alone, its caption quotes only what its parts
+say, its links resolve from README.md, the shape check knows the placement
+and wants one scene per step in step order, and `stepProblems` holds the
+scenes to the list, whenever the list numbers a step, and each region to
+its place, right after its item.
 
 The five, each taken as its app's other scenes are:
 
@@ -175,35 +228,41 @@ The five, each taken as its app's other scenes are:
 5. **Run**, `host-record-tabs`: the order the hero shows open, drawn by
    React alone, in Side by side, the record pane alone. The hero already
    shows the workspace, so Run's picture is the record, and in Side by
-   side its lane is narrow enough, 513 CSS px, for a small picture to be
-   read.
+   side its lane is narrow, 513 CSS px.
 
 **The camera's bench stops short of a pseudo-element's drawing.** Side by
-side's separator is a `::before`'s border beside the record lane, which
-the bench, reading elements alone, put in the picture as a sliver. A
-`::before` or `::after` that paints is now read as its box, from its
-offsets where it is placed absolutely and as its element's otherwise.
+side's separator, and Stacked's line, are a `::before`'s border beside the
+record lane and under the records, which the bench, reading elements
+alone, put in the picture as a sliver. A `::before` or `::after` that
+paints a border or a background is now read as its box, from its offsets
+where it is placed absolutely and as its element's otherwise; a glyph it
+draws is not.
 
 ## Consequences
 
 **What it buys.** A reader of the README meets the product at work on data
 that looks like theirs, a list view, a filter and a child record, and sees
 each step of the path from a connection to a person's record as the product
-draws it, every picture still taken from a state the product reaches and
-held to its text. The exact digits keep their picture, beside the host
-page's other careful states.
+draws it, under the sentence that says the step, every picture still taken
+from a state the product reaches and held to its text. The exact digits
+keep their picture, beside the host page's other careful states.
 
 **What it costs.**
 
 - **More pictures to retake.** Six more scenes, two of them on the host
   page, whose pictures need Docker to retake; a change of look -- the
   room's stylesheet, a font, Chromium -- retakes six pictures more.
-- **Bytes.** 656,638 more bytes of WebP in a checkout, and in history again
+- **Bytes.** 644,538 more bytes of WebP in a checkout, and in history again
   at each retake.
-- **Small pictures may be hard to read.** At 400 CSS px the studio's steps
-  are drawn at under half their size, and the Generate step's notes are
-  long; a reader opens the picture to read it, and nothing measures
-  whether a step reads at GitHub's width.
+- **How it works is long.** Its pictures stand under their steps rather
+  than beside a sentence, the studio's drawn at 0.7 of their 874 to 916
+  CSS px; the Generate step's notes are long, and its picture is the
+  tallest. Nothing measures whether one reads at GitHub's width, where
+  a narrow window scales them further; a reader opens one whole.
+- **The list is five lists.** Each item is a one-item ordered list
+  numbered by its first item, because a generated region between items
+  ends a Markdown list; a renderer that ignores an ordered list's start
+  would number every step 1.
 - **The host walk is longer and more coupled.** Its new acts insert and
   delete rows and publish two forms between host-other-tenant and
   host-delete; host-delete undoes them, and host-drift puts the renderers
@@ -232,6 +291,25 @@ guide.
 hero was. The README's *How it works* would stay prose, and a buyer would
 follow five links to see what each step looks like.
 
+**A table after the list, each picture at 400 CSS px beside its caption
+led by the step**, this record's first take. The studio's steps were then
+drawn at under half their size, where the Generate step's notes could not
+be read, and each step was told twice, by the list and by the table.
+
+**Each step's picture at the width it was taken at.** Readable, and the
+five 3,844 CSS px tall together as recorded, against 2,691 at 0.7, which
+was read as enough.
+
+**Less of the Generate step.** A part is a whole element, and the clip
+refuses text no part holds, so the notes the caption quotes cannot be
+pictured without the panel around them; the Choose step's lookups, which
+are narrower, say what was chosen and not what the generator made of it.
+
+**A hero on the order's own tab**, its form under the grid. The form's
+height, not measured across Stacked's record pane, would be added to the
+hero's, and no child record would show; Run pictures the form, and the
+hero's caption says so.
+
 **Screenshots taken by hand**, with a believable data set typed into a
 running stack. Faster to make, and exactly what 0038 refused: nothing
 holds them to the text the page shows, and they go stale unseen.
@@ -250,11 +328,14 @@ refused it: row-level security does not bind the owner, so the pictures
 would show what production must not do.
 
 **Run's picture in Stacked**, the hero's layout. The record pane is then
-1,165 CSS px wide, drawn at a third of its size in the table.
+1,165 CSS px wide, drawn at 816, for the same form Side by side's lane
+shows in 513.
 
 ## Older records
 
-Applied and unchanged: 0047, whose workspace the hero shows; 0105, whose
-view the grid opens on; 0142, whose tab holds the deliveries; 0145, whose
+Narrowed: 0047, whose cost that the README's pictures show no child grid
+now holds for order lines alone -- its Status line says so. Applied and
+unchanged: 0105, whose view the grid opens on; 0106, whose Columns hide
+the deliveries' keys; 0142, whose tab holds the deliveries; 0145, whose
 line the keyboard moves; 0122, whose disabled fields Run's caption names;
 and 0065, which Publish's caption names and does not picture.

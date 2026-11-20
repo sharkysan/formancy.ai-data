@@ -660,7 +660,7 @@ and *How it works*' in the README, each app's on its page of the guide,
 each on its own page and on no other, its links aimed from there
 ([0154](../decisions/0154-the-readme-speaks-to-a-buyer-first-and-the-detail-lives-in-the-guide.md)) -- to
 `scripts/pictures/scenes.json` and what was captured, and *How it works*'
-small pictures to its list, one scene per step in its order
+pictures to its list, one scene per step, each under its step's item
 ([0168](../decisions/0168-the-readme-pictures-the-workspace-a-buyer-meets-and-each-step-of-how-it-works.md)).
 The hero's orders are invented, inserted and deleted again by the host
 page's walk through the owner's connection, never added to the shared

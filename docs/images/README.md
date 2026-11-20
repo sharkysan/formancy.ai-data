@@ -43,8 +43,9 @@ page does not restate them.
   then publishes `pg-order` again as version 2 with a list view, Online
   orders, its default, and `pg-delivery`, an order's deliveries, through the
   same plane (`apps/host/scripts/pictures-forms.mjs`), and host-delete's act
-  deletes the rows first. They are never in the shared fixture model, whose
-  rows every parity suite counts
+  deletes the rows first. clara hides the deliveries' own id and tenant in
+  their Columns, as a person may (0106). They are never in the shared
+  fixture model, whose rows every parity suite counts
   ([0168](../decisions/0168-the-readme-pictures-the-workspace-a-buyer-meets-and-each-step-of-how-it-works.md)).
 - **The examples page** is its static build; it has no server.
 
@@ -137,8 +138,9 @@ works*' for a `step` scene -- its caption, its alt text, and its
 **quotes**: every “…” in a caption or alt names the parts it must occur in,
 and `pnpm test:repo` fails when the recorded text of a named part does not
 hold it. The picture regions are rendered from scenes.json and the record:
-the hero's and *How it works*' in the README, and each app's on its page of the guide,
-`docs/guide/<app>.md`, a caption's links, which scenes.json writes from the
+the hero's in the README and one under each step of its *How it works*,
+and each app's on its page of the guide, `docs/guide/<app>.md`, a caption's
+links, which scenes.json writes from the
 repository's root, aimed from the page. `pnpm test:repo` fails when a region
 is not what the render gives, or is on a page it is not drawn on
 ([0154](../decisions/0154-the-readme-speaks-to-a-buyer-first-and-the-detail-lives-in-the-guide.md)).
@@ -160,10 +162,15 @@ undecided keys); that host-delete's confirmation, under the grid, takes the
 keyboard and offers Keep it before Delete it; that the lines' form notes that nothing scopes its rows
 until the box is ticked (watched failing with the note taken out of the
 step); that tenant 1's orders in group Online are the hero's invented ones,
-newest first, each a row of the grid, and that the open order's Delivery tab
-lists its two deliveries; that `pg` is discovered as `formancy_writer`; and
-that the server's latest version of `pg-order` is 1 once the Publish step
-says it published it. They run at every capture and every `--check`.
+newest first (watched failing with them expected oldest first), each a row
+of the grid (watched failing with a row 10417 waited for), that the open
+order's Delivery tab lists its two deliveries (watched failing with three
+waited for), and that its grid shows Carrier and Shipped at alone once their
+keys are hidden (watched failing with the id left shown); that `pg` is
+discovered as `formancy_writer` (watched failing with `formancy_reader`
+waited for); and that the server's latest version of `pg-order` is 1 once
+the Publish step says it published it (watched failing with 2 expected).
+They run at every capture and every `--check`.
 
 ## Commands
 
@@ -200,8 +207,9 @@ through.
    tools) and the date into the pull request and below.
    There is no retake for width: GitHub scales a wider picture down. If the
    hero's rows cannot be read at that width, the hero's parts change, and
-   the pull request says so; *How it works*' pictures are drawn at 400 CSS
-   px, and one that cannot be read there is opened whole.
+   the pull request says so; *How it works*' pictures are drawn under their
+   steps at 0.7 of the size they were taken at, and one that cannot be read
+   there is opened whole.
 4. Run `pnpm pictures --all` once more on the same machine. Its table says
    every picture is `unchanged`, and no file it wrote the first time changes,
    because a settled shot and its encoding are the same bytes each time and
