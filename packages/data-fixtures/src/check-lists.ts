@@ -1,5 +1,5 @@
 import type { CheckMeta, DatabaseKind } from '@formancy/data-core'
-import { readCheckList } from '@formancy/data-core'
+import { readCheckList, readDomainList } from '@formancy/data-core'
 
 /*
  * A column whose values a check lists is a select of exactly them (0152),
@@ -37,6 +37,12 @@ export function checkListOf(kind: DatabaseKind, check: Pick<CheckMeta, 'expressi
   const read = check.expression === null ? null : readCheckList(kind, check.expression)
   if (read === null) return null
   return { column: read.column, values: [...new Set(read.literals.map((literal) => literal.text))].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)) }
+}
+
+/** A PostgreSQL domain's check as data-core reads it (0170): its values, in codepoint order and each once; `null`, no list. */
+export function domainListOf(check: Pick<CheckMeta, 'expression'>): string[] | null {
+  const literals = check.expression === null ? null : readDomainList(check.expression)
+  return literals === null ? null : [...new Set(literals.map((literal) => literal.text))].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
 }
 
 /**

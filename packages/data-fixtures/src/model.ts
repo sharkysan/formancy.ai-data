@@ -28,6 +28,25 @@ export interface ExpectedColumnFacts {
   nullable?: boolean
   generated?: Generation
   hasDefault?: boolean
+  /**
+   * The PostgreSQL domains of the column's type, outermost first (0170).
+   * Left out, the column has none, and one reported with domains is a
+   * disagreement: a column of no domain carries no `domains` at all, or every
+   * snapshot of a catalog without one would fingerprint otherwise than
+   * before 0170.
+   */
+  domains?: readonly ExpectedDomain[]
+}
+
+/**
+ * A domain of a column's type as the model pins it (0170): its name, and
+ * each of its checks by name, with what data-core reads of each as the
+ * engine spells it -- `listed` the values a domain's list compares its value
+ * with, as a set in codepoint order, or `null`, no list.
+ */
+export interface ExpectedDomain {
+  ref: ObjectRef
+  checks: ReadonlyArray<{ name: string; enforced?: boolean; validated?: boolean; listed?: readonly string[] | null }>
 }
 
 export interface ExpectedColumn extends ExpectedColumnFacts {

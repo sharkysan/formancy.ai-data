@@ -1,11 +1,12 @@
 import type { CheckMeta, ColumnMeta, CoverageGap, InboundKey, MetadataSnapshot, NormalizedType, ObjectMeta, ObjectRef, RoutineMeta } from '@formancy/data-core'
 import { describeRoutine, findObject, gapCovers } from '@formancy/data-core'
-import { checkListOf } from './check-lists.js'
+import { checkListOf, domainListOf } from './check-lists.js'
 import type {
   ExpectedCheck,
   ExpectedCheckFacts,
   ExpectedColumn,
   ExpectedColumnFacts,
+  ExpectedDomain,
   ExpectedObject,
   ExpectedRoutine,
   ExpectedRoutineFacts,
@@ -305,8 +306,11 @@ function typeDisagreements(actual: { type: NormalizedType; databaseType: string 
   if (actual.type.kind !== expected.kind)
     return [`${where} type kind is ${JSON.stringify(actual.type.kind)}, expected ${JSON.stringify(expected.kind)} (database type ${actual.databaseType})`]
   const type = actual.type as unknown as Record<string, unknown>
+  // An enum's name and labels are an object and a list (0170): compared as JSON, in order.
   return Object.entries(expected)
-    .filter(([property, value]) => type[property] !== value)
+    .filter(([property, value]) =>
+      typeof value === 'object' && value !== null ? JSON.stringify(type[property]) !== JSON.stringify(value) : type[property] !== value,
+    )
     .map(
       ([property, value]) =>
         `${where} type ${property} is ${JSON.stringify(type[property])}, expected ${JSON.stringify(value)} (database type ${actual.databaseType})`,
@@ -321,7 +325,45 @@ function columnDisagreements(actual: ColumnMeta, expected: ExpectedColumnFacts, 
     out.push(`${where} generated is ${actual.generated}, expected ${expected.generated}`)
   if (expected.hasDefault !== undefined && actual.hasDefault !== expected.hasDefault)
     out.push(`${where} hasDefault is ${String(actual.hasDefault)}, expected ${String(expected.hasDefault)}`)
+  out.push(...domainDisagreements(actual, expected.domains, where))
   return out
+}
+
+/**
+ * Whether a column's domains are the model's (0170): none where it names
+ * none -- not even an empty list --, and otherwise each, outermost first, by
+ * name, with its checks by name, each check's flags where the model pins
+ * them, and data-core's reading of each as this engine spelled it.
+ */
+function domainDisagreements(actual: ColumnMeta, expected: readonly ExpectedDomain[] | undefined, where: string): string[] {
+  if (expected === undefined)
+    return actual.domains === undefined ? [] : [`${where} has domains [${actual.domains.map((domain) => name(domain.ref)).join(', ')}], expected none`]
+  const found = actual.domains ?? []
+  const names = found.map((domain) => name(domain.ref)).join(', ')
+  const wanted = expected.map((domain) => name(domain.ref)).join(', ')
+  if (names !== wanted) return [`${where} domains are [${names}], expected [${wanted}]`]
+  return expected.flatMap((domain, index) => {
+    const reported = (found[index] as NonNullable<ColumnMeta['domains']>[number]).checks
+    const at = `${where} domain ${name(domain.ref)}`
+    const checks = reported.map((check) => check.name).join(', ')
+    const wantedChecks = domain.checks.map((check) => check.name).join(', ')
+    if (checks !== wantedChecks) return [`${at} checks are [${checks}], expected [${wantedChecks}]`]
+    return domain.checks.flatMap((check, position) => {
+      const read = reported[position] as CheckMeta
+      const out: string[] = []
+      if (check.enforced !== undefined && read.enforced !== check.enforced)
+        out.push(`${at} ${check.name} enforced is ${String(read.enforced)}, expected ${String(check.enforced)}`)
+      if (check.validated !== undefined && read.validated !== check.validated)
+        out.push(`${at} ${check.name} validated is ${String(read.validated)}, expected ${String(check.validated)}`)
+      if (check.listed !== undefined) {
+        const values = domainListOf(read)
+        const said = (list: readonly string[] | null) => (list === null ? 'no list' : `[${list.join(', ')}]`)
+        if (JSON.stringify(values) !== JSON.stringify(check.listed))
+          out.push(`${at} ${check.name} reads as ${said(values)} from ${JSON.stringify(read.expression)}, expected ${said(check.listed)}`)
+      }
+      return out
+    })
+  })
 }
 
 /**

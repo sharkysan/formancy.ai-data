@@ -50,7 +50,7 @@ export {
 export { DEFAULT_PARITY, DEFAULT_TABLE } from './defaults.js'
 export { ALICE, AUDITED_POLICY, AUDITED_PRICE_POLICY, AUDITED_PRICE_STAMPS, AUDITED_STAMPS, BOB, STAMP_PARITY } from './stamps.js'
 export type { StampCase, StampedRow } from './stamps.js'
-export { CHECK_LIST_PARITY, checkListOf, LISTED_TABLE } from './check-lists.js'
+export { CHECK_LIST_PARITY, checkListOf, domainListOf, LISTED_TABLE } from './check-lists.js'
 export type { ListedCase } from './check-lists.js'
 export { DECLINE_PARITY, DECLINING_MESSAGES, DECLINING_REMOVABLE, DECLINING_TABLE } from './declines.js'
 export type { DeclineAnswer, DeclineCase } from './declines.js'
@@ -94,6 +94,7 @@ export type {
   ExpectedCheckFacts,
   ExpectedColumn,
   ExpectedColumnFacts,
+  ExpectedDomain,
   ExpectedForeignKey,
   ExpectedObject,
   ExpectedRoutine,
@@ -104,6 +105,7 @@ export type {
 export { DISPLAY_PARITY, FILTER_PARITY, PARITY_SCOPE, REFUSAL_PARITY, TEMPORAL_PARITY } from './parity.js'
 export type { FilterParityCase, ParityFilterColumn, RefusalParityCase } from './parity.js'
 export { renamedColumn } from './rename.js'
+export { STATES, STATES_MODEL, STATES_SCOPE } from './states.js'
 export { EDGE_VALUES, FIRST_SHIPMENT, SECOND_SHIPMENT } from './values.js'
 export { DELIVERIES, UUID_PARITY, UUID_ROWS, uuidOrder } from './uuid.js'
 export { VERSION_PARITY } from './chains.js'
