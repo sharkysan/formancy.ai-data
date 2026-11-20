@@ -115,6 +115,42 @@ describe('the state moves', () => {
   })
 })
 
+describe('a state field over an enum', () => {
+  // A status of a PostgreSQL enum is a state field (0170), as
+  // validatePolicy accepts: offered as one, its moves between labels
+  // fit, and they publish as typed. Watched failing with the State field
+  // offering text and whole numbers alone: status was no option.
+  test('is offered, and its moves publish as typed', async () => {
+    await plane.close()
+    plane = await startPlane({ enums: true })
+    const user = await signIn(plane)
+    await generateOrder(user, 'fixture-enums')
+    const policy = await writeOrderPolicy(user)
+    const offered = within(within(policy).getByLabelText<HTMLSelectElement>('State field'))
+      .getAllByRole<HTMLOptionElement>('option')
+      .map((option) => option.value)
+    expect(offered).toContain('status')
+    await user.selectOptions(within(policy).getByLabelText('State field'), 'status')
+    await addMove(user, policy, 1, '', 'placed', 'clerk')
+    await addMove(user, policy, 2, 'placed', 'shipped', 'clerk')
+    expect(problems(policy)).toEqual([])
+    const publish = await goTo(user, 'Publish')
+    await user.click(await within(publish).findByRole('button', { name: 'Publish version 1' }))
+    await within(publish).findByText('Published version 1 of sales-order.')
+    const latest = await createAdminClient({ token: TOKENS.admin, fetch: plane.fetch }).latest('sales-order')
+    if (!latest.ok) throw new Error(latest.message)
+    const status = latest.value.bundle.bindings.fields.find((binding) => binding.field === 'status')
+    expect(status?.kind === 'column' ? status.type.kind : undefined).toBe('enum')
+    expect(latest.value.bundle.policy.transitions).toEqual({
+      field: 'status',
+      moves: [
+        { from: null, to: 'placed', roles: ['clerk'] },
+        { from: 'placed', to: 'shipped', roles: ['clerk'] },
+      ],
+    })
+  })
+})
+
 describe('a draft’s moves, as its publisher reads them', () => {
   // The publisher approving a draft approves its moves too, so the review
   // says each one and that every other change is refused; a policy with

@@ -215,18 +215,16 @@ export function withoutCascadeAt(policy: FormPolicy, index: number): FormPolicy 
   )
 }
 
+/** The kinds a state is spelled in, as `validatePolicy` accepts: text, a whole number, or an enum's label (0170). */
+const STATE_KINDS: ReadonlySet<string> = new Set(['text', 'integer', 'enum'])
+
 /**
- * The fields a policy may hold to moves (0112): a column field whose value
- * is text or a whole number, the shapes a state is spelled in, as
- * `validatePolicy` accepts -- and one the form writes, or nothing could
- * move it.
+ * The fields a policy may hold to moves (0112): a column field of a kind
+ * in `STATE_KINDS` -- and one the form writes, or nothing could move it.
  */
 export function stateFields(bindings: FormBindings): string[] {
   return bindings.fields
-    .filter(
-      (binding) =>
-        binding.kind === 'column' && (binding.type.kind === 'text' || binding.type.kind === 'integer') && (binding.writes.create || binding.writes.update),
-    )
+    .filter((binding) => binding.kind === 'column' && STATE_KINDS.has(binding.type.kind) && (binding.writes.create || binding.writes.update))
     .map((binding) => binding.field)
 }
 
