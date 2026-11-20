@@ -353,7 +353,9 @@ of them. A refusal about some of the records names them and says
 nothing was done to any, all of it said as the keyboard lands there,
 and offers Read the page again, never a run again past it; a run whose
 answer was lost is checked by reading each record, and run again only
-where none moved
+where none moved. Only the Records grid offers a choice -- a child section
+and a Drill down level offer none -- so more than a page of records is run
+a page at a time
 ([0166](../decisions/0166-a-person-chooses-a-pages-records-by-a-column-of-boxes-and-runs-an-action-over-them-from-a-bar-above-the-grid.md)).
 
 New record, and a child's new row, start each field at its column's
