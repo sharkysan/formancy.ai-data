@@ -15,11 +15,14 @@
 // The fixture's edge-case order, 2^53+1, is in group A, and so outside the
 // view: the list is the invented orders alone, which the act holds against
 // the database. React alone draws the record, one paper as an application's
-// page draws one, and the record is pictured in Side by side, where its lane
-// is narrow enough for a small picture to be read. The workspace is
+// page draws one, and the record is pictured in Side by side, whose narrow
+// lane keeps Run's picture in the README small. The workspace is
 // pictured in Stacked with the line between the records and the record
 // moved to its end by the keyboard, so the six rows are drawn whole in the
-// 900 px window the camera opens.
+// 900 px window the camera opens, and with the deliveries' keys -- their
+// own id and the tenant, which the order's grid above does not show --
+// hidden in the deliveries' Columns, as a person who reads carriers hides
+// them (0106).
 //
 // `undo`, which host-delete's act calls first, takes the rows out again and
 // puts the line back where clara found it, so host-delete's grid holds the
@@ -30,7 +33,7 @@ import { DELIVERY, deliveryPolicy, guidePolicy, orderRequest, publish, VIEWED } 
 
 /** The customers the orders are for: tenant 1's, numbered after the fixture's 1001 and the 1002 host-refused deletes. */
 const CUSTOMERS = [
-  { no: 1003, name: 'Café Lumière GmbH', country: 'CH', limit: '25000.00' },
+  { no: 1003, name: 'Café Entwurf GmbH', country: 'CH', limit: '25000.00' },
   { no: 1004, name: 'Beispiel Logistik KG', country: 'DE', limit: '60000.00' },
   { no: 1005, name: 'Vorlage & Partner GmbH', country: 'DE', limit: '10000.00' },
 ]
@@ -54,6 +57,10 @@ const DELIVERIES = [
   { id: '3f1c2a9e-6b4d-4e8a-9c71-5d2e8b0a4f16', carrier: 'Express', shipped: '2026-11-18 09:30:00+00' },
   { id: '8a7d4c3b-2e1f-4a96-b5c8-0f9e6d3a1b27', carrier: 'Freight', shipped: null },
 ]
+
+/** The deliveries' columns hidden in their Columns, by label, and the ones left, in the grid's order. */
+const HIDDEN = ['Id', 'Tenant id']
+const SHOWN = ['Carrier', 'Shipped at']
 
 /** The rows above, inserted through the database's owner, whom row-level security does not bind. */
 async function seed(owner) {
@@ -115,10 +122,19 @@ export function workspaceScenes(plane, { records, detail, pane, carryOn, signIn,
         await line(page).press('End')
         // The order's deliveries, in the tab beside it: listed the first time it is shown.
         await record(page).getByRole('tab', { name: DELIVERY.title, exact: true }).click()
-        await record(page)
-          .getByRole('tabpanel', { name: DELIVERY.title, exact: true })
+        const deliveries = record(page).getByRole('tabpanel', { name: DELIVERY.title, exact: true })
+        await deliveries
           .getByRole('status')
           .filter({ hasText: `Rows 1–${String(DELIVERIES.length)}.` })
+          .waitFor()
+        // Their keys hidden, in the section's Columns, and the panel closed again: what is left is what a reader of carriers reads.
+        const columns = deliveries.getByRole('button', { name: 'Columns', exact: true })
+        await columns.click()
+        for (const label of HIDDEN) await deliveries.getByRole('checkbox', { name: `Show ${label}`, exact: true }).uncheck()
+        await columns.click()
+        await deliveries
+          .getByRole('grid', { name: DELIVERY.title, exact: true })
+          .getByRole('row', { name: SHOWN.join(' '), exact: true })
           .waitFor()
         return { parts: { Forms: page.getByRole('navigation', { name: HOST.forms, exact: true }), Workspace: page.getByRole('main') } }
       },

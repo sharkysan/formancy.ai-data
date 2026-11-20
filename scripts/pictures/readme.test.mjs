@@ -18,9 +18,9 @@ import {
   rewrite,
   shapeProblems,
   START,
-  STEP_WIDTH,
+  STEP_SCALE,
   stepProblems,
-  STEPS,
+  stepRegion,
 } from './readme.mjs'
 
 /**
@@ -87,8 +87,8 @@ describe("the repository's README pictures", () => {
   })
 
   // A step added to How it works, or renamed there, would stand without its
-  // picture, or the table would lead a picture with a step the list does not have.
-  test('picture every step of How it works, one each, as its list names them', () => {
+  // picture, and a picture moved would stand under another step than its own.
+  test('picture every step of How it works, one each, under its item, as its list names them', () => {
     expect(stepProblems(here)).toEqual([])
   })
 })
@@ -97,8 +97,8 @@ describe("the repository's README pictures", () => {
  * A small repository: one hero, an inline scene with a step and two `more`
  * scenes after it, a host `more` scene, an examples scene, and two `step`
  * scenes, a studio one and a host one, for README.md's How it works of two
- * steps. Its snapshot lines are written by hand in the shapes Playwright
- * prints.
+ * steps, each followed by its region. Its snapshot lines are written by
+ * hand in the shapes Playwright prints.
  */
 const LOOK = {
   platform: 'linux-x64',
@@ -210,7 +210,7 @@ const TEXT = {
   'host-record-tabs': { Record: '- region "Order k1:10422":\n  - tab "Delivery"' },
 }
 
-/** README.md as the small repository has it: the hero's region, then How it works, its two steps listed and their region after them. */
+/** README.md as the small repository has it: the hero's region, then How it works, its two steps listed, each followed by its region. */
 const README = [
   '# Formancy Data',
   '',
@@ -220,9 +220,13 @@ const README = [
   '## How it works',
   '',
   '1. **Connect.** The studio discovers it.',
+  '',
+  START('how-it-works-1'),
+  END,
+  '',
   '2. **Run.** A page draws it.',
   '',
-  START(STEPS),
+  START('how-it-works-2'),
   END,
   '',
   '## Licence',
@@ -557,82 +561,69 @@ describe('each check, on a small repository', () => {
 })
 
 /*
- * README.md's How it works, one small picture per step (0168): the `step`
+ * README.md's How it works, a picture under each step (0168): the `step`
  * placement held as the hero is, each case on the small repository above.
  */
 describe('the steps of How it works, on a small repository', () => {
-  // The format the README shows, pinned: one table, a row per step in
-  // scenes.json's order, the picture at STEP_WIDTH or its recorded width
-  // where that is less, linked to itself so a reader can open it whole,
-  // beside its caption led by the step as the list numbers it -- and the
-  // step scenes in that region alone, none in its app's.
-  // Watched failing with every step drawn at STEP_WIDTH, its recorded width
-  // unread (the host step's 320 drawn at 400), and with regionOf left
-  // without `step`: README.md then had no region how-it-works to write,
-  // "README.md must hold the pictures regions hero, ...; how-it-works not
-  // drawn on this page".
-  test('renders one table on README.md, each step small, linked to itself and led by its step, and in no other region', () => {
+  // The format the README shows, pinned: a region per step, named for its
+  // number and drawn on README.md, its picture at STEP_SCALE of its
+  // recorded width and linked to itself so a reader can open it whole, then
+  // its caption led by nothing, since the step's item stands above it --
+  // and the step scenes in those regions alone, none in their app's.
+  // Watched failing with every step drawn at its recorded width (the
+  // studio step's 842 drawn at 842, not 589), and with regionOf left
+  // without `step`: README.md's regions were then none it draws, "README.md
+  // must hold the pictures regions hero, ...; how-it-works-1,
+  // how-it-works-2 not drawn on this page".
+  test('renders each step in a region of its own on README.md, at 0.7 of its size, linked to itself, and in no other region', () => {
     const { scenes: list, record } = fixture()
     record['host-record-tabs'].css.width = 320
     const rendered = render(list, record)
-    expect(pageOf(STEPS)).toBe('README.md')
-    expect(STEP_WIDTH).toBe(400)
-    expect(rendered[STEPS]).toBe(
+    expect(STEP_SCALE).toBe(0.7)
+    expect(stepRegion('2. Run')).toBe('how-it-works-2')
+    expect(pageOf('how-it-works-1')).toBe('README.md')
+    expect(rendered['how-it-works-1']).toBe(
       [
-        '<table>',
-        '<tr>',
-        '<td>',
+        '[<img src="./docs/images/readme/studio-connect-pg.webp" width="589" alt="The Connect step.">](./docs/images/readme/studio-connect-pg.webp)',
         '',
-        '[<img src="./docs/images/readme/studio-connect-pg.webp" width="400" alt="The Connect step.">](./docs/images/readme/studio-connect-pg.webp)',
+        '*It saw everything: “No gap was reported.”*',
+      ].join('\n'),
+    )
+    expect(rendered['how-it-works-2']).toBe(
+      [
+        '[<img src="./docs/images/readme/host-record-tabs.webp" width="224" alt="The open order.">](./docs/images/readme/host-record-tabs.webp)',
         '',
-        '</td>',
-        '<td>',
-        '',
-        '**1. Connect.** *It saw everything: “No gap was reported.”*',
-        '',
-        '</td>',
-        '</tr>',
-        '<tr>',
-        '<td>',
-        '',
-        '[<img src="./docs/images/readme/host-record-tabs.webp" width="320" alt="The open order.">](./docs/images/readme/host-record-tabs.webp)',
-        '',
-        '</td>',
-        '<td>',
-        '',
-        `**2. Run.** *A page draws it, beside its “Delivery” ([0008](${LINK})).*`,
-        '',
-        '</td>',
-        '</tr>',
-        '</table>',
+        `*A page draws it, beside its “Delivery” ([0008](${LINK})).*`,
       ].join('\n'),
     )
     expect(rendered.studio).not.toContain('studio-connect-pg')
     expect(rendered.host).not.toContain('host-record-tabs')
   })
 
-  // The region is the render, on README.md and on no other page: its
+  // A step's region is the render, on README.md and on no other page: its
   // markers lost in an edit of the README, or a copy of them left on a page
   // of the guide, would show what no capture made, or nothing.
-  // Watched failing with pageOf left without STEPS: README.md's region was
-  // then one not drawn on it, "how-it-works not drawn on this page".
-  test('regions: How it works missing from README.md, and planted on a page of the guide', () => {
+  // Watched failing with pageOf left without the steps' regions: README.md's
+  // were then regions not drawn on it, "how-it-works-1, how-it-works-2 not
+  // drawn on this page".
+  test('regions: a step missing from README.md, and planted on a page of the guide', () => {
     const missing = fixture()
-    missing.documents['README.md'] = missing.documents['README.md'].replace(START(STEPS), '')
-    expect(regionProblems(missing)).toEqual([`README.md does not hold the pictures region "how-it-works", opened by ${START(STEPS)}`])
+    missing.documents['README.md'] = missing.documents['README.md'].replace(START('how-it-works-1'), '')
+    expect(regionProblems(missing)).toEqual([`README.md does not hold the pictures region "how-it-works-1", opened by ${START('how-it-works-1')}`])
     const elsewhere = fixture()
-    elsewhere.documents['docs/guide/studio.md'] += `\n${START(STEPS)}\n${END}\n`
-    expect(regionProblems(elsewhere)).toEqual(['docs/guide/studio.md holds the pictures region "how-it-works", which is drawn on README.md'])
+    elsewhere.documents['docs/guide/studio.md'] += `\n${START('how-it-works-2')}\n${END}\n`
+    expect(regionProblems(elsewhere)).toEqual(['docs/guide/studio.md holds the pictures region "how-it-works-2", which is drawn on README.md'])
   })
 
   // Its pictures and its captions' links are read from README.md, where
   // the region is: a picture gone would leave a step linking nowhere.
-  // Watched failing with pageOf left without STEPS, as the case above.
+  // Watched failing with pageOf left without the steps' regions, as the
+  // case above.
   test('links: a step whose picture does not exist, aimed from README.md', () => {
     const state = fixture()
     state.files.delete(pictureOf('host-record-tabs'))
     expect(linkProblems(state)).toEqual([
-      'README.md\'s pictures region "how-it-works" links ./docs/images/readme/host-record-tabs.webp, which is no file of the repository',
+      'README.md\'s pictures region "how-it-works-2" links ./docs/images/readme/host-record-tabs.webp, which is no file of the repository',
     ])
   })
 
@@ -648,9 +639,9 @@ describe('the steps of How it works, on a small repository', () => {
     ])
   })
 
-  // A step scene must say which step it pictures, and the table is drawn in
-  // scenes.json's order, so the steps must come in theirs; a placement the
-  // render does not know would draw the scene nowhere.
+  // A step scene must say which step it pictures, and the steps come in
+  // their order in scenes.json as in the README; a placement the render
+  // does not know would draw the scene nowhere.
   // Watched failing with each check taken out of shapeProblems in turn.
   test('shape: a step scene naming no step, two in the wrong order, and an unknown placement', () => {
     const unnamed = fixture()
@@ -673,10 +664,7 @@ describe('the steps of How it works, on a small repository', () => {
   // second half -- a scene's step the list does not have -- taken out.
   test("steps: How it works' list and the step scenes disagree", () => {
     const added = fixture()
-    added.documents['README.md'] = added.documents['README.md'].replace(
-      '2. **Run.** A page draws it.',
-      '2. **Run.** A page draws it.\n3. **Review drift.** It is checked.',
-    )
+    added.documents['README.md'] = added.documents['README.md'].replace('\n## Licence', '\n3. **Review drift.** It is checked.\n\n## Licence')
     expect(stepProblems(added)).toEqual(['the step "3. Review drift" of README.md\'s How it works is pictured by 0 step scenes, not one'])
     const renamed = fixture()
     renamed.scenes[7].step = '2. Running'
@@ -687,5 +675,40 @@ describe('the steps of How it works, on a small repository', () => {
     const gone = fixture()
     gone.documents['README.md'] = gone.documents['README.md'].replace('## How it works', '## How to')
     expect(stepProblems(gone)).toEqual(['README.md has no numbered steps under ## How it works, which the step scenes picture'])
+  })
+
+  // Every step scene taken out, with the regions they were drawn in, would
+  // leave How it works listing steps no picture shows while every other
+  // check passed: there is no region left to be wrong, and no scene left to
+  // name a step. The list alone asks for them.
+  // Watched failing with stepProblems answering nothing when scenes.json has
+  // no step scene, as it first did: "expected [] to deeply equal [ …(2) ]".
+  test('steps: How it works listing steps and no scene picturing any', () => {
+    const state = fixture()
+    state.scenes = state.scenes.filter((scene) => scene.placement !== 'step')
+    for (const name of ['how-it-works-1', 'how-it-works-2'])
+      state.documents['README.md'] = state.documents['README.md'].replace(new RegExp(`${START(name)}[\\s\\S]*?${END}\\n`), '')
+    expect(regionProblems(state)).toEqual([])
+    expect(stepProblems(state)).toEqual([
+      'the step "1. Connect" of README.md\'s How it works is pictured by 0 step scenes, not one',
+      'the step "2. Run" of README.md\'s How it works is pictured by 0 step scenes, not one',
+    ])
+  })
+
+  // A step's picture stands under its item: a region moved under another
+  // step, or below the list, would show the Connect step under Run, with
+  // every region still the render and on its page.
+  // Watched failing with the placement check taken out of stepProblems.
+  test('steps: a region under another step than its own', () => {
+    const state = fixture()
+    const text = state.documents['README.md']
+    const region = (name) => new RegExp(`${START(name)}[\\s\\S]*?${END}`).exec(text)[0]
+    const [first, second] = [region('how-it-works-1'), region('how-it-works-2')]
+    state.documents['README.md'] = text.replace(first, '<first>').replace(second, first).replace('<first>', second)
+    expect(regionProblems(state)).toEqual([])
+    expect(stepProblems(state)).toEqual([
+      'the pictures region "how-it-works-1" is not right after the step "1. Connect" of README.md\'s How it works, so its picture would stand under another step',
+      'the pictures region "how-it-works-2" is not right after the step "2. Run" of README.md\'s How it works, so its picture would stand under another step',
+    ])
   })
 })

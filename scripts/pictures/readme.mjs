@@ -5,18 +5,19 @@
 // them in `pnpm test:repo` without a browser:
 //
 // - **Render.** One generated region per placement: `hero` for the hero
-//   scene and `how-it-works` for the `step` scenes, both in README.md, and
-//   one per app for the rest, in scenes.json's order, each on that app's
-//   page of the guide, docs/guide/<app>.md (`pageOf`). An `inline` or
-//   `hero` scene is its picture at its recorded CSS width and its italic
-//   caption, a studio scene's led by its step; each run of consecutive
-//   `more` scenes is one <details> whose summary is derived from their
-//   titles. A `step` scene is one step of the README's *How it works*, which
-//   its `step` names as that list does: one row of a table, its picture
-//   small, at STEP_WIDTH, and linked to itself, beside its caption led by
-//   the step. A caption's links are written from the repository's root, as
-//   scenes.json holds them, and the render re-aims them, and every picture,
-//   from the page the region is on.
+//   scene and `how-it-works-<n>` for the `step` scene of step n, all in
+//   README.md, and one per app for the rest, in scenes.json's order, each on
+//   that app's page of the guide, docs/guide/<app>.md (`pageOf`). An
+//   `inline` or `hero` scene is its picture at its recorded CSS width and
+//   its italic caption, a studio scene's led by its step; each run of
+//   consecutive `more` scenes is one <details> whose summary is derived
+//   from their titles. A `step` scene is one step of the README's *How it
+//   works*, which its `step` names as that list does, and its region
+//   follows that step's item in the list: its picture at STEP_SCALE of its
+//   size, linked to itself, and its italic caption, led by nothing, since
+//   the item above it names the step. A caption's links are written from
+//   the repository's root, as scenes.json holds them, and the render
+//   re-aims them, and every picture, from the page the region is on.
 //   `node scripts/pictures/readme.mjs --write` writes the regions; nothing
 //   else does.
 // - **Check.** Each function below returns the sentences that are wrong with
@@ -25,8 +26,8 @@
 //   bytes match, nothing else is in the pictures' directory, every caption
 //   quotes only what its parts say, one look, every link and picture the
 //   regions show resolves from the page it is on, the scenes' shape, one
-//   `step` scene for each step of *How it works* in its order, and a guard
-//   on the guard.
+//   `step` scene for each step of *How it works*, its region right after
+//   the step's item, and a guard on the guard.
 
 import { execFileSync } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
@@ -36,22 +37,32 @@ import { fileURLToPath } from 'node:url'
 import { marker } from '../generated-block.mjs'
 import { describeLook, IMAGES, misquotes, pictureOf, readRecord, readScenes, REPO, serialize, undecodable } from './record.mjs'
 
-/** The region of the README's *How it works*, which every `step` scene is drawn in. */
+/** What the name of each region of the README's *How it works* starts with: a `step` scene is drawn in its step's. */
 export const STEPS = 'how-it-works'
 
+/** The region the step `step` -- `"2. Generate"` -- is drawn in: `how-it-works-2`, after the list's item 2. */
+export const stepRegion = (step) => `${STEPS}-${/^(\d+)\./.exec(String(step))?.[1] ?? 'unnumbered'}`
+
+/** Whether the region `name` is one of *How it works*. */
+const isStep = (name) => name.startsWith(`${STEPS}-`)
+
 /** The page a region is drawn on, from the repository's root: the hero's and the steps' README.md, an app's its page of the guide. */
-export const pageOf = (name) => (name === 'hero' || name === STEPS ? 'README.md' : `docs/guide/${name}.md`)
+export const pageOf = (name) => (name === 'hero' || isStep(name) ? 'README.md' : `docs/guide/${name}.md`)
 
 const PLACEMENTS = ['hero', 'inline', 'more', 'step']
 
 /**
- * The CSS width a `step` scene is drawn at, or its recorded width where that
- * is less: about half of the column github.com gives a README in a desktop
- * window, so its caption has the other half beside it. That column has not
- * been measured (docs/images/README.md); a reader opens the picture, which
- * links to itself, to read it whole.
+ * What a `step` scene is drawn at, of the CSS width it was taken at: small
+ * enough that five steps do not outweigh the rest of the README, and every
+ * step's text drawn at one size, 0.7 of the page's. Measured on 2026-11-20
+ * by resizing the studio's Generate step with Lanczos to its width at one
+ * device pixel per CSS pixel and reading it: at 0.44 its notes could not be
+ * read, at 0.6 its grey lines and code names blurred, at 0.7 they read
+ * (0168). github.com scales a picture wider than its column down further;
+ * that column has not been measured (docs/images/README.md), and a reader
+ * opens the picture, which links to itself, to read it whole.
  */
-export const STEP_WIDTH = 400
+export const STEP_SCALE = 0.7
 // The one grammar 0035 gives every generated region, which names a single
 // source: scenes.json, where each caption and alt comes from. captured.json is
 // what the pictures were held to, and readme.test.mjs checks it beside them.
@@ -64,8 +75,8 @@ const ANY_START = /<!-- generated by scripts\/pictures\/readme\.mjs from [^>]*: 
 export const HERO_LINE =
   'Every picture in this README is taken by `pnpm pictures` from the built pages and the real data server, and the pictures job fails when one of them shows text the page no longer shows ([how, and what nothing checks](./docs/images/README.md)).'
 
-/** The region a scene is drawn in: the hero's own, the steps' of *How it works*, or its app's. */
-const regionOf = (scene) => (scene.placement === 'hero' ? 'hero' : scene.placement === 'step' ? STEPS : scene.app)
+/** The region a scene is drawn in: the hero's own, its step's of *How it works*, or its app's. */
+const regionOf = (scene) => (scene.placement === 'hero' ? 'hero' : scene.placement === 'step' ? stepRegion(scene.step) : scene.app)
 
 /** The regions the pages must carry, in scenes.json's order: derived, so an app given scenes is given a region. */
 export const regionNames = (scenes) => [...new Set(scenes.map(regionOf))]
@@ -96,32 +107,15 @@ function picture(scene, record) {
 }
 
 /**
- * The `step` scenes as *How it works* shows them: one table, a row per step,
- * the picture at STEP_WIDTH and linked to itself, beside the caption led by
- * the step as the list above it numbers it, `**2. Generate.**`. Each cell's
- * Markdown is set off by blank lines, so GitHub reads it as Markdown inside
- * the HTML.
+ * A `step` scene as *How it works* shows it, under its step's item in the
+ * list: the picture at STEP_SCALE of its recorded width, linked to itself,
+ * then its italic caption, which says what the picture shows; the item
+ * above it already says the step.
  */
-function steps(scenes, record) {
-  const rows = scenes.map((scene) => {
-    const source = `./${pictureOf(scene.id)}`
-    const width = Math.min(recorded(scene, record).css.width, STEP_WIDTH)
-    return [
-      '<tr>',
-      '<td>',
-      '',
-      `[<img src="${source}" width="${String(width)}" alt="${attribute(scene.alt)}">](${source})`,
-      '',
-      '</td>',
-      '<td>',
-      '',
-      `**${String(scene.step)}.** *${scene.caption}*`,
-      '',
-      '</td>',
-      '</tr>',
-    ].join('\n')
-  })
-  return ['<table>', ...rows, '</table>'].join('\n')
+function step(scene, record) {
+  const source = `./${pictureOf(scene.id)}`
+  const width = Math.round(recorded(scene, record).css.width * STEP_SCALE)
+  return [`[<img src="${source}" width="${String(width)}" alt="${attribute(scene.alt)}">](${source})`, '', `*${scene.caption}*`].join('\n')
 }
 
 /** A relative link or picture source: no scheme, and not a fragment of the page itself. */
@@ -149,12 +143,12 @@ export function relink(text, page) {
 export function render(scenes, record) {
   const rendered = {}
   for (const name of regionNames(scenes)) {
-    if (name === STEPS) {
+    if (isStep(name)) {
       rendered[name] = relink(
-        steps(
-          scenes.filter((candidate) => regionOf(candidate) === name),
-          record,
-        ),
+        scenes
+          .filter((candidate) => regionOf(candidate) === name)
+          .map((scene) => step(scene, record))
+          .join('\n\n'),
         pageOf(name),
       )
       continue
@@ -445,7 +439,7 @@ export function shapeProblems({ scenes, appScripts }) {
       problems.push(`${id}: apps/${String(scene.app)}/scripts/pictures.mjs does not exist, so nothing takes or checks this picture`)
   }
   if (scenes.filter((scene) => scene.placement === 'hero').length !== 1) problems.push('scenes.json must have exactly one hero scene')
-  // One scene per step, in the steps' order: the table is drawn in scenes.json's.
+  // One scene per step, in the steps' order, so scenes.json reads as the README does.
   scenes
     .filter((scene) => scene.placement === 'step')
     .forEach((scene, index) => {
@@ -458,28 +452,57 @@ export function shapeProblems({ scenes, appScripts }) {
   return problems
 }
 
-/** The steps of README.md's *How it works*, as its numbered list leads each, `"2. Generate"` for `2. **Generate.**`; `undefined` where it has no such section. */
-export function stepsOf(markdown) {
+/** README.md's *How it works*, from its heading to the next; `undefined` where it has none. */
+function howItWorks(markdown) {
   const text = markdown.replaceAll('\r\n', '\n')
   const start = text.indexOf('\n## How it works\n')
   if (start === -1) return undefined
   const after = text.indexOf('\n## ', start + 1)
-  const section = text.slice(start, after === -1 ? undefined : after)
-  return [...section.matchAll(/^(\d+)\. \*\*(.+?)\.\*\*/gm)].map((match) => `${match[1]}. ${match[2]}`)
+  return text.slice(start, after === -1 ? undefined : after)
+}
+
+/** The numbered items of *How it works*, `"2. Generate"` for `2. **Generate.**`, and the regions it opens, in the order the section has them. */
+function stepMarks(section) {
+  const items = [...section.matchAll(/^(\d+)\. \*\*(.+?)\.\*\*/gm)].map((match) => ({ at: match.index, step: `${match[1]}. ${match[2]}` }))
+  const regions = [...section.matchAll(ANY_START)].map((match) => ({ at: match.index, region: match[1] }))
+  return [...items, ...regions].sort((a, b) => a.at - b.at)
+}
+
+/** The steps of README.md's *How it works*, as its numbered list leads each, `"2. Generate"` for `2. **Generate.**`; `undefined` where it has no such section. */
+export function stepsOf(markdown) {
+  const section = howItWorks(markdown)
+  return section === undefined ? undefined : stepMarks(section).flatMap((mark) => (mark.step === undefined ? [] : [mark.step]))
 }
 
 /**
  * Every step of README.md's *How it works* is pictured by one `step` scene,
- * and every `step` scene pictures one of them as the list numbers and names
- * it: a step added, renamed or renumbered in the list, or a scene's step in
- * scenes.json, fails here until the two say the same.
+ * whose region opens right after the step's item, before anything else the
+ * section numbers or generates; and every `step` scene pictures one of them
+ * as the list numbers and names it. A step added, renamed or renumbered in
+ * the list, a region moved under another step, or a scene's step in
+ * scenes.json, fails here until they say the same. A README whose *How it
+ * works* numbers no step needs no step scene, and must have none.
  */
 export function stepProblems({ scenes, documents }) {
   const pictured = scenes.filter((scene) => scene.placement === 'step')
-  if (pictured.length === 0) return []
-  const listed = documents['README.md'] === undefined ? undefined : stepsOf(documents['README.md'])
-  if (listed === undefined || listed.length === 0) return ['README.md has no numbered steps under ## How it works, which the step scenes picture']
+  const readme = documents['README.md']
+  const section = readme === undefined ? undefined : howItWorks(readme)
+  const marks = section === undefined ? [] : stepMarks(section)
+  const listed = marks.flatMap((mark) => (mark.step === undefined ? [] : [mark.step]))
+  if (listed.length === 0) return pictured.length === 0 ? [] : ['README.md has no numbered steps under ## How it works, which the step scenes picture']
+  const misplaced = marks.flatMap((mark, index) => {
+    if (mark.step === undefined) return []
+    const region = stepRegion(mark.step)
+    // A region README.md does not hold is regionProblems' to say, and a step pictured by none or by two the lines below.
+    if (pictured.filter((scene) => scene.step === mark.step).length !== 1 || !readme.includes(START(region))) return []
+    return marks[index + 1]?.region === region
+      ? []
+      : [
+          `the pictures region "${region}" is not right after the step "${mark.step}" of README.md's How it works, so its picture would stand under another step`,
+        ]
+  })
   return [
+    ...misplaced,
     ...listed
       .filter((step) => pictured.filter((scene) => scene.step === step).length !== 1)
       .map(

@@ -246,11 +246,12 @@ export function padded(area, margin, size) {
  * How much of `margin` each side of `area` keeps: all of it, or less where
  * something drawn beside the area belongs to no part and holds none -- a
  * neighbouring panel's edge, a button's glow -- whole CSS px short of it, so
- * the bench never shows a sliver of something else. "Drawn" is a border, a
- * background, text, a control or an image, an element's or a ::before's or
- * ::after's, and a coloured box shadow by how far it reaches; a black one is
- * the bench darkened, and is not counted (the
- * Steps panel's reaches 30 px, and only its border was seen in the
+ * the bench never shows a sliver of something else. "Drawn" is an element's
+ * border, background, text, control or image, a ::before's or ::after's
+ * border or background -- not a glyph it draws, a required field's "*" or
+ * a trail's "›", which is not read -- and either's coloured box shadow by
+ * how far it reaches; a black one is the bench darkened, and is not counted
+ * (the Steps panel's reaches 30 px, and only its border was seen in the
  * pictures). Something beside two sides -- a corner -- is kept out by the
  * side that loses less. Opposite sides keep the same, the less of the two:
  * a pane beside another's glow kept 16 px on one side and none on the other,
