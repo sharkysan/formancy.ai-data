@@ -14,7 +14,10 @@
   lines alone, since the hero shows an order's deliveries; extended by
   [0169](0169-the-guides-pages-picture-drill-down-a-persons-own-view-columns-and-a-starting-value-and-the-camera-waits-two-frames-between-shots.md):
   the guide's scenes walk over its invented orders, between the
-  workspace's acts and host-delete's
+  workspace's acts and host-delete's; extended by
+  [0172](0172-the-readme-is-a-short-pitch-page-and-how-it-works-opens-with-a-sketch-drawn-by-hand.md):
+  the six captions are shorter, three quotes dropped, and the hero's no
+  longer points at Run, whose caption says it is the hero's order
 - **Date:** 2026-11-20
 - **Deciders:** Daniel Bacher
 - **Verified by:** `scripts/pictures/readme.test.mjs`, in `pnpm test:repo`,

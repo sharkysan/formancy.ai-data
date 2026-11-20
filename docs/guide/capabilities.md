@@ -152,9 +152,10 @@ get*](../../README.md#what-you-get) is the short version, and
   removed in one version and given back in the next are not asked about
   ([0039](../decisions/0039-a-publish-says-what-happens-to-the-grants-of-reassigned-keys.md)).
 - **Publishes without overwriting anyone.** Of two administrators publishing
-  from one version exactly one wins, every version is kept and checked on
-  every read, and an older one is restored only while the database still fits
-  it
+  from one version exactly one wins, every version is kept -- a file in the
+  configuration store beside the server, nothing in your database -- and
+  checked on every read, and an older one is restored only while the
+  database still fits it
   ([0013](../decisions/0013-published-configuration-is-files-with-link-based-swap.md),
   [0019](../decisions/0019-a-published-form-is-checked-every-time-it-is-read.md),
   [0030](../decisions/0030-presentation-is-a-patch-over-the-generated-base.md)).
@@ -516,6 +517,10 @@ get*](../../README.md#what-you-get) is the short version, and
   [0142](../decisions/0142-a-records-child-forms-are-tabs-beside-it.md),
   [0143](../decisions/0143-a-form-is-listed-in-a-group.md),
   [0144](../decisions/0144-the-host-lists-its-forms-by-group.md)).
+  A form that is its own child is shown as a tree of its records, and the
+  host page's Drill down shows one level at a time with a trail back
+  ([0110](../decisions/0110-a-form-that-is-its-own-child-is-shown-as-a-tree-of-its-records.md),
+  [0090](../decisions/0090-a-hosts-workspace-can-drill-down-one-level-at-a-time-with-a-trail-back.md)).
 - **One definition, both renderers**, through one client; the host page
   draws a record in React, Angular or both, as the person chooses
   ([0029](../decisions/0029-a-host-renders-a-published-form-through-one-client.md),

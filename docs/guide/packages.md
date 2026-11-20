@@ -1,7 +1,8 @@
 # Packages
 
-The packages this repository builds, which of them are published, and how
-they relate to the Apache-2.0 formancy packages they build on.
+The packages this repository builds, which of them are published, how they
+relate to the Apache-2.0 formancy packages they build on, and the licence
+they are under, with what the built apps carry of what they bundle.
 
 | Package | What it is |
 | --- | --- |
@@ -37,3 +38,34 @@ A host whose renderer is older than `@formancy/*` 0.8.0 refuses a spec 5
 form outright, so it moves its renderer before a form is published again;
 nothing here runs an older renderer. A TypeScript host on one casts the
 published form to its own `FormSchema`.
+
+A host draws a published form with `@formancy/react` or
+`@formancy/angular`, given its options by `@formancy/data-client`, and
+dresses it with a theme of `@formancy/themes`: the renderers ship no CSS.
+
+## The licence, and what the apps bundle
+
+The packages here are source-available under [`LICENSE.md`](../../LICENSE.md),
+never Apache-2.0, as [the README's table](../../README.md#licence-in-one-table)
+says. Why a paid module exists beside an Apache-2.0 project, and why in a
+repository of its own, is decision
+[0001](../decisions/0001-a-paid-module-in-its-own-repository.md); the
+decision to put the licence in force before a lawyer had read it, and what
+that leaves open, is
+[0048](../decisions/0048-the-licence-is-in-force-before-a-lawyer-has-read-it.md);
+Version 1.1, under which a redistribution agreement is requested at the same
+address as a production licence, is
+[0054](../decisions/0054-version-1-1-names-the-address-for-a-redistribution-agreement-too.md).
+
+The studio, the host page and the examples page bundle other people's
+packages, React, Angular and upstream formancy among them: each build writes
+`THIRD-PARTY-NOTICES.txt` beside its page with their licence and notice
+texts, but for what
+[0046](../decisions/0046-a-built-app-carries-the-licence-and-notice-texts-of-everything-it-bundles.md)
+names, and stops when a bundled package ships no licence text. The composed
+stack serves them at `/studio/THIRD-PARTY-NOTICES.txt` and
+`/host/THIRD-PARTY-NOTICES.txt`, and this repository's own `LICENSE.md` and
+`NOTICE` are in the image. The examples page's are at
+https://formancy.ai/data/examples/THIRD-PARTY-NOTICES.txt, and the page
+links this repository for the rest
+([0069](../decisions/0069-the-examples-page-is-served-at-formancy-ai-data-examples.md)).

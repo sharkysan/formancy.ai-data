@@ -98,7 +98,7 @@ with a link, and does not restate it. These documents do the same.
 | [The release report](release/README.md) | What every run of the gates reports about itself, what fails it, and what a release does with it |
 | [`gates.json`](release/gates.json) | The release gates, each with the evidence a run must pass or the reason it is open |
 | [`limitations.json`](release/limitations.json) | For every decision record, the costs a user, integrator or operator meets, or why it has none |
-| [The pictures](images/README.md) | How the README's and the guide's pictures are taken, what holds them, and what they show that is wrong |
+| [The pictures](images/README.md) | How the README's and the guide's screenshots are taken and the README's sketch drawn, what holds them, and what they show that is wrong |
 
 The delivery plan this repository started from is a working document kept
 out of the repository, as `.gitignore` says; what it asked for became the

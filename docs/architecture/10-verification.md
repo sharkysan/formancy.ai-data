@@ -654,7 +654,7 @@ not Safari; and no scrollbar took width in any of them.
 
 ## 10.6 The README's pictures
 
-Every picture in `README.md` and on the guide's pages is taken by
+Every screenshot in `README.md` and on the guide's pages is taken by
 `pnpm pictures` from a state the product reaches, the built page against
 the real server, and never retouched
 ([0038](../decisions/0038-readme-pictures-are-taken-by-a-script-and-held-to-the-text-they-show.md)).
@@ -675,6 +675,15 @@ a shot begun sooner saw the window 1×1 px
 `pictures` job, walks the same states and fails when a pictured element no
 longer says what the caption quotes. What a picture looks like is held by
 review alone; `docs/images/README.md` lists what else nothing checks.
+
+The README's one drawing, the sketch of the architecture that opens its
+*How it works*, `docs/images/architecture.svg`, is drawn by hand.
+`scripts/architecture-sketch.test.mjs` fails when it names a package or an
+app the workspace does not have, when a published package is drawn by no
+box, when its `<desc>` or the README's alt leaves out a name it draws, when
+it would load anything, and when it draws with a colour room.css does not
+declare. That its arrows and layout are true of the code is review's
+([0172](../decisions/0172-the-readme-is-a-short-pitch-page-and-how-it-works-opens-with-a-sketch-drawn-by-hand.md)).
 
 ## 10.7 The install gate
 

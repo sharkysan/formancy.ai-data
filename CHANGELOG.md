@@ -22,6 +22,13 @@ which are kept unchanged under a heading of their own below it (0171).
 
 ### Changed
 
+- **The README is a short page for somebody deciding, and *How it works*
+  opens with a sketch of the architecture drawn by hand**
+  ([0172](./docs/decisions/0172-the-readme-is-a-short-pitch-page-and-how-it-works-opens-with-a-sketch-drawn-by-hand.md)).
+  Why: it said most of the guide again, and nothing showed how the pieces
+  fit. The guide's pages hold the detail, and a guard holds the sketch's
+  names to the workspace.
+
 ### Fixed
 
 ## 0.4.0 — 2026-11-20
