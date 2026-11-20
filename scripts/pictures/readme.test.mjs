@@ -18,6 +18,9 @@ import {
   rewrite,
   shapeProblems,
   START,
+  STEP_WIDTH,
+  stepProblems,
+  STEPS,
 } from './readme.mjs'
 
 /**
@@ -82,12 +85,20 @@ describe("the repository's README pictures", () => {
   test('leave no app script without a scene and no region without a picture', () => {
     expect(guardProblems(here)).toEqual([])
   })
+
+  // A step added to How it works, or renamed there, would stand without its
+  // picture, or the table would lead a picture with a step the list does not have.
+  test('picture every step of How it works, one each, as its list names them', () => {
+    expect(stepProblems(here)).toEqual([])
+  })
 })
 
 /*
  * A small repository: one hero, an inline scene with a step and two `more`
- * scenes after it, a host `more` scene, and an examples scene. Its snapshot
- * lines are written by hand in the shapes Playwright prints.
+ * scenes after it, a host `more` scene, an examples scene, and two `step`
+ * scenes, a studio one and a host one, for README.md's How it works of two
+ * steps. Its snapshot lines are written by hand in the shapes Playwright
+ * prints.
  */
 const LOOK = {
   platform: 'linux-x64',
@@ -161,6 +172,26 @@ function scenes() {
       alt: 'An alert “No such record.”',
       quotes: { 'No such record.': ['Record'] },
     },
+    {
+      id: 'studio-connect-pg',
+      app: 'studio',
+      placement: 'step',
+      title: 'Connect',
+      step: '1. Connect',
+      caption: 'It saw everything: “No gap was reported.”',
+      alt: 'The Connect step.',
+      quotes: { 'No gap was reported.': ['Seen'] },
+    },
+    {
+      id: 'host-record-tabs',
+      app: 'host',
+      placement: 'step',
+      title: 'Run',
+      step: '2. Run',
+      caption: `A page draws it, beside its “Delivery” ([0008](${LINK})).`,
+      alt: 'The open order.',
+      quotes: { Delivery: ['Record'] },
+    },
   ]
 }
 
@@ -175,7 +206,28 @@ const TEXT = {
   'studio-regenerated': { Regenerated: '- region "Regenerated from version 3":\n  - paragraph: Nothing is published until you publish it.' },
   'studio-restored': { Versions: '- region "Versions of pg-order":\n  - status: Restored version 1 as version 4. The database was not changed.' },
   'host-other-tenant': { Record: '- region "Record":\n  - alert: No such record.' },
+  'studio-connect-pg': { Seen: '- region "What pg can see":\n  - paragraph: No gap was reported.' },
+  'host-record-tabs': { Record: '- region "Order k1:10422":\n  - tab "Delivery"' },
 }
+
+/** README.md as the small repository has it: the hero's region, then How it works, its two steps listed and their region after them. */
+const README = [
+  '# Formancy Data',
+  '',
+  START('hero'),
+  END,
+  '',
+  '## How it works',
+  '',
+  '1. **Connect.** The studio discovers it.',
+  '2. **Run.** A page draws it.',
+  '',
+  START(STEPS),
+  END,
+  '',
+  '## Licence',
+  '',
+].join('\n')
 
 /** The small repository, every check passing: what the pages' regions, the record and the files are after a capture. */
 function fixture() {
@@ -193,16 +245,18 @@ function fixture() {
       look: structuredClone(LOOK),
       database: 'captured snapshots',
       stylesheet: 'sha256 0',
-      text: TEXT[scene.id],
+      // A copy: a case that edits a recorded line would otherwise edit every later fixture's.
+      text: structuredClone(TEXT[scene.id]),
     })
   }
   const skeleton = (title, name) => [`# ${title}`, '', 'Intro.', '', START(name), END, ''].join('\n')
-  const titles = { hero: 'Formancy Data', examples: 'Examples', studio: 'Studio', host: 'Host' }
+  const titles = { examples: 'Examples', studio: 'Studio', host: 'Host' }
+  const guides = Object.entries(titles).map(([name, title]) => [pageOf(name), rewrite(skeleton(title, name), list, record, pageOf(name))])
   return {
     scenes: list,
     record,
     recordText: serialize(record, list),
-    documents: Object.fromEntries(Object.entries(titles).map(([name, title]) => [pageOf(name), rewrite(skeleton(title, name), list, record, pageOf(name))])),
+    documents: Object.fromEntries([['README.md', rewrite(README, list, record)], ...guides]),
     listing: ['captured.json', ...list.map((scene) => `${scene.id}.webp`)],
     file: (path) => files.get(path),
     exists: (path) => [LINK.slice(2), RECIPE].includes(path) || files.has(path),
@@ -211,7 +265,7 @@ function fixture() {
   }
 }
 
-const ALL = { regionProblems, integrityProblems, orphanProblems, quoteProblems, lookProblems, linkProblems, shapeProblems, guardProblems }
+const ALL = { regionProblems, integrityProblems, orphanProblems, quoteProblems, lookProblems, linkProblems, shapeProblems, stepProblems, guardProblems }
 
 describe('each check, on a small repository', () => {
   // The guard on the guards below: the unchanged small repository passes
@@ -499,5 +553,139 @@ describe('each check, on a small repository', () => {
     expect(guardProblems({ ...state, record: {} })).toEqual([
       expect.stringMatching(/^the regions could not be rendered, so none drew a picture: host-loaded has no record/),
     ])
+  })
+})
+
+/*
+ * README.md's How it works, one small picture per step (0168): the `step`
+ * placement held as the hero is, each case on the small repository above.
+ */
+describe('the steps of How it works, on a small repository', () => {
+  // The format the README shows, pinned: one table, a row per step in
+  // scenes.json's order, the picture at STEP_WIDTH or its recorded width
+  // where that is less, linked to itself so a reader can open it whole,
+  // beside its caption led by the step as the list numbers it -- and the
+  // step scenes in that region alone, none in its app's.
+  // Watched failing with every step drawn at STEP_WIDTH, its recorded width
+  // unread (the host step's 320 drawn at 400), and with regionOf left
+  // without `step`: README.md then had no region how-it-works to write,
+  // "README.md must hold the pictures regions hero, ...; how-it-works not
+  // drawn on this page".
+  test('renders one table on README.md, each step small, linked to itself and led by its step, and in no other region', () => {
+    const { scenes: list, record } = fixture()
+    record['host-record-tabs'].css.width = 320
+    const rendered = render(list, record)
+    expect(pageOf(STEPS)).toBe('README.md')
+    expect(STEP_WIDTH).toBe(400)
+    expect(rendered[STEPS]).toBe(
+      [
+        '<table>',
+        '<tr>',
+        '<td>',
+        '',
+        '[<img src="./docs/images/readme/studio-connect-pg.webp" width="400" alt="The Connect step.">](./docs/images/readme/studio-connect-pg.webp)',
+        '',
+        '</td>',
+        '<td>',
+        '',
+        '**1. Connect.** *It saw everything: “No gap was reported.”*',
+        '',
+        '</td>',
+        '</tr>',
+        '<tr>',
+        '<td>',
+        '',
+        '[<img src="./docs/images/readme/host-record-tabs.webp" width="320" alt="The open order.">](./docs/images/readme/host-record-tabs.webp)',
+        '',
+        '</td>',
+        '<td>',
+        '',
+        `**2. Run.** *A page draws it, beside its “Delivery” ([0008](${LINK})).*`,
+        '',
+        '</td>',
+        '</tr>',
+        '</table>',
+      ].join('\n'),
+    )
+    expect(rendered.studio).not.toContain('studio-connect-pg')
+    expect(rendered.host).not.toContain('host-record-tabs')
+  })
+
+  // The region is the render, on README.md and on no other page: its
+  // markers lost in an edit of the README, or a copy of them left on a page
+  // of the guide, would show what no capture made, or nothing.
+  // Watched failing with pageOf left without STEPS: README.md's region was
+  // then one not drawn on it, "how-it-works not drawn on this page".
+  test('regions: How it works missing from README.md, and planted on a page of the guide', () => {
+    const missing = fixture()
+    missing.documents['README.md'] = missing.documents['README.md'].replace(START(STEPS), '')
+    expect(regionProblems(missing)).toEqual([`README.md does not hold the pictures region "how-it-works", opened by ${START(STEPS)}`])
+    const elsewhere = fixture()
+    elsewhere.documents['docs/guide/studio.md'] += `\n${START(STEPS)}\n${END}\n`
+    expect(regionProblems(elsewhere)).toEqual(['docs/guide/studio.md holds the pictures region "how-it-works", which is drawn on README.md'])
+  })
+
+  // Its pictures and its captions' links are read from README.md, where
+  // the region is: a picture gone would leave a step linking nowhere.
+  // Watched failing with pageOf left without STEPS, as the case above.
+  test('links: a step whose picture does not exist, aimed from README.md', () => {
+    const state = fixture()
+    state.files.delete(pictureOf('host-record-tabs'))
+    expect(linkProblems(state)).toEqual([
+      'README.md\'s pictures region "how-it-works" links ./docs/images/readme/host-record-tabs.webp, which is no file of the repository',
+    ])
+  })
+
+  // A step's caption is held to its parts as every other caption is.
+  // Watched failing with quoteProblems left to the scenes that are not
+  // `step`: the misquote passed.
+  test("quotes: a step's caption quoting what its part does not say", () => {
+    const state = fixture()
+    state.scenes[6].caption = 'It saw everything: “No gap was found.”'
+    state.scenes[6].quotes = { 'No gap was found.': ['Seen'] }
+    expect(quoteProblems(state)).toEqual([
+      'studio-connect-pg: “No gap was found.” is not inside one name or value of what the part Seen says, so the caption quotes what its picture does not show',
+    ])
+  })
+
+  // A step scene must say which step it pictures, and the table is drawn in
+  // scenes.json's order, so the steps must come in theirs; a placement the
+  // render does not know would draw the scene nowhere.
+  // Watched failing with each check taken out of shapeProblems in turn.
+  test('shape: a step scene naming no step, two in the wrong order, and an unknown placement', () => {
+    const unnamed = fixture()
+    delete unnamed.scenes[6].step
+    expect(shapeProblems(unnamed)).toEqual(['studio-connect-pg is drawn in How it works and names no step of it'])
+    const swapped = fixture()
+    swapped.scenes.splice(6, 2, swapped.scenes[7], swapped.scenes[6])
+    expect(shapeProblems(swapped)).toEqual([
+      'host-record-tabs is the step scene number 1 in scenes.json and pictures step 2. Run: one scene per step, in step order',
+      'studio-connect-pg is the step scene number 2 in scenes.json and pictures step 1. Connect: one scene per step, in step order',
+    ])
+    const unknown = fixture()
+    unknown.scenes[7].placement = 'steps'
+    expect(shapeProblems(unknown)).toEqual(['host-record-tabs: placement "steps" is none of hero, inline, more, step'])
+  })
+
+  // How it works and its pictures say the same steps: a step added to the
+  // list, a scene's step renamed, or the section gone, each fails here.
+  // Watched failing with stepProblems answering nothing, and with its
+  // second half -- a scene's step the list does not have -- taken out.
+  test("steps: How it works' list and the step scenes disagree", () => {
+    const added = fixture()
+    added.documents['README.md'] = added.documents['README.md'].replace(
+      '2. **Run.** A page draws it.',
+      '2. **Run.** A page draws it.\n3. **Review drift.** It is checked.',
+    )
+    expect(stepProblems(added)).toEqual(['the step "3. Review drift" of README.md\'s How it works is pictured by 0 step scenes, not one'])
+    const renamed = fixture()
+    renamed.scenes[7].step = '2. Running'
+    expect(stepProblems(renamed)).toEqual([
+      'the step "2. Run" of README.md\'s How it works is pictured by 0 step scenes, not one',
+      'host-record-tabs pictures the step "2. Running", which README.md\'s How it works does not have',
+    ])
+    const gone = fixture()
+    gone.documents['README.md'] = gone.documents['README.md'].replace('## How it works', '## How to')
+    expect(stepProblems(gone)).toEqual(['README.md has no numbered steps under ## How it works, which the step scenes picture'])
   })
 })
