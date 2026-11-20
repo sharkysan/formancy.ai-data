@@ -118,7 +118,10 @@
   by the runtime over a description and met by the database; a write
   decided before a label was added refused by the definition's guard, the
   labels digested; and the type renamed under a planned write a changed
-  schema (42704), and another type in review.
+  schema (42704), and another type in review;
+  `packages/data-postgres/src/records/errors.test.ts` -- a 42704 sent as
+  an ERROR is `schema-changed`, and one sent FATAL is thrown, which
+  `parity.integration.test.ts` meets on PostgreSQL 15 and 16.
   `packages/data-postgres/src/discovery-types.integration.test.ts` -- its
   enum is read as one, its domain over numeric still unsupported.
 
@@ -217,7 +220,10 @@ quoted one part at a time; reads it as `::pg_catalog.text`, which no
 setting spells otherwise; searches it as that text; sorts it by the type's
 own operator class, so a page after a row (0108) compares in the order it
 sorts. A domain over text or a whole number is bound as its base type. A
-type named by a statement and gone is `schema-changed` (42704). A
+type named by a statement and gone is `schema-changed` (42704, sent as
+an ERROR; the same code sent FATAL as a connection starts, a setting the
+server does not know, is thrown as before, told apart by the severity
+the server gives it: `records/errors.ts`). A
 qualified type name resolves only in a schema the role may use, so an enum
 in a schema the connected account has no USAGE on is unsupported for it,
 in discovery and in the root's description alike (`LABELS`): no value of
