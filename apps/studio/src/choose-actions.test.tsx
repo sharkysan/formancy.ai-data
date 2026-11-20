@@ -130,6 +130,30 @@ describe('the routines offered as actions', () => {
     )
   })
 
+  // A routine PostgreSQL does not call given a NULL (0167) is listed, its
+  // box disabled and the generator's refusal under it in the generator's
+  // words, once the form's version is confirmed and nothing else refuses
+  // it: a run over a record whose field is NULL would answer done for a
+  // call that never ran. Pressed, the box stays unticked and no action is
+  // named, so nothing over it reaches a proposal. Watched failing on
+  // 2026-11-19 with `nullInputProblem` unasked in `routineProblem`:
+  // "expected false to be true", the box offered.
+  test('refuse a routine PostgreSQL does not call given a NULL, in the generator’s words', async () => {
+    routinesNow((routine) => ({ ...routine, onNull: 'not-called' }))
+    const user = await signIn(plane)
+    const here = await choose(user, 'fixture')
+    await user.selectOptions(within(here).getByLabelText('Version column'), 'row_version')
+    const box = within(here).getByRole<HTMLInputElement>('checkbox', { name: OFFER_SHIP_ORDER })
+    expect(box.disabled).toBe(true)
+    expect(computeAccessibleDescription(box)).toBe(
+      `function · returns nothing · may write · order_id bigint, tenant integer. The generator refuses it: ${SHIP_ORDER} is STRICT: PostgreSQL does not call it when an argument is NULL, so a run would answer done for a call that never ran.`,
+    )
+    await user.click(box)
+    expect(box.checked).toBe(false)
+    expect(within(here).queryByRole('textbox', { name: `Action name for ${SHIP_ORDER}` })).toBeNull()
+    expect({ strict: [...(await audit()), ...unnamed()] }).toEqual({ strict: [] })
+  })
+
   // A rowversion order moves its version only through a touch column the
   // administrator confirms (0155, 0159): until one is chosen, the step
   // says so in the generator's words, and once it is the procedure is

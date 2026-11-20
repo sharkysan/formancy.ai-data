@@ -162,8 +162,10 @@ the pane of what the connection can see lists its routines under its
 tables; without it no routine is read, and the Choose step offers no
 action and says so. There, an Actions group lists every routine, none
 ticked: one no run could call -- one this account may not execute, a
-PostgreSQL function that returns a value, a SQL Server function -- is
-listed disabled with the generator's reason, and a form that offers no
+PostgreSQL function that returns a value or is STRICT, which PostgreSQL
+does not call when an argument is NULL
+([0167](../decisions/0167-a-snapshot-says-whether-the-engine-calls-a-routine-given-a-null-and-the-generator-refuses-a-strict-one-before-publication.md)), a SQL Server
+function -- is listed disabled with the generator's reason, and a form that offers no
 action at all, with no confirmed version or, on a rowversion, no touch
 column, says so above them. "Offer `sales.ship_order(…)` as an action"
 names it after its routine, which you may type over, and gives each

@@ -7,6 +7,7 @@ import type {
   ParameterMode,
   ReferentialAction,
   RoutineMeta,
+  RoutineOnNull,
   RowSecurity,
   TextLengthUnit,
 } from '@formancy/data-core'
@@ -448,6 +449,12 @@ export interface ExpectedRoutine {
   parameters: ReadonlyArray<{ type: ExpectedType; mode: ParameterMode }>
   effects: RoutineMeta['effects']
   returns: RoutineMeta['returns']
+  /**
+   * Whether the engine calls it given a NULL argument (0167): on both
+   * engines, `called` for every routine created without RETURNS NULL ON
+   * NULL INPUT, the default of each, and never left unread by discovery.
+   */
+  onNull: RoutineOnNull
   /** Whether each account the fixture creates may execute it: the owner may execute every routine, and the restricted files grant the rest. */
   executable: Readonly<Record<FixtureAccount, boolean>>
   /**
@@ -478,6 +485,7 @@ export const FIXTURE_ROUTINES: readonly ExpectedRoutine[] = deepFreeze([
     ],
     effects: 'writes',
     returns: 'void',
+    onNull: 'called',
     executable: { owner: true, reader: false, writer: true },
     byKind: {
       postgres: { kind: 'function', signature: 'pg_catalog.int8, pg_catalog.int4', reach: 'account', names: ['order_id', 'tenant'], defaults: [false, false] },
@@ -489,6 +497,7 @@ export const FIXTURE_ROUTINES: readonly ExpectedRoutine[] = deepFreeze([
     parameters: [{ type: INT32, mode: 'in' }],
     effects: 'reads',
     returns: 'set',
+    onNull: 'called',
     executable: { owner: true, reader: false, writer: false },
     byKind: { sqlserver: { kind: 'function', signature: '', reach: 'owner', names: ['@tenant_id'], defaults: [null] } },
   },

@@ -47,6 +47,21 @@ function shipped(routine: RoutineMeta | null, ...more: RoutineMeta[]): MetadataS
 const rows = (report: DriftReport) =>
   report.changes.map((change) => [change.kind, change.severity, change.subject.kind === 'routine' ? change.subject.routine.name : ''])
 
+/**
+ * The order on SQL Server with `ship` bound over `ship`, a procedure by
+ * the order's id, on its rowversion with `notes` confirmed as the touch
+ * column a run sets (0155).
+ */
+function sqlServerShip(ship: RoutineMeta): { base: MetadataSnapshot; bindings: FormBindings } {
+  const base = withRoutines(snapshot('sqlserver'), [ship])
+  const generated = orderForm(base).bindings
+  const concurrency: ConcurrencyBinding = { ...(generated.concurrency as ConcurrencyBinding), touch: 'notes' }
+  const root = base.objects.find((object) => object.ref.name === 'order') as ObjectMeta
+  const choice: ActionChoice = { ...SHIP, routine: ship.ref, parameters: [{ parameter: '@order_id', from: { key: 'id' } }] }
+  const bound = bindAction(base, root, { identity: generated.identity, concurrency, fields: generated.fields }, choice) as BoundAction
+  return { base, bindings: { ...generated, concurrency, actions: [{ ...bound, dialog: null }] } }
+}
+
 describe('a routine an action binds', () => {
   // Gone, with no gap to say the account lost sight of it: `ship` cannot
   // run, and only `ship`; every write the form offers is untouched.
@@ -89,6 +104,70 @@ describe('a routine an action binds', () => {
     expect(rows(report)).toEqual([['routine-reach-changed', 'review', 'ship_order']])
     expect(report.actions).toEqual(['ship', 'close'])
     expect(report.runtime.actions).toEqual(['ship', 'close'])
+  })
+
+  // Made STRICT since publication (0167): PostgreSQL no longer calls it
+  // given a NULL, and the run's description refuses it (0160). It stops
+  // its actions alone, at review and at the runtime, in the generator's
+  // words. Watched failing on 2026-11-19 with `madeStrict` answering null:
+  // a `routine-changed` for review, which stops nothing; and with it left
+  // out of `runtimeRoutineStops` alone: "expected [ 'ship', 'close' ] to
+  // deeply equal [ 'close' ]".
+  test('made STRICT blocks its actions, at review and at the runtime', () => {
+    const base = routineSnapshot('postgres', [{ ...SHIP_ORDER, onNull: 'called' }, CLOSE_ORDER])
+    const report = review(routineSnapshot('postgres', [{ ...SHIP_ORDER, onNull: 'not-called' }, CLOSE_ORDER]), base)
+    expect(rows(report)).toEqual([['routine-changed', 'blocking', 'ship_order']])
+    expect(report.changes[0]?.message).toBe(
+      'sales.ship_order(pg_catalog.int8, pg_catalog.int4) is STRICT: PostgreSQL does not call it when an argument is NULL, so a run would answer done for a call that never ran; it was not when the form was published. ship is blocked until the form is reviewed.',
+    )
+    expect(report.actions).toEqual(['close'])
+    expect(report.runtime.actions).toEqual(['close'])
+  })
+
+  // STRICT's rule is PostgreSQL's alone (0167): a run on SQL Server calls
+  // a procedure, which the engine always calls. A bound procedure dropped
+  // and created again as a scalar function declared RETURNS NULL ON NULL
+  // INPUT changed what a call of it rests on, and that one change says so,
+  // without a second in PostgreSQL's words beside it. Watched failing on
+  // 2026-11-19 with `madeStrict` asked whatever the engine: "expected [ [
+  // 'routine-changed', …(2) ], …(1) ] to deeply equal [ [
+  // 'routine-changed', …(2) ] ]".
+  test('on SQL Server, a procedure become a function not called given a NULL is one change of what a call rests on', () => {
+    const ship = msRoutine('ship_order', [msParameter('@order_id', '127:8:19:0', INT64, 'bigint')], { onNull: 'called' })
+    const { base, bindings } = sqlServerShip(ship)
+    const result = { typeId: '127:8:19:0', databaseType: 'bigint', type: INT64 }
+    const current = withRoutines(snapshot('sqlserver'), [{ ...ship, kind: 'function', effects: 'reads', returns: 'scalar', result, onNull: 'not-called' }])
+    const report = diffSnapshots(base, current, bindings, ACTION_POLICY)
+    expect(rows(report)).toEqual([['routine-changed', 'blocking', 'ship_order']])
+    expect(report.changes[0]?.message).toMatch(/changed what a call of it rests on/)
+    expect(report.actions).toEqual([])
+    expect(report.runtime.actions).toEqual([])
+  })
+
+  // A snapshot taken before 0167 did not read whether PostgreSQL calls a
+  // routine given a NULL: read for the first time, the fact is no change of
+  // the routine, either way, and stops nothing -- the run's description
+  // still refuses a STRICT one (0160). The fact is in the fingerprint, so
+  // such a review never takes the fast path: every review of a form
+  // published before 0167 compares in full, until the form is published
+  // again from a discovery since, and finds no change -- the report the
+  // fast path gives, which `fixture.ts` holds on every call. Watched
+  // failing on 2026-11-19 with the routine compared whole: "called:
+  // expected [ [ 'routine-changed', …(2) ] ] to deeply equal []"; and,
+  // with `fixture.ts`'s check of 0167 beside it, that check first:
+  // "whether a routine is called given a NULL, read since 0167, changed a
+  // report against a base that never read it"; and with the fact left out
+  // of the fingerprint: "called: expected '9f09d16e…' not to be
+  // '9f09d16e…'".
+  test('whether it is called given a NULL, read for the first time, is no change', () => {
+    for (const onNull of ['called', 'not-called'] as const) {
+      const current = routineSnapshot('postgres', [{ ...SHIP_ORDER, onNull }, CLOSE_ORDER])
+      expect(current.fingerprint, onNull).not.toBe(BASE.fingerprint)
+      const report = review(current)
+      expect(rows(report), onNull).toEqual([])
+      expect(report.actions, onNull).toEqual(['ship', 'close'])
+      expect(report.runtime.actions, onNull).toEqual(['ship', 'close'])
+    }
   })
 
   // What a call does not rest on -- what it may change -- is said for
@@ -185,6 +264,19 @@ describe('a routine no action binds', () => {
       ['routine-added', 'info', 'reopen_order'],
     ])
     expect(rows(review(shipped(SHIP_ORDER, { ...other, executable: false }), base))).toEqual([['routine-changed', 'info', 'archive_order']])
+  })
+
+  // Read for the first time, whether the engine calls a routine given a
+  // NULL is no change of one nothing binds either; between two snapshots
+  // that both say, a change of it is a note like any other (0167). Watched
+  // failing on 2026-11-19 with routines compared whole: "expected [ [
+  // 'routine-changed', 'info', …(1) ] ] to deeply equal []".
+  test('whether it is called given a NULL is a note only where both snapshots say', () => {
+    const other = pgRoutine('archive_order', [pgParameter('order_id', 'int8')])
+    const unknown = routineSnapshot('postgres', [SHIP_ORDER, CLOSE_ORDER, other])
+    expect(rows(review(shipped(SHIP_ORDER, { ...other, onNull: 'not-called' }), unknown))).toEqual([])
+    const known = routineSnapshot('postgres', [SHIP_ORDER, CLOSE_ORDER, { ...other, onNull: 'called' }])
+    expect(rows(review(shipped(SHIP_ORDER, { ...other, onNull: 'not-called' }), known))).toEqual([['routine-changed', 'info', 'archive_order']])
   })
 })
 
@@ -306,13 +398,7 @@ describe('a change of the root', () => {
   // `stillServes`: `ship` still ran.
   test('stops the actions whose touch column a run can no longer set', () => {
     const ship = msRoutine('ship_order', [msParameter('@order_id', '127:8:19:0', INT64, 'bigint')])
-    const base = withRoutines(snapshot('sqlserver'), [ship])
-    const generated = orderForm(base).bindings
-    const concurrency: ConcurrencyBinding = { ...(generated.concurrency as ConcurrencyBinding), touch: 'notes' }
-    const root = base.objects.find((object) => object.ref.name === 'order') as ObjectMeta
-    const choice: ActionChoice = { ...SHIP, routine: ship.ref, parameters: [{ parameter: '@order_id', from: { key: 'id' } }] }
-    const bound = bindAction(base, root, { identity: generated.identity, concurrency, fields: generated.fields }, choice) as BoundAction
-    const bindings: FormBindings = { ...generated, concurrency, actions: [{ ...bound, dialog: null }] }
+    const { base, bindings } = sqlServerShip(ship)
     expect(diffSnapshots(base, base, bindings, ACTION_POLICY).actions).toEqual(['ship'])
     const current = withRoutines(
       snapshot('sqlserver', (objects) => restrict(objects, 'order', 'notes', { update: false })),

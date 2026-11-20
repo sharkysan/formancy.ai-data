@@ -104,13 +104,32 @@ export interface RoutineMeta {
   reach: 'account' | 'owner'
   /** The account may call it, as the database's own privilege check answered at discovery (0027): what was true then. */
   executable: boolean
+  /**
+   * Whether the engine calls the routine when an argument is NULL (0167):
+   * `not-called` for PostgreSQL's STRICT (RETURNS NULL ON NULL INPUT) and
+   * a SQL Server function declared RETURNS NULL ON NULL INPUT, which the
+   * engine answers NULL for without running its body; `called` for every
+   * other, and for every procedure, which neither engine lets declare it.
+   *
+   * Absent where it was not read: in every snapshot taken before 0167, and
+   * on SQL Server for a function whose module row the catalog does not show
+   * the account. Never `null` beside absence -- one fact in two spellings
+   * would hash two ways -- and never guessed either way: absent is unknown.
+   * Absent, the key is not hashed, so a snapshot stored before 0167 keeps
+   * the fingerprint it was published with.
+   */
+  onNull?: RoutineOnNull
 }
+
+/** Whether the engine calls a routine when an argument is NULL, as `RoutineMeta.onNull` records it (0167). */
+export type RoutineOnNull = 'called' | 'not-called'
 
 /** Every value of each closed field, as a record so that a new one is a compile error here until it is listed. */
 const KINDS: Readonly<Record<RoutineMeta['kind'], true>> = { function: true, procedure: true }
 const EFFECTS: Readonly<Record<RoutineMeta['effects'], true>> = { reads: true, writes: true }
 const RETURNS: Readonly<Record<RoutineMeta['returns'], true>> = { void: true, scalar: true, set: true }
 const REACHES: Readonly<Record<RoutineMeta['reach'], true>> = { account: true, owner: true }
+const ON_NULL: Readonly<Record<RoutineOnNull, true>> = { called: true, 'not-called': true }
 const MODES: Readonly<Record<ParameterMode, true>> = { in: true, out: true, inout: true, variadic: true, table: true }
 const TYPE_KINDS: Readonly<Record<NormalizedTypeKind, true>> = {
   text: true,
@@ -164,6 +183,12 @@ function assertRoutine(kind: DatabaseKind, routine: unknown): RoutineMeta {
   if (!isListed(RETURNS, fields['returns'])) throw new Error(`${where}: returns ${JSON.stringify(fields['returns'])} is not one the contract names`)
   if (!isListed(REACHES, fields['reach'])) throw new Error(`${where}: reach ${JSON.stringify(fields['reach'])} is not one the contract names`)
   if (typeof fields['executable'] !== 'boolean') throw new Error(`${where}: executable is not a boolean`)
+  // Absent is "not read" (0167); present, it is one of the two. A key set to
+  // `undefined` or `null` is neither, and would hash otherwise than absence.
+  if (Object.hasOwn(fields, 'onNull') && !isListed(ON_NULL, fields['onNull']))
+    throw new Error(`${where}: onNull ${JSON.stringify(fields['onNull']) ?? 'undefined'} is not one the contract names`)
+  // Neither engine has the option for a procedure: CREATE PROCEDURE takes no STRICT, and no RETURNS NULL ON NULL INPUT.
+  if (fields['kind'] === 'procedure' && fields['onNull'] === 'not-called') throw new Error(`${where}: a procedure is called whatever its arguments`)
   // A scalar names what it returns, and nothing else names a result: a void
   // routine has none, and a set's rows are not one type on either engine.
   if (fields['returns'] === 'scalar') assertType(`${where}: its result`, fields['result'])

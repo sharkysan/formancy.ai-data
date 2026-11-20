@@ -205,6 +205,31 @@ describe('validateBundle', () => {
     expect(validateBundle(stored)).toEqual({ ok: true, bundle: stored })
   })
 
+  // Every form published with an action before 0167 is a bundle whose
+  // snapshot records routines and says nothing of whether the engine calls
+  // one given a NULL. The file is one such bundle, written by data-core and
+  // data-server at 7343512, the release before 0167: `note` bound over
+  // note_order. Read, it validates with the fingerprint it was published
+  // with; written again -- an approval, a policy edit -- its base and
+  // bindings are still what the generator makes of its request and
+  // snapshot (`generatedProblems`), and a run's planner asks the same
+  // generator of the stored binding (data-core's plan.test.ts, whose
+  // routines say nothing of it either). So it serves as it did, and
+  // whether note_order is STRICT its run's description still says (0160).
+  // Were an absent fact hashed as a value, the bundle would be refused on
+  // read; were a routine that does not say refused, on every write and
+  // every run. Watched failing on 2026-11-19 with an unknown routine read
+  // as one not called: "expected [ Array(1) ] to deeply equal []", the
+  // bindings not what the generator makes of them.
+  test('a bundle that bound an action before 0167 still validates and regenerates, with the fingerprint and bindings it was published with', () => {
+    const stored = JSON.parse(readFileSync(join(import.meta.dirname, 'fixtures', 'bundle-before-0167.json'), 'utf8')) as BundleV2
+    expect(stored.snapshot.fingerprint).toBe('470a16632ca9ff382cf791beddfeb534412e5a138a89e8ca4e0c8dc4af77b493')
+    expect(stored.snapshot.routines?.[0]).not.toHaveProperty('onNull')
+    expect(stored.bindings.actions?.map((action) => action.name)).toEqual(['note'])
+    expect(validateBundle(stored)).toEqual({ ok: true, bundle: stored })
+    expect(generatedProblems(stored)).toEqual([])
+  })
+
   // A snapshot discovered with routines (0158) is published like any other:
   // what it records of a routine is in its fingerprint, and the generator
   // reads none of it, so the form and bindings are the ones the same tables

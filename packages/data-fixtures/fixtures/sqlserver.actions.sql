@@ -30,8 +30,11 @@
 -- 66.60, and raises the amount of its customer's other orders noted
 -- 'raise others', as PostgreSQL's does; noted 'drop others' it deletes
 -- them, which it may by ownership chaining, the writer holding no DELETE:
--- a call that removes a later record of its selection (0165). Batches are
--- separated by GO.
+-- a call that removes a later record of its selection (0165). weigh_order
+-- cannot be a procedure, which SQL Server calls whatever its arguments: it
+-- is a scalar function declared RETURNS NULL ON NULL INPUT, which SQL Server
+-- answers NULL for given a NULL without running it, as PostgreSQL's STRICT
+-- one (0167). Batches are separated by GO.
 
 create schema actions;
 GO
@@ -141,6 +144,11 @@ begin
   set nocount on;
   declare @called bigint = next value for actions.called;
   insert actions.call (routine, record_id, note) values (N'touch_tag', 0, @p_code);
+end
+GO
+create function actions.weigh_order(@p_order bigint) returns int with returns null on null input as
+begin
+  return 1;
 end
 GO
 grant select, update on actions.customer to formancy_writer;

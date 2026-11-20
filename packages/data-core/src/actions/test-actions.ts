@@ -39,7 +39,13 @@ export function pgParameter(name: string, type: keyof typeof OID, extra: Partial
   return { name, mode: 'in', typeId, databaseType, type: normalized, hasDefault: false, ...extra }
 }
 
-/** A PostgreSQL function returning void, as its account may run it: its signature spelled from its parameters' types, as discovery spells it. */
+/**
+ * A PostgreSQL function returning void, as its account may run it: its
+ * signature spelled from its parameters' types, as discovery spells it.
+ * Saying nothing of whether PostgreSQL calls it given a NULL, as a snapshot
+ * taken before 0167 says nothing: every suite that binds and plans over one
+ * holds such a routine to what it bound and planned before (0167).
+ */
 export function pgRoutine(name: string, parameters: RoutineParameter[], extra: Partial<RoutineMeta> = {}): RoutineMeta {
   const spelled = Object.fromEntries(Object.entries(OID).map(([key, entry]) => [entry.typeId, key]))
   const signature = parameters

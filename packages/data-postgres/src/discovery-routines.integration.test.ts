@@ -15,11 +15,12 @@ import { discoverPostgres } from './index.js'
  *
  * Schema `probe` holds what the fixture does not: a routine of each shape
  * no action could bind, one PUBLIC may execute and one it may not, a
- * SECURITY DEFINER pair over a table the reader may not read, and an
- * aggregate. Schema `sealed` holds a function the reader is granted EXECUTE
- * on in a schema it has no USAGE on. Schema `ext` holds an extension's
- * functions beside one of its own. None touches `sales`, which stays
- * exactly what the model describes.
+ * SECURITY DEFINER pair over a table the reader may not read, an
+ * aggregate, and a STRICT pair beside one called given a NULL (0167).
+ * Schema `sealed` holds a function the reader is granted EXECUTE on in a
+ * schema it has no USAGE on. Schema `ext` holds an extension's functions
+ * beside one of its own. None touches `sales`, which stays exactly what
+ * the model describes.
  */
 let fixture: PostgresFixture
 let owner: Sql
@@ -66,6 +67,9 @@ beforeAll(async () => {
     create aggregate probe.total(integer) (sfunc = int4pl, stype = integer);
     create function probe.every_type(a bool, b int8, c int2, d int4, e text, f float4, g float8, h varchar, i date, j time, k timestamp,
       l timestamptz, m numeric, n uuid) returns void language sql as $$ select $$;
+    create function probe.strict_seven(n integer) returns integer language sql strict as $$ select 7 $$;
+    create function probe.null_on_null_seven(n integer) returns integer language sql returns null on null input as $$ select 7 $$;
+    create function probe.called_seven(n integer) returns integer language sql called on null input as $$ select 7 $$;
 
     create table probe.secret (v integer);
     insert into probe.secret values (42);
@@ -267,6 +271,32 @@ describe('which routines are recorded (0158)', () => {
     expect([await answer(reader, 'select probe.peek_as_owner()'), await answer(reader, 'select probe.peek_as_caller()')]).toEqual(['ok', '42501'])
     const [peeked] = await reader<{ v: number }[]>`select probe.peek_as_owner() as v`
     expect(peeked?.v).toBe(42)
+  })
+})
+
+describe('whether PostgreSQL calls a routine given a NULL (0167)', () => {
+  // STRICT, and its other spelling RETURNS NULL ON NULL INPUT, make
+  // PostgreSQL answer NULL for a call given a NULL argument without running
+  // the body: what a run over a record whose field is NULL would answer
+  // done for (0160), and what the generator refuses to bind. Each is
+  // recorded not called, from `proisstrict`, and every other routine --
+  // a procedure, which cannot be declared either, among them -- called;
+  // none is left unread, since pg_proc shows every role every routine. The
+  // server's own answer to a NULL is asserted beside it, so the fact is
+  // held to what the engine does and not to its spelling. First run in CI.
+  test('a STRICT function is recorded as not called given a NULL, as the server answers one, and every other routine as called', async () => {
+    const snapshot = await discoverPostgres(reader, { schemas: ['probe'], routines: true })
+    expect(['strict_seven', 'null_on_null_seven', 'called_seven', 'a_procedure', 'open_to_all'].map((name) => routine(snapshot, name).onNull)).toEqual([
+      'not-called',
+      'not-called',
+      'called',
+      'called',
+      'called',
+    ])
+    expect((snapshot.routines ?? []).filter((entry) => entry.onNull === undefined).map((entry) => describeRoutine(entry.ref))).toEqual([])
+    const [answers] = await owner<{ strict: number | null; spelled: number | null; called: number | null }[]>`
+      select probe.strict_seven(null) as strict, probe.null_on_null_seven(null) as spelled, probe.called_seven(null) as called`
+    expect(answers).toEqual({ strict: null, spelled: null, called: 7 })
   })
 })
 

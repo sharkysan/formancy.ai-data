@@ -1115,7 +1115,11 @@ through the runtime plane's route
    locked path, whose snapshot is the lock statement's, its whole
    definition as the catalog cache holds it too. A STRICT routine is
    refused by the description: PostgreSQL would not call it for a NULL
-   argument.
+   argument. The description decides it by the generator's own rule over
+   discovery's own reading of the routine, so a form is not published over
+   one its snapshot records as STRICT, and review stops the actions over
+   one made STRICT since
+   ([0167](../decisions/0167-a-snapshot-says-whether-the-engine-calls-a-routine-given-a-null-and-the-generator-refuses-a-strict-one-before-publication.md)).
    Fewer rows or calls than records throws inside the transaction, so it
    rolls back, and a record not moved is explained by the read an update
    alone asks.

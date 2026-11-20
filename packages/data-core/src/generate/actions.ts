@@ -134,7 +134,32 @@ export function ambiguousBeside(routines: readonly RoutineMeta[], routine: Routi
   })
 }
 
-/** Why a routine no run could call, or `null`: the shape each engine's run rests on (0159). */
+/**
+ * Why a run of `routine` could answer done for a call that never ran, or
+ * `null` (0167): PostgreSQL is known not to call it when an argument is
+ * NULL -- it is STRICT -- and answers NULL in its place, and an argument
+ * from a field is NULL wherever the record's column is.
+ *
+ * PostgreSQL's alone: a run on SQL Server calls a procedure, which the
+ * engine always calls, and a SQL Server function declared RETURNS NULL ON
+ * NULL INPUT is refused first, as a function (`routineProblem`).
+ *
+ * The one rule, asked by the generator of a snapshot's routine, by drift
+ * of a bound PostgreSQL routine since publication (`drift/routines.ts`),
+ * and by PostgreSQL's run description of the routine it reads again
+ * (`describedRoutineFrom`, which answers `refused`, 0160), each over a
+ * routine discovery's own `routineOf` normalised; that adapter's actions
+ * suite holds the generator and the description to one answer for every
+ * routine of the fixture's actions schema. A routine whose snapshot does not say -- one taken
+ * before 0167 -- is no problem here: it binds as it did, and the
+ * description still refuses it at run time.
+ */
+export function nullInputProblem(routine: Pick<RoutineMeta, 'ref' | 'onNull'>): string | null {
+  if (routine.onNull !== 'not-called') return null
+  return `${describeRoutine(routine.ref)} is STRICT: PostgreSQL does not call it when an argument is NULL, so a run would answer done for a call that never ran`
+}
+
+/** Why a routine no run could call, or `null`: the shape each engine's run rests on (0159), and whether the engine calls it at all (0167). */
 export function routineProblem(kind: DatabaseKind, routines: readonly RoutineMeta[], routine: RoutineMeta): string | null {
   const named = describeRoutine(routine.ref)
   if (!routine.executable) return `this connection's account may not execute ${named}`
@@ -143,6 +168,8 @@ export function routineProblem(kind: DatabaseKind, routines: readonly RoutineMet
       return `${named} is a procedure, which may COMMIT inside itself; a run calls a function, in the statement that names each record`
     if (routine.returns !== 'void')
       return `${named} returns ${routine.returns === 'set' ? 'rows' : 'a value'}, which a run would throw away: a function a run calls returns void, so it has nothing to report failure by but an error`
+    const uncalled = nullInputProblem(routine)
+    if (uncalled !== null) return uncalled
   } else if (routine.kind === 'function') {
     return `${named} is a function, which SQL Server forbids to write; a run calls a procedure`
   }

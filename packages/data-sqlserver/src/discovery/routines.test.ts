@@ -2,7 +2,15 @@ import { describe, expect, test } from 'vitest'
 import type { CatalogRow, ParameterRow, RoutineRow } from './routines.js'
 import { routinesOf } from './routines.js'
 
-const ROW: RoutineRow = { object_id: 1, schema_name: 'sales', routine_name: 'ship_order', type: 'P', access_object: '[sales].[ship_order]', can_execute: 1 }
+const ROW: RoutineRow = {
+  object_id: 1,
+  schema_name: 'sales',
+  routine_name: 'ship_order',
+  type: 'P',
+  access_object: '[sales].[ship_order]',
+  can_execute: 1,
+  null_on_null_input: false,
+}
 
 const PARAMETER: ParameterRow = {
   parameter_id: 1,
@@ -146,5 +154,28 @@ describe('routinesOf', () => {
       'its result: its user-defined type is hidden from this account, so it is recorded as unsupported, spelled as its base type decimal(14,2)',
     ])
     expect(routinesOf(rows()).gaps).toEqual([])
+  })
+
+  // Whether SQL Server calls a routine given a NULL (0167): a function
+  // declared RETURNS NULL ON NULL INPUT is not, which the generator and a
+  // later SQL Server run must not take for one that is; every procedure
+  // is, whatever its module row says, since CREATE PROCEDURE cannot declare
+  // otherwise; and a function whose module row the catalog did not show
+  // records nothing, never a guess either way. Watched failing on
+  // 2026-11-19 with the column read as a procedure's too: "expected
+  // 'not-called' to be 'called'"; and with a NULL read as called:
+  // "expected 'called' to be 'absent'".
+  test('a function declared RETURNS NULL ON NULL INPUT is not called given a NULL, a procedure always is, and an unshown module says nothing', () => {
+    const onNull = (routine: Partial<RoutineRow>) => {
+      const [found] = routinesOf(rows(routine, [])).routines
+      return found === undefined || !Object.hasOwn(found, 'onNull') ? 'absent' : found.onNull
+    }
+    expect(onNull({ type: 'FN', null_on_null_input: true })).toBe('not-called')
+    expect(onNull({ type: 'FN', null_on_null_input: false })).toBe('called')
+    expect(onNull({ type: 'TF', null_on_null_input: false })).toBe('called')
+    expect(onNull({ type: 'FN', null_on_null_input: null })).toBe('absent')
+    expect(onNull({ type: 'P', null_on_null_input: false })).toBe('called')
+    expect(onNull({ type: 'P', null_on_null_input: true })).toBe('called')
+    expect(onNull({ type: 'P', null_on_null_input: null })).toBe('called')
   })
 })

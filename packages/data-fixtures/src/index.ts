@@ -3,11 +3,13 @@ export type { ExpectedAccess, ExpectedCapability, ExpectedObjectAccess, Expected
 export {
   ACTION_CLERK,
   ACTION_DECLINED_REASON,
+  ACTION_ON_NULL,
   ACTION_PARITY,
   ACTION_SCOPE,
   actionAnswer,
   actionExpected,
   actionForms,
+  actionOnNull,
   actionTagForm,
   actionToken,
   plannedAction,
@@ -16,6 +18,7 @@ export {
 } from './actions.js'
 export type { ActionAnswer, ActionBundle, ActionCase, ActionExpectation, ActionForms } from './actions.js'
 export {
+  ACTION_ON_NULL_CASE,
   actionCase,
   browseCase,
   covers,

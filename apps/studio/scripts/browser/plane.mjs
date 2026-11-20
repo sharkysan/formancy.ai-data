@@ -25,12 +25,19 @@ export const snapshot = (name) => JSON.parse(readFileSync(join(APP, 'src', 'fixt
  * `withRoutines` (src/test-routines.ts), from the same file, which
  * src/fixtures.test.ts holds to the model both adapters answer to. This
  * copy, and `withoutRoutines` below, are held to the suite's by review
- * alone: nothing compares the two.
+ * alone: nothing compares the two. `change` makes each routine what a
+ * state's database has in its place -- ship_order made STRICT (0167) --
+ * as the suite's `routinesNow` does, never in the file.
  */
-export function withRoutines(name) {
+export function withRoutines(name, change = (routine) => routine) {
   const { fingerprint: _, ...contents } = snapshot(name)
   const facts = JSON.parse(readFileSync(join(APP, 'src', 'fixtures', 'routines.json'), 'utf8'))[name]
-  return createSnapshot({ ...contents, scope: { ...contents.scope, routines: true }, routines: facts.routines, gaps: [...contents.gaps, ...facts.gaps] })
+  return createSnapshot({
+    ...contents,
+    scope: { ...contents.scope, routines: true },
+    routines: facts.routines.map(change),
+    gaps: [...contents.gaps, ...facts.gaps],
+  })
 }
 
 /** A database as a discovery whose scope does not ask for routines reads it: the captured file it always was (0158). */

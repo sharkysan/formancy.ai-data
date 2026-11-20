@@ -1,7 +1,9 @@
+import { readdirSync } from 'node:fs'
 import { DATABASE_KINDS } from '@formancy/data-core'
 import { describe, expect, test } from 'vitest'
+import { ACTION_ON_NULL } from './actions.js'
 import { READER, WRITER } from './containers.js'
-import { readFixture, splitBatches } from './load.js'
+import { type FixtureFile, readFixture, splitBatches } from './load.js'
 import { FIXTURE_ROUTINES } from './model.js'
 
 describe('splitBatches', () => {
@@ -43,6 +45,28 @@ describe('the fixture files', () => {
         contains ? opensWith : true,
         `a batch contains CREATE SCHEMA, VIEW, FUNCTION, PROCEDURE or TRIGGER after its first statement:\n${batch.slice(0, 120)}`,
       ).toBe(true)
+    }
+  })
+
+  // A PostgreSQL routine's body is a dollar-quoted string, `$$` or `$tag$`,
+  // closed by the same quote. One `$` lost in an edit leaves a dollar sign
+  // PostgreSQL's lexer reads as a stray character, and the file, sent as
+  // one simple query, is a syntax error before any of it runs: every start
+  // of the PostgreSQL fixture fails, every suite over it with it, and only
+  // where Docker runs. Comments stripped first, since a positional `$1` in
+  // one is prose; each quoted body taken out by its own tag; no dollar
+  // sign may be left. The files are listed from the directory, so one
+  // added is held too. Watched failing on 2026-11-19 with weigh_order's
+  // body quoted by a single `$`: "expected [ …(2) ] to deeply equal []",
+  // naming its opening and closing lines.
+  test('each PostgreSQL file closes every dollar quote it opens, and has no dollar sign outside one', () => {
+    const files = readdirSync(new URL('../fixtures/', import.meta.url)).filter((name) => /^postgres\b.*\.sql$/.test(name)) as FixtureFile[]
+    expect(files).toContain('postgres.actions.sql')
+    for (const file of files) {
+      const unquoted = readFixture(file)
+        .replaceAll(/--.*$/gm, '')
+        .replaceAll(/\$([A-Za-z_]\w*)?\$[\s\S]*?\$\1\$/g, '')
+      expect(unquoted.match(/^.*\$.*$/gm) ?? [], file).toEqual([])
     }
   })
 
@@ -173,5 +197,35 @@ describe('the fixture files', () => {
     expect(of(sequences, sqlServer)).toEqual(of(sequences, postgres))
     expect(of(sequences, postgres)).toEqual(['called'])
     expect(names(sqlServer).filter((name) => name !== 'pk_ticket' && name !== 'pk_tag')).toEqual(names(postgres))
+  })
+
+  // ACTION_ON_NULL is one expectation for both engines over the routines
+  // both actions editions create (0167), each STRICT or declared RETURNS
+  // NULL ON NULL INPUT where it says not called: a routine added to both
+  // and left out of it would be one whose fact no shared case reads, and
+  // one it says is not called but whose file does not declare it so, a
+  // case that fails for a reason far from the edit. Watched failing on
+  // 2026-11-19 with weigh_order left out of ACTION_ON_NULL: "expected [
+  // 'broken_order', 'close_order', …(1) ] to deeply equal [ 'broken_order',
+  // 'close_order', …(2) ]"; and with STRICT taken out of the PostgreSQL file:
+  // "expected [] to deeply equal [ 'weigh_order' ]".
+  test('ACTION_ON_NULL names each routine both actions editions create, and only those it says are not called are declared so', () => {
+    const strip = (text: string) => text.replaceAll(/--.*$/gm, '')
+    const created = (text: string) => [...strip(text).matchAll(/create\s+(?:function|procedure)\s+actions\.(\w+)([^\n]*)/gi)]
+    const postgres = created(readFixture('postgres.actions.sql'))
+    const sqlServer = created(readFixture('sqlserver.actions.sql'))
+    const shared = postgres.map((match) => match[1] as string).filter((name) => sqlServer.some((other) => other[1] === name))
+    expect(Object.keys(ACTION_ON_NULL).sort()).toEqual(shared.sort())
+    const declared = (matches: RegExpMatchArray[], option: RegExp) =>
+      matches
+        .filter((match) => option.test(match[2] ?? ''))
+        .map((match) => match[1] as string)
+        .sort()
+    const skipped = Object.entries(ACTION_ON_NULL)
+      .filter(([, onNull]) => onNull === 'not-called')
+      .map(([name]) => name)
+      .sort()
+    expect(declared(postgres, /\bstrict\b/i)).toEqual(skipped)
+    expect(declared(sqlServer, /\breturns\s+null\s+on\s+null\s+input\b/i)).toEqual(skipped)
   })
 })

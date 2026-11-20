@@ -38,7 +38,8 @@
         "returns": "void",
         "result": null,
         "reach": "account",
-        "executable": true
+        "executable": true,
+        "onNull": "called"
       }
     ],
     "gaps": []
@@ -82,7 +83,8 @@
         "returns": "void",
         "result": null,
         "reach": "account",
-        "executable": false
+        "executable": false,
+        "onNull": "called"
       }
     ],
     "gaps": []
@@ -126,7 +128,8 @@
         "returns": "void",
         "result": null,
         "reach": "account",
-        "executable": true
+        "executable": true,
+        "onNull": "called"
       }
     ],
     "gaps": []
@@ -158,7 +161,8 @@
         "returns": "set",
         "result": null,
         "reach": "owner",
-        "executable": true
+        "executable": true,
+        "onNull": "called"
       },
       {
         "ref": {
@@ -197,7 +201,8 @@
         "returns": "void",
         "result": null,
         "reach": "owner",
-        "executable": true
+        "executable": true,
+        "onNull": "called"
       }
     ],
     "gaps": []
@@ -242,7 +247,8 @@
         "returns": "set",
         "result": null,
         "reach": "owner",
-        "executable": false
+        "executable": false,
+        "onNull": "called"
       },
       {
         "ref": {
@@ -281,7 +287,8 @@
         "returns": "void",
         "result": null,
         "reach": "owner",
-        "executable": true
+        "executable": true,
+        "onNull": "called"
       }
     ],
     "gaps": []

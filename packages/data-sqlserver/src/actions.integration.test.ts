@@ -1,12 +1,16 @@
 import type { ActionAdapter, ActionOutcome, ActionRequest, PolicyContext } from '@formancy/data-core'
+import { generateForm } from '@formancy/data-core'
 import {
   ACTION_CLERK,
   ACTION_DECLINED_REASON,
+  ACTION_ON_NULL,
+  ACTION_ON_NULL_CASE,
   ACTION_SCOPE,
   actionAnswer,
   actionCase,
   actionExpected,
   actionForms,
+  actionOnNull,
   actionToken,
   covers,
   plannedAction,
@@ -517,6 +521,43 @@ describe('a run as an account whose only permission on the procedure is EXECUTE'
     } finally {
       await owner.request().batch(`grant execute on actions.close_order to ${RUNNER}`)
     }
+  })
+})
+
+describe('a routine SQL Server does not call given a NULL, told before publication (0167)', () => {
+  // Discovery reads sys.sql_modules' null_on_null_input of every function
+  // of the schema, and calls every procedure called: the one expectation
+  // both engines are held to, weigh_order a scalar function declared
+  // RETURNS NULL ON NULL INPUT and every other routine called. First run
+  // in CI.
+  test('is recorded by discovery, and every other routine as called', covers('sqlserver', ACTION_ON_NULL_CASE), () => {
+    expect(actionOnNull(forms.orders.snapshot)).toEqual(ACTION_ON_NULL)
+  })
+
+  // A run on SQL Server calls a procedure, which SQL Server calls whatever
+  // its arguments, so the generator refuses weigh_order as the function it
+  // is, by the rule a SQL Server run rests on, before whether it is called
+  // given a NULL: the engines differ in the note, not in the refusal, and
+  // SQL Server's own procedures are each recorded called. First run in CI.
+  test('is refused by the generator as a function, and every procedure is called', () => {
+    const snapshot = forms.orders.snapshot
+    const weigh = (snapshot.routines ?? []).find((routine) => routine.ref.schema === 'actions' && routine.ref.name === 'weigh_order')
+    if (weigh === undefined) throw new Error('the snapshot records no weigh_order')
+    expect([weigh.kind, weigh.returns, weigh.onNull]).toEqual(['function', 'scalar', 'not-called'])
+    const generated = generateForm(snapshot, {
+      connection: 'actions',
+      root: forms.orders.bindings.root,
+      formId: 'action-weigh',
+      title: 'Weigh',
+      lookups: [{ foreignKey: 'fk_order_customer', display: ['name'] }],
+      versionColumn: 'version',
+      actions: [{ name: 'weigh', routine: weigh.ref, scope: 'record', parameters: [{ parameter: '@p_order', from: { key: 'id' } }] }],
+    })
+    expect(generated.notes.filter((note) => note.subject === 'weigh').map((note) => note.message)).toEqual([
+      'Action weigh is not offered: actions.weigh_order() is a function, which SQL Server forbids to write; a run calls a procedure.',
+    ])
+    const procedures = (snapshot.routines ?? []).filter((routine) => routine.kind === 'procedure')
+    expect(procedures.map((routine) => [routine.ref.name, routine.onNull])).toEqual(procedures.map((routine) => [routine.ref.name, 'called']))
   })
 })
 

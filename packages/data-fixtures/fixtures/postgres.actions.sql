@@ -31,7 +31,9 @@
 -- one: what one call of a selection writes to a column another record of
 -- it passes (0165).
 -- broken_order references a column no table has, which PL/pgSQL finds only
--- when it runs.
+-- when it runs. weigh_order is STRICT: PostgreSQL answers NULL for a call
+-- given a NULL argument without running it, which discovery records and the
+-- generator refuses to bind (0167); a run's description refuses it too.
 
 create schema actions;
 
@@ -105,10 +107,17 @@ begin
 end
 $$;
 
-revoke execute on function actions.close_order(bigint, text, text, numeric, int), actions.broken_order(bigint), actions.reprice(bigint) from public;
+create function actions.weigh_order(p_order bigint) returns void language plpgsql strict as $$
+begin
+  perform pg_catalog.nextval('actions.called');
+  insert into actions.call (routine, record_id) values ('weigh_order', p_order);
+end
+$$;
+
+revoke execute on function actions.close_order(bigint, text, text, numeric, int), actions.broken_order(bigint), actions.reprice(bigint), actions.weigh_order(bigint) from public;
 grant usage on schema actions to formancy_writer;
 grant select on actions.customer, actions."order", actions.price to formancy_writer;
 grant update on actions.customer, actions."order", actions.price to formancy_writer;
 grant insert on actions.call to formancy_writer;
 grant usage on sequence actions.called to formancy_writer;
-grant execute on function actions.close_order(bigint, text, text, numeric, int), actions.broken_order(bigint), actions.reprice(bigint) to formancy_writer;
+grant execute on function actions.close_order(bigint, text, text, numeric, int), actions.broken_order(bigint), actions.reprice(bigint), actions.weigh_order(bigint) to formancy_writer;

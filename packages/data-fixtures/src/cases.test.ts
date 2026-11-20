@@ -11,6 +11,7 @@ import type { ListedCase } from './check-lists.js'
 import { COLUMN_FILTER_PARITY } from './column-filters.js'
 import type { ColumnFilterCase } from './column-filters.js'
 import {
+  ACTION_ON_NULL_CASE,
   actionCase,
   browseCase,
   cascadeCase,
@@ -102,6 +103,7 @@ const FAMILIES: Readonly<Record<string, readonly string[]>> = {
   DECLINE_PARITY: (Object.keys(DECLINE_PARITY) as DeclineCase[]).map(declineCase),
   SAVE_PARITY: (Object.keys(SAVE_PARITY) as SaveCase[]).map(saveCase),
   ACTION_PARITY: (Object.keys(ACTION_PARITY) as ActionCase[]).map(actionCase),
+  ACTION_ON_NULL: [ACTION_ON_NULL_CASE],
   // The comparators' models, through the cases that hold an adapter to them.
   FIXTURE_MODEL: [MODEL_CASES.owner, MODEL_CASES.structure, MODEL_CASES.restricted, MODEL_CASES.described],
   READER_ACCESS: [MODEL_CASES.readerAccess],
@@ -125,6 +127,7 @@ const NOT_CASES: Readonly<Record<string, string>> = {
   ROUTINE_SCOPE: 'a discovery scope',
   MODEL_CASES: 'the ids themselves',
   UPDATE_RECREATED_CASE: "the id of UPDATE_RECREATED's case",
+  ACTION_ON_NULL_CASE: "the id of ACTION_ON_NULL's case",
   SIZED_CUSTOMERS: "what the sized table is generated from (0034); what a lookup on it reads is sizedRowsRead()'s, a function",
   FIXTURE_CUSTOMERS: "the fixture's own customers, which the sized table holds beside the generated ones",
   SIZED_CHUNK_ROWS: 'how many rows one statement of the sized load carries',

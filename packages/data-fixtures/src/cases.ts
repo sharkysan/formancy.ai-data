@@ -135,6 +135,9 @@ export const saveCase = (name: SaveCase): string => `saves: ${name}`
 /** What a run of an action over the open record (0160) or a selection (0165) does on each engine, by the name of its entry in ACTION_PARITY. */
 export const actionCase = (name: ActionCase): string => `actions: ${name}`
 
+/** Whether discovery records each engine calling the actions schema's routines given a NULL (0167): ACTION_ON_NULL, one case. */
+export const ACTION_ON_NULL_CASE = 'actions: whether the engine calls each routine given a NULL'
+
 /**
  * Every case both adapters answer to, in a fixed order: the model's, then
  * every filter, label, temporal read, refusal and edge value, then the two
@@ -149,7 +152,8 @@ export const actionCase = (name: ActionCase): string => `actions: ${name}`
  * that lists a column's values makes of its field (0152), then what a write
  * the deployment refuses in words for the person answers (0156), then what
  * a save of a record with its rows does (0155), then what a run of an
- * action does (0160).
+ * action does (0160), then whether the engine calls each of the actions
+ * schema's routines given a NULL (0167).
  * Throws on a duplicate id, which would be two cases the report could not
  * tell apart -- two filter entries with one column and value, say.
  */
@@ -180,6 +184,7 @@ export function sharedCases(): string[] {
     ...(Object.keys(DECLINE_PARITY) as DeclineCase[]).map(declineCase),
     ...(Object.keys(SAVE_PARITY) as SaveCase[]).map(saveCase),
     ...(Object.keys(ACTION_PARITY) as ActionCase[]).map(actionCase),
+    ACTION_ON_NULL_CASE,
   ]
   const seen = new Set<string>()
   for (const id of ids) {
