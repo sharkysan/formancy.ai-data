@@ -18,7 +18,7 @@ Apache-2.0 [formancy](https://github.com/sharkysan/formancy.ai) engine.
 
 *The host page, an example of your application's own page, as clara, a clerk of tenant 1, sees it: the forms she may read; the orders of `sales.order` a page at a time in an AG Grid Community grid, opened on “Online orders”, a list view an administrator named; and the open order's deliveries in a tab beside it, a form of their own over `sales.delivery`, with their own id and the tenant hidden in its Columns. Every row is what the server answered her through `@formancy/data-client`, under the form's policy ([0047](./docs/decisions/0047-a-hosts-workspace-lists-opens-and-edits-records-in-linked-grids.md), [0105](./docs/decisions/0105-a-forms-list-offers-views-its-administrator-named.md), [0142](./docs/decisions/0142-a-records-child-forms-are-tabs-beside-it.md)). The order's own tab draws its form, as Run in [How it works](#how-it-works) shows. The orders, the deliveries and three of the customers are invented, and the capture script inserts them through the database's owner; Muster AG is the test fixture's.*
 
-Every picture in this README is taken by `pnpm pictures` from the built pages and the real data server, and the pictures job fails when one of them shows text the page no longer shows ([how, and what nothing checks](./docs/images/README.md)).
+The screenshots in this README are taken by `pnpm pictures` from the built pages and the real data server, and the pictures job fails when one of them shows text the page no longer shows; the sketch in *How it works* is drawn by hand ([how, and what nothing checks](./docs/images/README.md)).
 
 <!-- end generated -->
 
@@ -91,6 +91,10 @@ names the images, and what no test runs on
 [0067](./docs/decisions/0067-the-adapter-suites-run-on-every-image-of-a-per-engine-matrix.md)).
 
 ## How it works
+
+[<img src="./docs/images/architecture.svg" width="600" alt="A sketch of how Formancy Data fits together. Your application's pages draw published forms with @formancy/react or @formancy/angular and ask the data server's runtime plane through @formancy/data-client, with the token the application already holds; the host page, apps/host, is this repository's example of one. The studio, apps/studio, is for administrators, built from this repository, and asks only the administrator plane. The data server, @formancy/data-server, is one image holding both planes, @formancy/data-core, which decides policy, generation, plans and drift, @formancy/data-identity, which verifies the application's token offline, and the configuration store, the published forms kept as files. Below it the adapters, @formancy/data-postgres and @formancy/data-sqlserver, read and write PostgreSQL and SQL Server as the account each connection names.">](./docs/images/architecture.svg)
+
+*What each package holds, and what it may import, is in [the building blocks](./docs/architecture/05-building-blocks.md).*
 
 1. **Connect.** An operator allowlists a connection -- a database, the
    account to reach it as, the schemas it approves -- and the studio
