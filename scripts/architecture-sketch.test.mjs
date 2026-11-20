@@ -85,8 +85,20 @@ const plain = (markup) =>
     .replace(/\s+/g, ' ')
     .trim()
 
-/** `svg` without its comments, which say things about the drawing and are none of it. */
-const uncommented = (svg) => svg.replace(/<!--[\s\S]*?-->/g, '')
+/**
+ * `svg` without its comments, which say things about the drawing and are none of it.
+ * Taken out until none is left: one pass over `<!<!-- -->-- -->` would leave a
+ * comment's opening behind, and a name or a colour after it would go unread.
+ */
+function uncommented(svg) {
+  let before
+  let after = svg
+  do {
+    before = after
+    after = before.replace(/<!--[\s\S]*?-->/g, '')
+  } while (after !== before)
+  return after
+}
 
 /** What the boxes say: the text of every <text>, its <tspan>s included. */
 const drawnText = (svg) => [...uncommented(svg).matchAll(/<text\b[^>]*>([\s\S]*?)<\/text>/g)].map((found) => plain(found[1])).join(' ')
