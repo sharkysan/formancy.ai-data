@@ -835,6 +835,13 @@ which was read at that scale but not at GitHub's width, which nothing
 measures; a reader opens one whole. Its Publish step pictures a
 publish, not 0065's review, which the studio's pictures plane does not run
 ([0168](../decisions/0168-the-readme-pictures-the-workspace-a-buyer-meets-and-each-step-of-how-it-works.md)).
+Accepted for the README's sketch of the architecture: it is drawn by hand,
+so its arrows and layout are true only while review keeps them so -- its
+guard holds the names it writes, its colours and its alt, not where an
+arrow goes -- and it is a third drawing of the architecture beside the
+building blocks' and the context's, which nothing compares; in a column
+narrower than its 600 CSS px it is scaled down, to two thirds at 400
+([0172](../decisions/0172-the-readme-is-a-short-pitch-page-and-how-it-works-opens-with-a-sketch-drawn-by-hand.md)).
 
 [The status page](../guide/status.md) names what is not there yet, and the
 README's *What it does not do yet* most of it: figures for a page of

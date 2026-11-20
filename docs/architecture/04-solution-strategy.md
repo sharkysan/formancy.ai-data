@@ -250,9 +250,12 @@ passes, and the default deadline is derived from those figures
 [0063](../decisions/0063-the-default-lookup-deadline-is-outside-the-measured-product.md)).
 The browser gates make every check in Chromium, Firefox and WebKit
 ([0058](../decisions/0058-the-browser-gates-run-in-chromium-firefox-and-webkit-and-each-fact-the-browsers-disagree-on-is-named-and-held.md)),
-and the README's pictures are taken by a script from states the product
+and the README's screenshots are taken by a script from states the product
 reaches and held to the text they show
-([0038](../decisions/0038-readme-pictures-are-taken-by-a-script-and-held-to-the-text-they-show.md)).
+([0038](../decisions/0038-readme-pictures-are-taken-by-a-script-and-held-to-the-text-they-show.md)),
+while its sketch of the architecture is drawn by hand and held to the
+workspace's names
+([0172](../decisions/0172-the-readme-is-a-short-pitch-page-and-how-it-works-opens-with-a-sketch-drawn-by-hand.md)).
 
 ---
 

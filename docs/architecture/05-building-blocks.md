@@ -39,6 +39,16 @@ and the live demo's own code, private, which nothing installs:
                                    and Worker, which forwards the runtime plane
 ```
 
+The README draws the same workspace for somebody deciding, as
+[a sketch](../images/architecture.svg), `docs/images/architecture.svg`,
+drawn by hand: a host's pages and the studio, each over its plane of the
+server; the server's one image holding both planes, data-core,
+data-identity and the configuration store; and the two adapters below it,
+with their databases. `scripts/architecture-sketch.test.mjs` fails when it
+names a package or app this workspace does not have or leaves out a
+published one; that its arrows say what the imports above say is review's
+([0172](../decisions/0172-the-readme-is-a-short-pitch-page-and-how-it-works-opens-with-a-sketch-drawn-by-hand.md)).
+
 What each manifest lets it import:
 
 | Package | Published | At run time | Besides, in its tests and scripts |

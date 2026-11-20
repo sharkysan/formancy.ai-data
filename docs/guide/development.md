@@ -105,14 +105,17 @@ difference is a named fact in that file, held by the checks it names, and
 the report fails a run in which a gate did not make one of them in a browser
 ([0058](../decisions/0058-the-browser-gates-run-in-chromium-firefox-and-webkit-and-each-fact-the-browsers-disagree-on-is-named-and-held.md)).
 
-The pictures in the README and on this guide's pages are taken by
+The screenshots in the README and on this guide's pages are taken by
 `pnpm pictures` from the built pages
 against the real data server, and `pnpm test:pictures`, in Chromium, in a CI
 job of its own, walks the same states and fails when a pictured element says
 something else
 ([0038](../decisions/0038-readme-pictures-are-taken-by-a-script-and-held-to-the-text-they-show.md)).
 [`docs/images/README.md`](../images/README.md) says what taking them
-needs, how to retake one, and what nothing checks.
+needs, how to retake one, and what nothing checks. The README's sketch of
+the architecture is drawn by hand, and `pnpm test:repo` holds its names
+to the workspace
+([0172](../decisions/0172-the-readme-is-a-short-pitch-page-and-how-it-works-opens-with-a-sketch-drawn-by-hand.md)).
 
 `pnpm performance` measures the shipped server on a quiet Linux machine and
 rewrites [`docs/performance.md`](../performance.md); it refuses while any
