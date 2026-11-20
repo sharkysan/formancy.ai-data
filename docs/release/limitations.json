@@ -24,7 +24,7 @@
       "none": "Its user-facing cost, that what is tested is the images of each engine's matrix and no other, is the report's tested-on section, derived from each run, and 0067's, 0073's and 0074's limitations."
     },
     "0004": {
-      "reviewed": "sha256:94a7235f8bce87b3d84282fe407f5f6e1149820e07fa63b4961979cc12ce4f3b",
+      "reviewed": "sha256:0651825f83d8bde5046533a2a5287a2a867596c79f49612e782e5b669e25814b",
       "limitations": [
         {
           "area": "databases",
@@ -33,11 +33,11 @@
       ]
     },
     "0005": {
-      "reviewed": "sha256:80f605dcbd7a07a6387ccf7b3a2ed1e58208c6750ae306a49b04d05363179569",
+      "reviewed": "sha256:922fda4c494c399bdff96d3e4c37de019c94e7c856f0afd69521802957550814",
       "none": "Its costs -- every change to the business model made in three places, two of them in different SQL dialects, and a minute to start both servers -- fall on contributors."
     },
     "0006": {
-      "reviewed": "sha256:da44a67ff650d445be006c34f82d92bed7d9164310e1216bff0fbd29621591c6",
+      "reviewed": "sha256:3380958b1b898ff46b45ecf1c143ac60de7154e18968a039795d2c3a64504078",
       "limitations": [
         {
           "area": "databases",
@@ -113,7 +113,7 @@
       ]
     },
     "0010": {
-      "reviewed": "sha256:76cbf4ca5ff372403bfde59c5796cebfe8da0843d81de63798ed54c619d20bcf",
+      "reviewed": "sha256:67465d13a7e9f2d9f37b4453cfbab7d7ab1d560596f3a84c1caeb6d3e61d57da",
       "limitations": [
         {
           "area": "forms",
@@ -1040,7 +1040,7 @@
       ]
     },
     "0041": {
-      "reviewed": "sha256:91e2c4d94bbce96eda598e6fc601c618f9306e40796440e092bf6ff03c59e939",
+      "reviewed": "sha256:b8810f9013e3539a9360e16928a3c22ae91c8e69baff163bde7e61ba2cefd404",
       "limitations": [
         {
           "area": "forms",
@@ -5143,7 +5143,7 @@
       "none": "Its costs are the repository's and CI's: four more pictures to retake when a pictured sentence or the look changes, three of them needing Docker, their bytes, a longer host walk in the pictures job, and two frames more between the camera's shots. Nobody who installs, integrates or operates the module meets them."
     },
     "0170": {
-      "reviewed": "sha256:1ff3ece1e0216dc6dc1147544b90eb82dedbd320657b8175ce2437f9fa5a1a7a",
+      "reviewed": "sha256:fd013faef7095bbbd6023b05bfafa07e80fe328b6880f4431d63e2521afd6e8e",
       "limitations": [
         {
           "area": "databases",
@@ -5166,7 +5166,12 @@
         },
         {
           "area": "forms",
-          "says": "A label added under a published form is refused by it until the form is generated again, so a record holding one is refused on Save until an offered label is chosen, a record whose key holds one cannot be opened by its token, and a lookup that reads the enum is blocked.",
+          "says": "A label added under a published form is refused by it until the form is generated again, so a record holding one is refused on Save until an offered label is chosen, and a record whose key holds one cannot be opened by its token.",
+          "heldBy": "packages/data-core/src/generate/enums.test.ts"
+        },
+        {
+          "area": "forms",
+          "says": "A label added or renamed under a published form blocks a lookup that reads the enum until the form is generated again.",
           "heldBy": "packages/data-core/src/drift/enums.test.ts"
         },
         {
@@ -5189,7 +5194,16 @@
         },
         {
           "area": "access",
-          "says": "A value is cast to the enum by its name, so an account without USAGE on the type's schema is refused every write and comparison of it at runtime, which discovery does not see."
+          "says": "An enum in a schema the connected account has no USAGE on is unsupported for it and left out of its forms, though it could be read; a GRANT or a REVOKE of that USAGE under a published form blocks the form until it is generated again.",
+          "heldBy": "packages/data-postgres/src/states.integration.test.ts"
+        },
+        {
+          "area": "forms",
+          "says": "A check that leaves out some of an enum's labels, the table's or a domain's over the enum, is not read: the select offers every label, and the database refuses the others on Save."
+        },
+        {
+          "area": "testing",
+          "says": "A PostgreSQL domain in a key, a lookup or a row filter is offered as its base type is, and no suite runs one."
         },
         {
           "area": "forms",

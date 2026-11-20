@@ -22,11 +22,13 @@
   no other kind's cast default is read (watched failing with the enum left
   out of the readers); a starting value is one of its labels; its filter
   offers equality with a label alone (watched failing with a range
-  offered); a key value is one of its labels (watched failing with any
-  text taken); a state field's moves are between labels (watched failing
-  with a state field held to text and whole numbers); an enum no catalog
-  could have produced is refused (watched failing with its shape
-  unchecked). `packages/data-core/src/generate/domains.test.ts` -- a
+  offered); its codec's refusal, a person's field error, names no type
+  (watched failing with the type named); a key value is one of its labels
+  (watched failing with any text taken); a state field's moves are between
+  labels (watched failing with a state field held to text and whole
+  numbers); an enum no catalog could have produced is refused (watched
+  failing with its shape unchecked).
+  `packages/data-core/src/generate/domains.test.ts` -- a
   domain's check as PostgreSQL deparses one, `VALUE` for the value, read
   as a list over varchar, text and an integer, as one value, as an OR, and
   with awkward values (watched failing with the table's reader asked); a
@@ -49,11 +51,29 @@
   (watched failing with it read as the type loosened alone: a note), a label
   renamed a tightened column stopping writes in review and at runtime
   (watched failing with the labels left out of the comparison: nothing
-  stopped), the type renamed another type; a domain's list narrowed,
+  stopped), a label renamed under a select the form only shows a field
+  the column outgrew, for review (watched failing with it read as a
+  narrower column alone: a note), the type renamed another type, an enum
+  read before and unsupported now said as such (watched failing with
+  "from sales.order_state to sales.order_state"); a lookup keyed by an
+  enum blocked by a label added or renamed, said by its labels (watched
+  failing with the spelling alone); an enum and a domain respelled by the
+  search_path no change, in review and at runtime, and a domain retyped to
+  another still one (watched failing with the spelling compared alone:
+  both blocked the form); a domain's list narrowed,
   widened, dropped, no longer validated, or beside a NOT VALID one, as 0152
   weighs a table's, the runtime comparing none (watched failing with the
   domains left out of review's lists). `packages/data-core/src/lookup/searchable.test.ts`
   and `display.test.ts` -- an enum is searched and shown as its label.
+  `packages/data-core/src/records/list-terms.test.ts` and
+  `plan-list.test.ts` -- a list's search over an enum column, as the
+  planner writes it, is read by the terms every adapter's list reads its
+  request through, its type rebuilt, and one whose type was edited by hand
+  refused (watched failing with text and integer alone taken: every search
+  of such a form failed on PostgreSQL before a statement was built).
+  `apps/studio/src/policy-moves.test.tsx` -- the Policy step offers an
+  enum field as a state field, and its moves publish as typed (watched
+  failing with text and whole numbers alone offered).
   `packages/data-postgres/src/discovery/types.test.ts` -- an enum, and a
   domain over one, is its labels (watched failing with the labels left
   unread); a domain over text or a whole number is its base type with the
@@ -75,17 +95,25 @@
   boxes, columns left out and defaults, a lookup onto a table keyed by an
   enum, and the near misses: awkward labels, an empty label and none, a
   type in a schema whose name needs quoting and its default, a domain's
-  list added NOT VALID, a domain over a domain, an array of an enum;
+  list added NOT VALID, a domain over a domain, an array of an enum, a
+  domain's default dropped, or set on the domain below it, after it was
+  declared, read as none and met by the engine (23502), and an enum in a
+  schema the reader may not use unsupported for it and left out, its cast
+  refused (42501);
   `states-records.integration.test.ts` -- a create and an update of a
   label of every select read back as given, the column's and the domain's
   defaults stored, a label the codec refuses and one past it the engine
   refuses as out of range (22P02), a value a domain's list leaves out a
   check violation, a page sorted by an enum in its type's order both ways
   and paged after a row one at a time, a search and a filter on a label,
-  an export's cells, a record read by a token spelling its label, a lookup
+  an export's cells, the same sort, paging, filter and cells over a domain
+  over varchar and one over an integer, each listed, and one over text
+  that is not, a record read by a token spelling its label, a lookup
   onto it searched, resolved and a token that is no label rejected without
   failing the statement, and a state field's moves;
-  `states-drift.integration.test.ts` -- ADD VALUE, a domain's list replaced
+  `states-drift.integration.test.ts` -- the form discovered with the
+  schema on the search_path and reviewed and described without it, no
+  drift; ADD VALUE, a domain's list replaced
   NOT VALID, validated and dropped, and RENAME VALUE, each reviewed, decided
   by the runtime over a description and met by the database; a write
   decided before a label was added refused by the definition's guard, the
@@ -139,10 +167,13 @@ its labels in `enumsortorder`. A domain over an enum is the enum.
 **A column of a domain carries its chain** (`ColumnMeta.domains`), outermost
 first, each domain with its checks as `pg_get_expr` spells them, and its
 type is the one the chain ends in, with the innermost domain's modifier; a
-domain's NOT NULL is the column's, and the nearest domain's default its
-default where it has none of its own -- what an INSERT that leaves it out
-stores (`discovery/domains.ts`'s `DOMAIN_CHAIN`, one join for discovery and
-for the root's description). Neither property exists on a column of any
+domain's NOT NULL is the column's, and the default of the domain the
+column is declared with its default where it has none of its own -- what
+an INSERT that leaves it out stores, since `get_typdefault` reads the
+column's type alone: CREATE DOMAIN copies the default of the domain it is
+declared over, once, and an ALTER DOMAIN of either moves only its own
+(`discovery/domains.ts`'s `DOMAIN_CHAIN`, one join for discovery and for
+the root's description). Neither property exists on a column of any
 other type, so a snapshot of a catalog with neither is the one discovery
 made before 0170, to the byte, and one stored before it -- a published
 bundle's, a draft's, a capture -- reads, fingerprints and generates as it
@@ -152,9 +183,12 @@ did, its enums and domains unsupported until discovered again.
 other it is unsupported. Every operation over such a column is its base
 type's -- PostgreSQL resolves an operator or a function over a domain as
 over its base, and takes a value of the base into the domain under its
-checks -- and the suite proves each over a domain over text, varchar and
-an integer, listed or not. Its checks that are no list are the database's,
-as a table's are (0152).
+checks. The suite runs a create, an update and a read back, a sort both
+ways, a page after a row, a filter and an export over a domain over
+varchar and one over an integer whose checks list their values, and one
+over text whose check does not; a domain in a key, a lookup or a row
+filter is its base type's too, and no suite runs one. Its checks that are
+no list are the database's, as a table's are (0152).
 
 **An enum column is a select of exactly its labels, in the type's order**
 (`generate/controls.ts`), each its own option's text: not 0152's stated
@@ -183,7 +217,11 @@ quoted one part at a time; reads it as `::pg_catalog.text`, which no
 setting spells otherwise; searches it as that text; sorts it by the type's
 own operator class, so a page after a row (0108) compares in the order it
 sorts. A domain over text or a whole number is bound as its base type. A
-type named by a statement and gone is `schema-changed` (42704).
+type named by a statement and gone is `schema-changed` (42704). A
+qualified type name resolves only in a schema the role may use, so an enum
+in a schema the connected account has no USAGE on is unsupported for it,
+in discovery and in the root's description alike (`LABELS`): no value of
+it could be cast, and the column is left out, as every enum was before.
 
 **Drift**: an enum's labels are its type, which the root's description
 reads too, digested, since they are names (`records/definition.ts`). A
@@ -191,10 +229,16 @@ label gone -- RENAME VALUE takes the old away -- is a tightened column:
 writes of the field stop in review and at runtime, as a shorter varchar's
 do (0010, 0041). A label added is a field the column outgrew, for review:
 the select refuses a value it does not offer rather than writing another
-back (formancy.ai 0076), so nothing stops. Another type is another type. A
-domain's list is weighed as a table's check (`drift/listed.ts`, 0152):
-review's alone, the runtime comparing no check. A column read now that
-the published snapshot called unsupported is a note.
+back (formancy.ai 0076), so nothing stops. A label renamed under a select
+the form only shows is one too: the form writes nothing a rename could
+stop. A lookup that reads the enum is blocked by either, said by the labels.
+Another type is another type. A domain's list is weighed as a table's
+check (`drift/listed.ts`, 0152): review's alone, the runtime comparing no
+check. A column read now that the published snapshot called unsupported is
+a note. A type the search_path alone respells is the same type:
+`format_type` leaves out the schema of a type the path makes visible, and
+an enum's name is in its type and a domain's in its chain, so a discovery
+and a description under two paths agree (`drift/compare.ts`).
 
 **SQL Server is unchanged**: no enum, an alias type its system type, no
 rule read (`data-sqlserver/src/discovery/types.ts` says where the engines
@@ -245,9 +289,16 @@ database refuses them.
   again, as for any type change a lookup reads (0028).
 - A change to a domain's checks that is no list a select rests on is not
   reported, where a table's is noted.
-- A value is cast to the enum by name: an account without USAGE on the
-  type's schema is refused every write and comparison of it, which
-  discovery does not see; it is permission-denied at runtime.
+- An enum in a schema the connected account has no USAGE on is
+  unsupported for it and left out of its forms, though it could be read:
+  every value is cast to the type by its name, which needs that USAGE. A
+  GRANT or a REVOKE of it under a published form is a type changed, which
+  blocks the form in review and at runtime until it is generated again.
+- A check that leaves out some of an enum's labels, the table's or a
+  domain's over the enum, is not read: the select offers every label, and
+  the database refuses the others on Save with a check violation.
+- A domain in a key, a lookup or a row filter is offered as its base type
+  is, and no suite runs one.
 - On SQL Server a rule bound to an alias type or a column is not read: a
   value it refuses is refused on Save, and a rule that lists values is no
   select.

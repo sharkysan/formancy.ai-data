@@ -32,6 +32,13 @@ browser.
   short. Both are absent from a snapshot taken before, which keeps its
   fingerprint; `createSnapshot` refuses one without the other, and a key
   between two tables of the snapshot said otherwise at its two ends.
+  Since [0170](../../docs/decisions/0170-an-enum-is-a-select-of-its-labels-and-a-domain-whose-check-lists-its-values-a-select-of-them.md)
+  a column's type may be an `enum`, PostgreSQL's, with its type's name
+  and its labels in the engine's order, and a column of a domain carries
+  its chain (`domains`), outermost first, each domain with its checks.
+  Both are absent from every snapshot taken before, where such a column is
+  `unsupported`, so it reads, fingerprints and generates as it did;
+  `createSnapshot` refuses an enum no catalog could have produced.
 - **The server a snapshot was read from**: `server`, its product, major
   and, for SQL Server, the connected database's compatibility level, as
   each adapter's `ping` reports them too (`ServerIdentity` extends
