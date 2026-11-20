@@ -33,20 +33,30 @@
 // switch shows. The switch and opening by token are behind For the demo, at
 // the end of the record's header (0146), opened for each use and closed
 // after, as a person who works with records leaves them -- but for another
-// tenant's record, whose refusal is said inside them. The connection is the order form's own account, which may
-// not read sales.order_line, so no child section is pictured: the guide's
-// setup has no line form to publish (0047 says what nothing grants it).
+// tenant's record, whose refusal is said inside them. The connection is the
+// order form's own account, which may not read sales.order_line, so no line
+// is pictured: the guide's setup has no line form to publish (0047 says what
+// nothing grants it). It may read sales.delivery, whose form the workspace's
+// scenes publish.
 //
 // host-delete publishes the getting-started job's second form,
 // journey.json's `deleting` -- pg-order with delete granted to whoever may
 // read and every key a delete of an order acts through named (0051) -- when
-// its scene starts, so the scenes before it show the guide's one form; it
+// its scene starts, so no scene before it lists a second order form; it
 // pictures a row's confirmation under the grid and keeps the order, which
-// host-drift loads after it (0053).
+// host-drift loads after it (0053). Every form is published through
+// pictures-forms.mjs.
 //
-// Walk order: typeahead, the hero, stale, refused, unknown, the unsaved
-// notice, another tenant, a delete's confirmation, drift -- last, because it
-// changes the table; the README shows them in scenes.json's order.
+// The README's hero and its How it works step Run, host-workspace and
+// host-record-tabs, are pictures-workspace.mjs's acts: invented orders,
+// inserted through the owner's connection, a list view, and the deliveries'
+// form beside the order's, the one child table this account may read; its
+// header says why they come before host-delete, which takes the orders out.
+//
+// Walk order: typeahead, the exact values, stale, refused, unknown, the
+// unsaved notice, another tenant, the record's tabs, the workspace, a
+// delete's confirmation, drift -- last, because it changes the table; the
+// README and the guide show them in scenes.json's order.
 // Elements are found by role and accessible name, with one exception, said
 // where it is: the host token is a password field, which has no role, so it
 // is found by its label.
@@ -63,9 +73,10 @@ import { POSTGRES_IMAGE, startPostgresFixture, WRITER } from '@formancy/data-fix
 import { createConnectionRegistry, createDataServer, createFileConfigurationStore, DRIVER_FACTORIES } from '@formancy/data-server'
 import postgres from 'postgres'
 import journey from '../../../scripts/getting-started/journey.json' with { type: 'json' }
-import { EMPTY_PRESENTATION, fieldsFromOperations } from '../../../scripts/getting-started/journey.mjs'
 import { HOST } from '../../../scripts/getting-started/walk.mjs'
 import { field, fillField, pictures, said, untilSnapshot } from '../../../scripts/pictures/session.mjs'
+import { deletingPolicy, FORM, guidePolicy, orderRequest, publish } from './pictures-forms.mjs'
+import { workspaceScenes } from './pictures-workspace.mjs'
 
 const app = join(dirname(fileURLToPath(import.meta.url)), '..')
 const require = createRequire(import.meta.url)
@@ -80,7 +91,6 @@ const IDENTITIES = {
 /** How long Angular may take to arrive, and the server to answer: the host gate's WITHIN. */
 const WITHIN = 20_000
 
-const [FORM] = journey.forms
 /** The fixture's edge-case order, by its record token: id 2^53+1, the largest numeric(18,4) amount, customer Muster AG. */
 const RECORD = 'k1:9007199254740993'
 const ID = '9007199254740993'
@@ -163,20 +173,7 @@ async function startPlane() {
     await fixture.stop()
   }
   try {
-    const ada = { authorization: `Bearer ${TOKENS.ada}` }
-    const { connection, root: table, formId, title, lookups, pinned, versionColumn } = FORM
-    const proposal = await server.inject({
-      method: 'POST',
-      url: '/v1/form-proposals',
-      headers: ada,
-      payload: { connection, root: table, formId, title, lookups, pinned, versionColumn },
-    })
-    if (proposal.statusCode !== 200) throw new Error(`the proposal for ${formId} answered ${String(proposal.statusCode)}`)
-    const { form, bindings, snapshot, generation } = proposal.json()
-    const policy = { version: 1, ...journey.policy, fields: fieldsFromOperations(journey.policy, bindings) }
-    const bundle = { format: 2, connection, generation, base: form, presentation: EMPTY_PRESENTATION, form, bindings, policy, snapshot }
-    const published = await server.inject({ method: 'POST', url: `/v1/forms/${formId}/versions`, headers: ada, payload: { expectedBase: null, bundle } })
-    if (published.statusCode !== 201) throw new Error(`publishing ${formId} answered ${String(published.statusCode)}`)
+    await publish(server, TOKENS.ada, orderRequest(), { policyOf: guidePolicy })
   } catch (error) {
     await close()
     throw error
@@ -223,6 +220,7 @@ function actsOver(plane) {
     await demo(page, false)
   }
   const both = (page) => ({ React: pane(page, 'React'), Angular: pane(page, 'Angular') })
+  const workspace = workspaceScenes(plane, { records, detail, pane, carryOn, signIn, renderer, untilSnapshot, tokens: TOKENS, HOST, within: WITHIN })
   return {
     'host-typeahead': async (page) => {
       // "As clara types, the page asks the runtime plane": the answer to her
@@ -397,31 +395,14 @@ function actsOver(plane) {
       return { parts: { Records: records(page), Record: detail(page, 'No record open') } }
     },
 
+    ...workspace.acts,
+
     'host-delete': async (page) => {
+      // The workspace's orders taken out again: its grid holds the fixture's order alone.
+      await workspace.undo(page)
       // The guide's second form, published as the getting-started job publishes it (journey.mjs, `deletion`).
       const formId = `${FORM.formId}${journey.deleting.formSuffix}`
-      const ada = { authorization: `Bearer ${TOKENS.ada}` }
-      const { connection, root: table, title, lookups, pinned, versionColumn } = FORM
-      const proposal = await plane.server.inject({
-        method: 'POST',
-        url: '/v1/form-proposals',
-        headers: ada,
-        payload: { connection, root: table, formId, title, lookups, pinned, versionColumn },
-      })
-      if (proposal.statusCode !== 200) throw new Error(`the proposal for ${formId} answered ${String(proposal.statusCode)}`)
-      const { form, bindings, snapshot, generation } = proposal.json()
-      const operations = { ...journey.policy.operations, delete: [...journey.policy.operations.read] }
-      const policy = { version: 1, ...journey.policy, operations, fields: fieldsFromOperations(journey.policy, bindings), cascades: journey.deleting.cascades }
-      const published = await plane.server.inject({
-        method: 'POST',
-        url: `/v1/forms/${formId}/versions`,
-        headers: ada,
-        payload: {
-          expectedBase: null,
-          bundle: { format: 2, connection, generation, base: form, presentation: EMPTY_PRESENTATION, form, bindings, policy, snapshot },
-        },
-      })
-      if (published.statusCode !== 201) throw new Error(`publishing ${formId} answered ${String(published.statusCode)}: ${published.body}`)
+      await publish(plane.server, TOKENS.ada, orderRequest(formId), { policyOf: deletingPolicy })
       await carryOn(page, page.getByRole('button', { name: HOST.signOut, exact: true }))
       await signIn(page, TOKENS.clara, formId)
       // The order's own row: its Delete is a button named for it, which asks under the grid.
@@ -444,8 +425,10 @@ function actsOver(plane) {
       await records(page).getByRole('button', { name: 'Keep it', exact: true }).click()
       await carryOn(page, page.getByRole('button', { name: HOST.signOut, exact: true }))
       await signIn(page, TOKENS.clara)
-      // Stacked, as clara arrived, whatever layout the address kept through Sign out.
+      // Stacked, as clara arrived, whatever layout the address kept through
+      // Sign out, and both renderers, which the workspace's scenes left at React.
       await page.getByRole('radio', { name: 'Stacked', exact: true }).check()
+      await renderer(page, 'Both')
       await load(page)
       const width = async () =>
         Number(
@@ -516,6 +499,13 @@ async function demo(page, shown) {
   if ((await disclosure.getAttribute('aria-expanded')) !== String(shown)) await disclosure.click()
 }
 
+/** The renderer switch, behind For the demo, set to `name` -- React, Angular or Both -- and put away again. */
+async function renderer(page, name) {
+  await demo(page, true)
+  await page.getByRole('radio', { name, exact: true }).check()
+  await demo(page, false)
+}
+
 /**
  * clara's arrival: signed in, the records stacked above the record -- so the
  * two papers stand side by side under the grid -- both renderers on, and a
@@ -525,9 +515,7 @@ async function arrive(page) {
   await signIn(page, TOKENS.clara)
   await page.getByRole('radio', { name: 'Stacked', exact: true }).check()
   await page.getByRole('region', { name: 'Records', exact: true }).getByRole('button', { name: HOST.newRecord, exact: true }).click()
-  await demo(page, true)
-  await page.getByRole('radio', { name: 'Both', exact: true }).check()
-  await demo(page, false)
+  await renderer(page, 'Both')
   for (const name of ['React', 'Angular']) {
     await page
       .getByRole('region', { name, exact: true })
