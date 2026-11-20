@@ -16,7 +16,8 @@ import { createPostgresRecords, discoverPostgres } from './index.js'
  * database itself.
  *
  * - Discovered under a search_path that makes the types visible: their
- *   columns respelled by their bare names, and no drift.
+ *   columns respelled by their bare names, no type changed, and nothing
+ *   stops.
  * - ALTER TYPE … ADD VALUE: a label a row may hold that the select does
  *   not offer. For review; nothing stops, and the published codec refuses
  *   the new label until the form is generated again.
@@ -86,10 +87,10 @@ describe('a published form over an enum and a domain, under another search_path'
   // format_type leaves a type's schema out exactly when the session's
   // search_path makes it visible: discovered with states on the path, an
   // enum's and a domain's column is spelled by its bare name, and
-  // described by a session without it, qualified. Nothing changed, and
+  // described by a session without it, qualified. No type changed, and
   // review and the runtime both say so; a respelling read as a type
   // changed refused every read of the form. Before any change below.
-  test('is not drift: discovered with the schema on the path, reviewed and described without it', async () => {
+  test('stops nothing: discovered with the schema on the path, reviewed and described without it', async () => {
     const pathed = postgres(fixture.admin, { onnotice: () => {}, connection: { search_path: 'states, public' } })
     try {
       const visible = await discoverPostgres(pathed, STATES_SCOPE)
@@ -99,7 +100,17 @@ describe('a published form over an enum and a domain, under another search_path'
       expect([spelled(visible, 'state'), spelled(visible, 'colour')]).toEqual(['order_state', 'colour'])
       expect([spelled(base, 'state'), spelled(base, 'colour')]).toEqual(['states.order_state', 'states.colour'])
       const published = generateForm(visible, REQUEST).bindings
-      expect(diffSnapshots(visible, base, published, policy).changes).toEqual([])
+      const report = diffSnapshots(visible, base, published, policy)
+      // No bound column changed type. The path respells a default naming
+      // the enum, and an array of one no field binds, each a note.
+      for (const name of ['state', 'priority', 'colour', 'size', 'code', 'tone', 'stated']) {
+        expect(
+          on(report, name).filter(([kind]) => kind === 'column-type-changed'),
+          name,
+        ).toEqual([])
+      }
+      expect(report.changes.filter((change) => change.severity !== 'info')).toEqual([])
+      expect(report).toMatchObject({ blocking: false, readable: true, writable: { create: true, update: true } })
       const now = await createPostgresRecords(owner).describe(TICKET)
       if (!now.ok) throw new Error(`expected a description, got ${now.code}`)
       for (const operation of ['read', 'create', 'update'] as const) {
