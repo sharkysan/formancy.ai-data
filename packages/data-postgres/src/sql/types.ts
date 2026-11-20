@@ -29,7 +29,10 @@ const INTEGERS = new Map<string, string>([
  * it sorts, where its text would compare by the alphabet. A domain over
  * text or a whole number is cast to its base type, which the database
  * takes into the domain and holds to its checks; a domain over an enum is
- * cast to the enum.
+ * cast to the enum. A qualified type name resolves only in a schema the
+ * role may use (42501 otherwise), so discovery reads an enum in a schema
+ * the account may not use as unsupported, and no value of it is bound
+ * (`discovery/domains.ts`'s `LABELS`).
  */
 export function sqlTypeOf(type: NormalizedType): string {
   switch (type.kind) {

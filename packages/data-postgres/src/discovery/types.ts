@@ -100,9 +100,10 @@ const BUILT_IN = new Map<string, (modifier: number, textUnit: TextLengthUnit) =>
 /**
  * The built-in types a domain over them is read as (0170): text and the
  * whole numbers, the kinds a domain's list of values is a select over, and
- * the ones every operation over a domain is proved on. A domain over any
- * other -- numeric, a date, a uuid, a boolean -- is unsupported, though the
- * type itself is not: nothing here has proved an operation over one.
+ * the ones the states suites run a domain's writes, reads, order, paging,
+ * filter and export over. A domain over any other -- numeric, a date, a
+ * uuid, a boolean -- is unsupported, though the type itself is not: nothing
+ * here has run an operation over one.
  */
 const DOMAIN_BASES: ReadonlySet<string> = new Set(['varchar', 'bpchar', 'text', 'int2', 'int4', 'int8'])
 

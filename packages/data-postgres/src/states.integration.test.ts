@@ -14,8 +14,10 @@ import { createPostgresRecords, discoverPostgres } from './index.js'
  * comparator, and a probe schema of this file's own for what the model
  * does not hold -- labels a person types awkwardly, an empty label and
  * none, a type in a schema whose name needs quoting, a domain's list added
- * NOT VALID, a domain over a domain, an array of an enum. PostgreSQL's
- * alone: SQL Server has no enum, so no case here is a shared one.
+ * NOT VALID, a domain over a domain, an array of an enum, a domain's default
+ * set or dropped after one was declared over it, and an enum in a schema
+ * the account may not use. PostgreSQL's alone: SQL Server has no enum, so
+ * no case here is a shared one.
  *
  * Written on 2026-11-20 without a server to run it on; its first run is in
  * CI, on every image of the matrix (0067).
@@ -28,6 +30,7 @@ let probe: MetadataSnapshot
 
 const TICKET: ObjectRef = { schema: 'states', name: 'ticket' }
 const PROBE: ObjectRef = { schema: 'states_probe', name: 'probe' }
+const DEFAULTS: ObjectRef = { schema: 'states_probe', name: 'defaults' }
 const REQUEST: GenerationRequest = { connection: 'test', root: TICKET, formId: 'ticket', title: 'Ticket', lookups: [], versionColumn: 'version' }
 
 beforeAll(async () => {
@@ -35,7 +38,9 @@ beforeAll(async () => {
   owner = postgres(fixture.admin, { onnotice: () => {} })
   // Declared here and nowhere else: what the model does not hold, each a
   // near miss of one rule. `blank` holds the empty label, which PostgreSQL
-  // takes; `nothing` no label at all.
+  // takes; `nothing` no label at all. CREATE DOMAIN copies the default of
+  // the domain it is declared over, once: `tint` took shade's 'red' and
+  // dropped it, and `plain_outer` was declared before `plain_base` had one.
   await owner.unsafe(`
     create schema states_probe;
     create schema "Odd States";
@@ -57,6 +62,13 @@ beforeAll(async () => {
       nested states_probe.outer_plain,
       moods states_probe.awkward[]
     );
+    create domain states_probe.shade as varchar(10) default 'red';
+    create domain states_probe.tint as states_probe.shade not null;
+    alter domain states_probe.tint drop default;
+    create domain states_probe.plain_base as text;
+    create domain states_probe.plain_outer as states_probe.plain_base;
+    alter domain states_probe.plain_base set default 'x';
+    create table states_probe.defaults (id integer primary key, tint states_probe.tint, plain states_probe.plain_outer);
   `)
   states = await discoverPostgres(owner, STATES_SCOPE)
   probe = await discoverPostgres(owner, { schemas: ['states_probe'] })
@@ -186,5 +198,50 @@ describe('the near misses', () => {
   test('an array of an enum is left out', () => {
     expect(findObject(probe, PROBE)?.columns.find((column) => column.name === 'moods')?.type).toEqual({ kind: 'unsupported' })
     expect(fieldOf(generated(), 'moods')).toBeUndefined()
+  })
+
+  // An INSERT that leaves a column out stores its type's own default, the
+  // domain it is declared with, never one further down the chain
+  // (`get_typdefault`): tint, whose default was dropped, has none, and
+  // its NOT NULL refuses the row (23502); plain, over a domain given one
+  // after it was declared, has none either. The root's description reads
+  // both as discovery does. To be watched failing in CI with the nearest
+  // default down the chain read: tint's was 'red'.
+  test("a domain's default is its own, whatever the domain it is declared over says since", async () => {
+    const columns = findObject(probe, DEFAULTS)?.columns
+    expect(columns?.find((column) => column.name === 'tint')).toMatchObject({ nullable: false, hasDefault: false, defaultExpression: null })
+    expect(columns?.find((column) => column.name === 'plain')).toMatchObject({ hasDefault: false, defaultExpression: null })
+    const described = await createPostgresRecords(owner).describe(DEFAULTS)
+    if (!described.ok) throw new Error(`expected a description, got ${described.code}`)
+    expect(described.described.columns).toEqual(columns?.map(({ access: _access, comment: _comment, ...column }) => column))
+    await expect(owner.unsafe('insert into states_probe.defaults (id) values (1)')).rejects.toMatchObject({ code: '23502' })
+    const [row] = await owner.unsafe("insert into states_probe.defaults (id, tint) values (2, 'red') returning plain")
+    expect(row?.['plain']).toBeNull()
+  })
+
+  // A value is cast to an enum by its name, which PostgreSQL resolves only
+  // in a schema the role may use (42501): for an account that may not use
+  // "Odd States", its enum is unsupported, in discovery and in the root's
+  // description, and left out, while an enum in a schema it may use is
+  // still one. To be watched failing in CI with the privilege unasked: the
+  // reader was offered a select every write of which was refused.
+  test('an enum in a schema the account may not use is unsupported for it', async () => {
+    const role = decodeURIComponent(new URL(fixture.reader).username)
+    await owner.unsafe(`grant usage on schema states_probe to "${role}"; grant select on states_probe.probe to "${role}"`)
+    const reader = postgres(fixture.reader, { onnotice: () => {} })
+    try {
+      await expect(reader.unsafe(`select 'bug'::pg_catalog.text::"Odd States"."Ticket Kind"`)).rejects.toMatchObject({ code: '42501' })
+      const seen = await discoverPostgres(reader, { schemas: ['states_probe'] })
+      const type = (name: string) => findObject(seen, PROBE)?.columns.find((column) => column.name === name)?.type
+      expect(type('kind')).toEqual({ kind: 'unsupported' })
+      expect(type('awkward')).toMatchObject({ kind: 'enum' })
+      const described = await createPostgresRecords(reader).describe(PROBE)
+      if (!described.ok) throw new Error(`expected a description, got ${described.code}`)
+      expect(described.described.columns.find((column) => column.name === 'kind')?.type).toEqual({ kind: 'unsupported' })
+      const form = generateForm(seen, { connection: 'test', root: PROBE, formId: 'probe', title: 'Probe', lookups: [] })
+      expect(fieldOf(form, 'kind')).toBeUndefined()
+    } finally {
+      await reader.end()
+    }
   })
 })

@@ -97,8 +97,9 @@ export const HOLDS_NO_NULL = `(${NOT_NULL} or dom.not_null)`
 
 /**
  * Column `a`'s default with its domains (0170), spelled for this session:
- * its own (`DEFAULT_EXPRESSION`), or the nearest domain's where it has none
- * -- what an INSERT that leaves it out stores. Never a generated column's
+ * its own (`DEFAULT_EXPRESSION`), or its type's where it has none -- the
+ * domain it is declared with, never one that domain is declared over -- what
+ * an INSERT that leaves it out stores. Never a generated column's
  * or an identity's, which no default fills. Of `DOMAIN_CHAIN`'s `dom`.
  * Shared with the root's description.
  */

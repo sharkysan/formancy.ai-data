@@ -21,8 +21,9 @@ import type { Statement } from '../sql/statement.js'
  * which carries oids and raw constants, never a spelling. A column of a
  * domain or an enum (0170) is read through discovery's `DOMAIN_CHAIN`: the
  * type its chain ends in, the innermost domain's modifier, its domains'
- * NOT NULL and the nearest one's default as its node tree, and an enum's
- * labels in their order, which are names -- so a label added or renamed,
+ * NOT NULL and the default of the domain it is declared with as its node
+ * tree, and an enum's labels in their order, which are names, NULL where
+ * the account may not use the enum's schema -- so a label added or renamed,
  * a domain made NOT NULL or given a default, moves the digest, and the
  * description reads the column as discovery does. A domain's checks are
  * spelled by `pg_get_expr`, which the search_path respells, so they travel

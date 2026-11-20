@@ -27,7 +27,11 @@ export class Statement {
     return `$${String(this.params.length)}::pg_catalog.text`
   }
 
-  /** A parameter, as text, converted by the server to `type` — one of the names in `types.ts`, never input. */
+  /**
+   * A parameter, as text, converted by the server to `type`: a name from
+   * `sqlTypeOf` (`types.ts`), one of its constants or an enum's name from
+   * approved metadata, quoted one part at a time (0170) -- never input.
+   */
   as(value: string | null, type: string): string {
     return `${this.text(value)}::${type}`
   }
