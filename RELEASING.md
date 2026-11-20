@@ -11,12 +11,18 @@ produced a tarball, and only the workflow can make it.
 # 1. Bump every package to the new version (one number across all of them)
 node scripts/bump.mjs 0.1.0
 
-# 2. Rename "## Unreleased" in CHANGELOG.md to the version's heading, and say
-#    what is knowingly missing. The release report names the upstream
+# 2. Write the version's section of CHANGELOG.md as a summary, as 0.4.0's is
+#    (0171): what the release is, how to get it, what upgrading from the
+#    release before asks of an operator or an integrator, what is new, and
+#    what is knowingly missing, each line with its record. Below it, move
+#    every entry under "## Unreleased", unchanged, under a heading no
+#    release announces -- "## Development between 0.4.0 and 0.5.0" -- and
+#    start Unreleased again, empty. The release report names the upstream
 #    @formancy/* versions the release was tested with; the changelog need not.
 #    The section becomes the release's notes, which GitHub caps at 125,000
 #    characters; scripts/release-notes.test.mjs, in `pnpm test:repo`, fails
-#    a section that would not fit (0064).
+#    a section that would not fit (0064), and an entry under Unreleased past
+#    500 characters, a sentence or two and its record's link (0171).
 
 # 2b. Whether docs/performance.md still describes what ships (0034). If this
 #     names a difference, either stop everything else on the machine -- the

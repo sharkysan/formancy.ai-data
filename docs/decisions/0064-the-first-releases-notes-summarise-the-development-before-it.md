@@ -1,6 +1,6 @@
 # 0064 — The first release's notes summarise the development before it
 
-- **Status:** accepted
+- **Status:** accepted; amended by 0171
 - **Date:** 2026-10-15
 - **Deciders:** Daniel Bacher
 - **Verified by:** `scripts/release-notes.test.mjs`, in `pnpm test:repo` —

@@ -150,8 +150,10 @@ in the same pull request as the code, not in a follow-up:
   The README's *Status* and `docs/guide/status.md` each describe one point
   in time and no other.
 - **`CHANGELOG.md`** — a line under *Unreleased* for anything a user or
-  integrator would notice, with the reason attached, not only the what. A bump
-  of an upstream `@formancy/*` version is always noticed.
+  integrator would notice: a sentence or two with its record, the reason
+  attached and the detail in the record
+  ([0171](docs/decisions/0171-every-releases-notes-are-a-summary-and-an-unreleased-entry-is-a-sentence-or-two.md)).
+  A bump of an upstream `@formancy/*` version is always noticed.
 - **Decision records** (`docs/decisions/`) — a new record for every decision
   someone could helpfully undo, in the format `docs/decisions/README.md`
   describes: next free number, the cost paragraph, the alternatives, and a

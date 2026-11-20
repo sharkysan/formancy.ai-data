@@ -171,8 +171,8 @@ get*](../../README.md#what-you-get) is the short version, and
   version is one publisher's, alone. Unset, as in the composed stack,
   every administrator publishes alone, as before
   ([0065](../decisions/0065-with-publisher-roles-set-a-draft-is-published-only-when-a-publisher-who-did-not-submit-it-approves-it.md)).
-- **Lets a browse role read any table or view's rows**, on `main` since
-  0.3.0. With `FORMANCY_DATA_BROWSE_ROLES` set, each role also an
+- **Lets a browse role read any table or view's rows**, since
+  0.4.0. With `FORMANCY_DATA_BROWSE_ROLES` set, each role also an
   administrator role, its holders page through the rows of any table or
   view the connection's account can see, fifty at a time, searched and
   sorted, in the studio's Browse step: as that account reads them, with no
@@ -197,8 +197,8 @@ get*](../../README.md#what-you-get) is the short version, and
   connection test and the studio's metadata pane say it before a form is
   generated
   ([0068](../decisions/0068-a-snapshot-records-the-server-it-was-read-from-and-nothing-refuses-a-server-discovery-can-read.md)).
-- **Chooses a form's rows saved with their record**, on `main` since
-  0.3.0: on the Choose step, under a lookup whose foreign key is NOT NULL
+- **Chooses a form's rows saved with their record**, since
+  0.4.0: on the Choose step, under a lookup whose foreign key is NOT NULL
   and onto another table, "Rows of this form are saved with their order",
   never ticked for anybody, and its "At least" and "At most", starting at
   none and at the cap data-core gives, one row less than a list's page;
@@ -258,8 +258,8 @@ get*](../../README.md#what-you-get) is the short version, and
   every save on a new connection and never sends one twice, so its page says
   the save may have been saved
   ([0058](../decisions/0058-the-browser-gates-run-in-chromium-firefox-and-webkit-and-each-fact-the-browsers-disagree-on-is-named-and-held.md)).
-- **A record is saved with its rows in one request**, on `main` since
-  0.3.0: an order with its lines, its child's lookup marked by an
+- **A record is saved with its rows in one request**, since
+  0.4.0: an order with its lines, its child's lookup marked by an
   administrator on the studio's Choose step as saved with its record,
   between a fewest and a most rows. `POST /v1/forms/:id/records/save`, which `@formancy/data-client`'s
   `save` sends, takes the record -- a create, or an update that may change
@@ -299,7 +299,7 @@ get*](../../README.md#what-you-get) is the short version, and
   that the page read as "it may have been saved"
   ([0156](../decisions/0156-a-trigger-can-refuse-a-write-in-words-the-person-reads.md)).
 - **An action runs a routine your database keeps over the open record**,
-  on `main` since 0.3.0: a PostgreSQL function returning void or a SQL
+  since 0.4.0: a PostgreSQL function returning void or a SQL
   Server procedure, bound by an administrator to a form with a source for
   every parameter -- a field, a key, a dialog's answer, the person's
   context or who they are -- and offered by `GET /v1/forms/:id` in
@@ -338,8 +338,8 @@ get*](../../README.md#what-you-get) is the short version, and
   [0162](../decisions/0162-the-host-page-runs-an-action-from-the-open-records-header-after-its-dialog-and-a-confirmation-in-place-and-reads-the-record-again.md),
   [0163](../decisions/0163-the-studio-binds-a-routine-as-an-action-offering-each-parameter-only-what-the-generator-binds-and-says-what-it-does-before-it-is-granted.md),
   [0167](../decisions/0167-a-snapshot-says-whether-the-engine-calls-a-routine-given-a-null-and-the-generator-refuses-a-strict-one-before-publication.md)).
-- **An action runs over a selection of up to a page of records**, on
-  `main` since 0.3.0: an action whose `scope` is `selection` in the
+- **An action runs over a selection of up to a page of records**, since
+  0.4.0: an action whose `scope` is `selection` in the
   generation request, bound by the generator's rules for the open
   record's, is run by `POST /v1/forms/:id/actions/:action/run` over one to
   `LIST_PAGE_SIZE` records -- more, or none, refused 400 before any
