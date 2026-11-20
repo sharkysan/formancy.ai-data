@@ -351,20 +351,21 @@ package: build it from this repository, as the composed stack builds it
 
 ## Status
 
-**0.3.0, released on 2026-10-21, is the latest release.** `main` has more
-since -- among it the studio's Browse step, list views named by an
-administrator and kept by a person, a grid's filter typed as a line, a
-record's child forms in tabs, state moves, versions changed from a date,
-starting values, a select of the values a check lists, the server's
-stamps of who wrote a record and when, a record saved with its rows
-in one request of the runtime plane, chosen in the studio and sent from
-the host page's own Save, and an action an administrator binds in the
-studio, run over the open record from the host page's header or over
-the records a person chose of its grid's page -- each a
-line of [`CHANGELOG.md`](./CHANGELOG.md)'s
-*Unreleased*, and the examples page and the live demo are deployed from
-`main`. [The status page](./docs/guide/status.md) says what 0.3.0 added
-over 0.2.0, and what is not yet measured or read by hand.
+**0.4.0, released on 2026-11-20, is the latest release.** Over 0.3.0 it
+adds the studio's Browse step, list views named by an administrator and
+kept by a person, a grid's filter typed as a line, a record's child forms
+in tabs, state moves, versions changed from a date, starting values, a
+select of the values a check lists, the server's stamps of who wrote a
+record and when, a record saved with its rows in one request, chosen in
+the studio and sent from the host page's own Save, and an action an
+administrator binds in the studio, run over the open record from the
+host page's header or over the records a person chose of its grid's
+page. [`CHANGELOG.md`](./CHANGELOG.md)'s 0.4.0 section summarises them,
+says what to do when upgrading from 0.3.0 and what is knowingly missing;
+its *Unreleased* says what is on `main` since, and the examples page and
+the live demo are deployed from `main`.
+[The status page](./docs/guide/status.md) says what 0.4.0 added over
+0.3.0, and what is not yet measured or read by hand.
 
 ## Licence, in one table
 

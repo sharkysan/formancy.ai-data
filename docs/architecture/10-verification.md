@@ -487,7 +487,10 @@ and each of these fails on the change that breaks what it holds:
   registers and what a publish refuses;
   `scripts/release-notes.test.mjs`: each changelog section a release could
   be cut with fits the release body
-  ([0064](../decisions/0064-the-first-releases-notes-summarise-the-development-before-it.md));
+  ([0064](../decisions/0064-the-first-releases-notes-summarise-the-development-before-it.md)),
+  and every entry under Unreleased is at most 500 characters, every run
+  of white space counted as one
+  ([0171](../decisions/0171-every-releases-notes-are-a-summary-and-an-unreleased-entry-is-a-sentence-or-two.md));
   `scripts/performance-stale.test.mjs`: no workflow runs the staleness
   check ([0084](../decisions/0084-a-release-does-not-wait-for-the-performance-figures-to-be-measured-again.md)), and every file the measured
   product leaves out, the default deadline's among them, holds one exported

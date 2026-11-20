@@ -201,7 +201,10 @@ Which of these the latest release carries, and which are on `main` only,
 the README's *Status*, [the status page](../guide/status.md) and
 `CHANGELOG.md`'s *Unreleased* say, and this section does not repeat them; the first release's notes summarise the
 development before it
-([0064](../decisions/0064-the-first-releases-notes-summarise-the-development-before-it.md)).
+([0064](../decisions/0064-the-first-releases-notes-summarise-the-development-before-it.md)),
+and so does every release's from 0.4.0 on, its entries kept below it and
+each new one a sentence or two with its record
+([0171](../decisions/0171-every-releases-notes-are-a-summary-and-an-unreleased-entry-is-a-sentence-or-two.md)).
 
 **Not built, and said so** in the README's *What it does not do yet*, the
 guide, `CHANGELOG.md`'s known gaps or the record that left it out:

@@ -4,18 +4,23 @@ Which release Formancy Data is at, what that release added, where `main`'s
 changes since are listed, and what is not yet measured or read by hand. [The
 README](../../README.md#status) gives the short version.
 
-**Status: 0.3.0, the third release.** Over 0.2.0 it adds the host
-token's verifier as a package of its own, `@formancy/data-identity`,
-which a product that verifies the same tokens installs without the
-server, Fastify or a driver
-([0091](../decisions/0091-the-host-identity-verifier-is-a-package-of-its-own-which-the-server-re-exports.md));
-a host page that drills down one level at a time, with a trail back
-([0090](../decisions/0090-a-hosts-workspace-can-drill-down-one-level-at-a-time-with-a-trail-back.md));
-and a release SBOM of what a consumer's install brings, held to that
-install
-([0092](../decisions/0092-the-sbom-describes-what-a-consumer-installs-and-is-held-to-that-install.md)).
-[`CHANGELOG.md`](../../CHANGELOG.md)'s 0.3.0 section says what else changed,
-what to do when upgrading from 0.2.0, and what is knowingly missing; its
+**Status: 0.4.0, the fourth release.** Over 0.3.0 it adds a record saved
+with the rows of its child forms in one request and one transaction
+([0155](../decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md));
+a routine the database keeps, bound in the studio as an action and run
+over the open record or over the records a person chose
+([0159](../decisions/0159-a-form-binds-a-database-routine-as-an-action-over-the-open-record.md),
+[0162](../decisions/0162-the-host-page-runs-an-action-from-the-open-records-header-after-its-dialog-and-a-confirmation-in-place-and-reads-the-record-again.md),
+[0166](../decisions/0166-a-person-chooses-a-pages-records-by-a-column-of-boxes-and-runs-an-action-over-them-from-a-bar-above-the-grid.md));
+a grid's filter typed as a line, and list views an administrator names
+and a person keeps
+([0131](../decisions/0131-a-person-types-a-grids-filter-as-a-line-and-sees-each-condition-as-a-chip.md),
+[0105](../decisions/0105-a-forms-list-offers-views-its-administrator-named.md),
+[0126](../decisions/0126-a-person-keeps-their-own-list-views-on-the-server-for-themselves-alone.md));
+and the studio's Browse step, for a browse role
+([0099](../decisions/0099-a-browse-role-reads-any-table-or-views-rows-as-the-connections-account-does.md)).
+[`CHANGELOG.md`](../../CHANGELOG.md)'s 0.4.0 section says what else changed,
+what to do when upgrading from 0.3.0, and what is knowingly missing; its
 *Unreleased* says what is on `main` since. The examples page at
 https://formancy.ai/data/examples/
 ([0069](../decisions/0069-the-examples-page-is-served-at-formancy-ai-data-examples.md))
@@ -27,8 +32,8 @@ names what fails when the line stops being true. Not yet: performance
 figures measured on this release -- [the performance page](../performance.md)
 describes 0.1.0
 ([0084](../decisions/0084-a-release-does-not-wait-for-the-performance-figures-to-be-measured-again.md))
--- and any for a page of records, a file of them, the menu of forms or a
-delete; a host page on another origin run in a browser; a run through a real
+-- and any for a page of records, a file of them, the menu of forms, a
+delete, a save or an action; a host page on another origin run in a browser; a run through a real
 Cloudflare tunnel; anything that reads what Cloudflare sends at the
 examples page's address, which was read by hand once, on 2026-10-16, or
 a sign-in to the live demo on Cloudflare, which was read by hand on

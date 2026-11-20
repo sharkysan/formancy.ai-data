@@ -6,9 +6,243 @@ depends on are a separate line, and a change to one is called out explicitly.
 
 Loosely [Keep a Changelog](https://keepachangelog.com), with reasons attached —
 a line that says only *what* changed is rarely the line you need six months
-later.
+later. An entry is a sentence or two with its decision record, where the
+detail is; a release's section summarises the entries written before it,
+which are kept unchanged under a heading of their own below it (0171).
 
 ## Unreleased
+
+### Added
+
+- The guide's pages picture Drill down, a person's own view, Columns and a
+  starting value, so a reader sees each where its prose describes it; a
+  tree, a state's moves and the studio's Browse stay unpictured, for the
+  reasons the record gives
+  ([0169](docs/decisions/0169-the-guides-pages-picture-drill-down-a-persons-own-view-columns-and-a-starting-value-and-the-camera-waits-two-frames-between-shots.md)).
+
+### Changed
+
+### Fixed
+
+## 0.4.0 — 2026-11-20
+
+**The fourth release of Formancy Data.**
+- A record is saved with the rows of its child forms in one request and
+  one transaction, all or none, held to the fewest and the most rows its
+  form allows.
+- A routine your database keeps, a PostgreSQL function or a SQL Server
+  procedure, can be bound to a form as an action, and run over the open
+  record or over the records a person chose.
+- A person finds records by a filter typed as a line, by list views an
+  administrator names or they keep themselves, and in the columns they
+  choose.
+- The studio reads any table or view's rows, for the administrators given
+  a browse role.
+
+Built on formancy's `@formancy/*` packages at 0.13.0, where 0.3.0 was
+built on 0.6.0. A number in parentheses is the
+[decision record](https://github.com/sharkysan/formancy.ai-data/blob/v0.4.0/docs/decisions/README.md)
+behind a line; each names the test that fails when it stops being true.
+
+### Get it
+
+- **Server image:** `ghcr.io/sharkysan/formancy-data-server:v0.4.0`,
+  signed, with its SBOM attached. There is no `latest` tag.
+- **npm packages, with provenance:** `@formancy/data-core`,
+  `@formancy/data-postgres`, `@formancy/data-sqlserver`,
+  `@formancy/data-server`, `@formancy/data-client` and
+  `@formancy/data-identity`, all at 0.4.0.
+- **Try it on your machine:** the
+  [getting-started guide](https://github.com/sharkysan/formancy.ai-data/blob/v0.4.0/docs/getting-started.md)
+  starts both databases, the server, the studio and a host page with one
+  command. CI runs it as written.
+
+### Upgrade from 0.3.0
+
+- **Upgrade the server and every host's `@formancy/data-client`
+  together.** 0.4.0's client takes a 0.3.0 server's form, menu and page of
+  records as `unexpected`, and 0.4.0's server refuses a 0.3.0 client's
+  list request, which pages by `offset`, as `400 malformed`
+  ([0108](https://github.com/sharkysan/formancy.ai-data/blob/v0.4.0/docs/decisions/0108-a-forms-list-pages-after-the-last-row-it-showed-found-again-by-its-key.md)).
+- **A host's renderer must be `@formancy/*` 0.8.0 or later.** A form
+  published from 0.4.0 is formancy's spec 5, which an older renderer
+  refuses. This release is tested at 0.13.0
+  ([0118](https://github.com/sharkysan/formancy.ai-data/blob/v0.4.0/docs/decisions/0118-generated-forms-move-to-spec-5-for-help-text-from-column-comments.md)).
+- **A form published at 0.3.0 keeps what it was generated with** -- no
+  help text from a column's comment, no starting value from its default,
+  no select of the values a check lists -- until it is generated again in
+  the studio's Drift step and published. A studio session, a draft or an
+  import holding a base generated before the upgrade is refused at publish
+  until then
+  ([0030](https://github.com/sharkysan/formancy.ai-data/blob/v0.4.0/docs/decisions/0030-presentation-is-a-patch-over-the-generated-base.md)),
+  and a form over a column named `__proto__` is refused on every read
+  until it is published again
+  ([0093](https://github.com/sharkysan/formancy.ai-data/blob/v0.4.0/docs/decisions/0093-a-column-named-proto-is-generated-under-another-key.md)).
+- **Rolled back to 0.3.0, a deployment refuses every version published
+  since**, until an earlier version is restored there
+  ([0118](https://github.com/sharkysan/formancy.ai-data/blob/v0.4.0/docs/decisions/0118-generated-forms-move-to-spec-5-for-help-text-from-column-comments.md)).
+- **A host token is verified only in its compact form**, three base64url
+  parts with no padding or space; anything else is refused as
+  `ERR_JWS_INVALID`
+  ([0101](https://github.com/sharkysan/formancy.ai-data/blob/v0.4.0/docs/decisions/0101-a-host-token-is-refused-unless-it-is-its-compact-form-exactly.md)).
+- **A trusted-proxy list whose entries together trust every IPv4 or every
+  IPv6 peer**, such as `0.0.0.0/1, 128.0.0.0/1`, stops the server at
+  start, as a prefix of 0 already did
+  ([0100](https://github.com/sharkysan/formancy.ai-data/blob/v0.4.0/docs/decisions/0100-a-proxy-list-whose-entries-together-trust-every-peer-is-refused.md)).
+- **The server image's code is root's.** Its user, `node`, writes only the
+  store at `/var/lib/formancy-data`, and the image starts on a read-only
+  root
+  ([0102](https://github.com/sharkysan/formancy.ai-data/blob/v0.4.0/docs/decisions/0102-the-server-image-gives-its-user-the-store-and-not-its-code.md)).
+- **Building from the repository needs Node 22.22.3 or a later 22, 24.15
+  or a later 24, or 26 or later.** The server image still runs on
+  `node:22.12-alpine`, and no published package names a Node version.
+  Fastify `^5.12.8` and `@azure/identity` 4.14.1 take the fixes for their
+  advisories; with a lockfile of your own, move `fast-uri` and
+  `ip-address` beneath Fastify past theirs too
+  ([0148](https://github.com/sharkysan/formancy.ai-data/blob/v0.4.0/docs/decisions/0148-the-workspaces-node-is-one-every-package-it-installs-accepts-and-so-is-the-server-images.md)).
+- **New settings, each safe left unset:** `FORMANCY_DATA_BROWSE_ROLES`,
+  nobody unset
+  ([0099](https://github.com/sharkysan/formancy.ai-data/blob/v0.4.0/docs/decisions/0099-a-browse-role-reads-any-table-or-views-rows-as-the-connections-account-does.md));
+  `FORMANCY_DATA_SAVE_DEADLINE_MS`, 1,900 ms unset, and with a SQL Server
+  connection allowed the server does not start at 7,500 ms or more
+  ([0155](https://github.com/sharkysan/formancy.ai-data/blob/v0.4.0/docs/decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md));
+  `FORMANCY_DATA_ACTION_DEADLINE_MS`, 15,000 ms unset
+  ([0161](https://github.com/sharkysan/formancy.ai-data/blob/v0.4.0/docs/decisions/0161-the-runtime-plane-runs-an-action-once-per-write-id-under-a-deadline-and-never-queues-it.md));
+  and `FORMANCY_DATA_ADMIN_TOKEN`, which the image's
+  `dist/drift-check-cli.mjs` reads
+  ([0111](https://github.com/sharkysan/formancy.ai-data/blob/v0.4.0/docs/decisions/0111-a-deploy-pipeline-checks-drift-with-a-command-that-fails-on-a-blocking-change.md)).
+- **Actions open connections of their own** to each allowlisted database:
+  a third PostgreSQL client and a second SQL Server pool of up to ten,
+  each named `formancy-data actions`
+  ([0160](https://github.com/sharkysan/formancy.ai-data/blob/v0.4.0/docs/decisions/0160-an-action-runs-in-one-transaction-that-locks-the-record-moves-its-version-and-calls-the-routine-guarded-and-never-retried.md)).
+- **Behind Cloudflare, run `tunnel-config` again**, as section 8 of the
+  [Cloudflare guide](https://github.com/sharkysan/formancy.ai-data/blob/v0.4.0/docs/deploy/cloudflare.md)
+  says: until then the runtime door forwards no save, change from a date,
+  action or person's own view, which fails closed
+  ([0037](https://github.com/sharkysan/formancy.ai-data/blob/v0.4.0/docs/decisions/0037-cloudflare-is-the-edge-not-the-runtime.md)).
+- **The configuration store keeps each person's own list views** under
+  `.people`, which a backup of the store holds
+  ([0126](https://github.com/sharkysan/formancy.ai-data/blob/v0.4.0/docs/decisions/0126-a-person-keeps-their-own-list-views-on-the-server-for-themselves-alone.md)).
+- **Audit events gain keys and operations**: `moved`, the administrator's
+  `object`, and a run's `action` and `records`; and `save`, `supersede`,
+  `action`, `view-save`, `view-remove` and `browse`
+  ([0112](https://github.com/sharkysan/formancy.ai-data/blob/v0.4.0/docs/decisions/0112-a-policy-holds-a-state-field-to-the-moves-it-lists.md),
+  [0099](https://github.com/sharkysan/formancy.ai-data/blob/v0.4.0/docs/decisions/0099-a-browse-role-reads-any-table-or-views-rows-as-the-connections-account-does.md),
+  [0161](https://github.com/sharkysan/formancy.ai-data/blob/v0.4.0/docs/decisions/0161-the-runtime-plane-runs-an-action-once-per-write-id-under-a-deadline-and-never-queues-it.md)).
+- **For embedders and adapter integrators:** `RecordAdapter` requires
+  `save`, `ActionAdapter` is a new port, `OpenConnection` needs `actions`
+  and `actionPool`, `MenuForm` needs `together` and `saves`, `listColumns`
+  takes the published views and an options object, and
+  `GET /v1/administration`'s `refuses` names `browse` to a caller without
+  a browse role
+  ([0155](https://github.com/sharkysan/formancy.ai-data/blob/v0.4.0/docs/decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md),
+  [0160](https://github.com/sharkysan/formancy.ai-data/blob/v0.4.0/docs/decisions/0160-an-action-runs-in-one-transaction-that-locks-the-record-moves-its-version-and-calls-the-routine-guarded-and-never-retried.md),
+  [0099](https://github.com/sharkysan/formancy.ai-data/blob/v0.4.0/docs/decisions/0099-a-browse-role-reads-any-table-or-views-rows-as-the-connections-account-does.md)).
+
+### What's new
+
+**On the host page**, the example workspace over the runtime plane:
+- **A record with its rows**: a child form's rows wait for the record's
+  own Save, which stores them all or none (0155).
+- **Actions** from the open record's header, or over the records ticked on
+  the Records grid (0162, 0166).
+- **Finding records**: a filter typed as a line, with chips, a box under
+  each header and `=` on a cell, a lookup filtered by its record or the
+  columns it shows and sorted by what it shows (0130–0136, 0139); list
+  views for some roles, and a person's own (0105, 0124–0126, 0128); and
+  columns shown, moved and sized (0106, 0151).
+- **Moving around**: forms by group, with a search (0143, 0144); child
+  forms as tabs (0142); a lookup's record a level below (0140, 0141); a
+  tree for a table that refers to itself (0110); a one-row extension as a
+  section (0109); Stacked first and the layout kept (0145); and the rows
+  on screen kept while the next page loads (0146).
+- **Editing**: Duplicate record (0107); a state field as its person's
+  moves (0127, 0129); Change from a date (0113, 0115); a field the person
+  may not write drawn unwritable (0117, 0122); a new record at its
+  starting values (0149, 0150).
+
+**In the studio**:
+- **A Browse step** for a browse role, its rows filtered by the host's
+  line and a row's foreign keys followed either way (0099, 0103, 0104,
+  0147).
+- **To choose**: versions (0114), rows saved with their record (0155),
+  stamps (0153), state moves (0112), routines bound as actions (0163), and
+  every lookup offered from the start (0138).
+- **To present**: help text and starting values (0119, 0150), list views
+  and the filter's fields (0105, 0123), state labels (0129) and a form's
+  group (0143).
+
+**In the server and the adapters**:
+- **The runtime plane** saves a record with its rows (0155); runs an
+  action once per write id, over the open record or up to a page of
+  records, all or nothing (0159–0161, 0165); changes a version from a date
+  (0113); filters a list, a file and a browse (0104, 0130); pages after
+  the last row shown (0108); stamps who wrote a record and when (0153);
+  holds a state field to its moves (0112); and says a trigger's refusal in
+  its own words (0156).
+- **Generation** writes formancy's spec 5, with a column's comment as help
+  text (0118); a select of the values a check lists (0152); a column's
+  constant default as a starting value (0149); and refuses a STRICT
+  PostgreSQL routine (0167). Discovery reads the routines in scope when
+  asked (0158).
+- **Operations**: `dist/drift-check-cli.mjs` for a deploy pipeline (0111),
+  and every `@formancy/*` dependency moved from 0.6.0 to 0.13.0 (0055).
+  The legal notice and the privacy review are no longer drafts.
+
+### Known gaps
+
+- **The performance figures are still 0.1.0's.**
+  [The performance page](https://github.com/sharkysan/formancy.ai-data/blob/v0.4.0/docs/performance.md)
+  was measured on 2026-10-15, at commit `2e0c4071e113`, and
+  `node scripts/performance-stale.mjs` names this release's code and
+  dependencies as different. The default lookup deadline, 892 ms, is still
+  derived from those figures, and none measure a page of records, a file
+  of them, the menu of forms, a delete, a save or an action
+  ([0084](https://github.com/sharkysan/formancy.ai-data/blob/v0.4.0/docs/decisions/0084-a-release-does-not-wait-for-the-performance-figures-to-be-measured-again.md)).
+- **Opening a form, a create and a save read every published form**, and
+  nothing is cached: about 2 ms a published form, measured once
+  ([0140](https://github.com/sharkysan/formancy.ai-data/blob/v0.4.0/docs/decisions/0140-a-form-names-the-forms-each-lookups-record-opens-in.md),
+  [0155](https://github.com/sharkysan/formancy.ai-data/blob/v0.4.0/docs/decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md)).
+- **What an action's routine does is the deployment's**: it may write what
+  no grant lets the person write. On PostgreSQL a form scoped through a
+  parent needs UPDATE on the parent's table for any run, and a run whose
+  answer was lost is reported as possibly run
+  ([0159](https://github.com/sharkysan/formancy.ai-data/blob/v0.4.0/docs/decisions/0159-a-form-binds-a-database-routine-as-an-action-over-the-open-record.md),
+  [0160](https://github.com/sharkysan/formancy.ai-data/blob/v0.4.0/docs/decisions/0160-an-action-runs-in-one-transaction-that-locks-the-record-moves-its-version-and-calls-the-routine-guarded-and-never-retried.md)).
+- **The host page runs an action** from the open record's header, and over
+  the records ticked on one page of the Records grid alone
+  ([0166](https://github.com/sharkysan/formancy.ai-data/blob/v0.4.0/docs/decisions/0166-a-person-chooses-a-pages-records-by-a-column-of-boxes-and-runs-an-action-over-them-from-a-bar-above-the-grid.md)).
+- **Two people saving lines of one order at once** makes the second stale,
+  and on SQL Server saves of different records wait on each other, and can
+  deadlock, where the child's foreign key has no index
+  ([0155](https://github.com/sharkysan/formancy.ai-data/blob/v0.4.0/docs/decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md)).
+- **A browse role reads every row the connection's account can read**,
+  with no form or policy between
+  ([0099](https://github.com/sharkysan/formancy.ai-data/blob/v0.4.0/docs/decisions/0099-a-browse-role-reads-any-table-or-views-rows-as-the-connections-account-does.md)).
+- **On a record just created, a field written on create only stays
+  writable** until the record is opened again
+  ([0122](https://github.com/sharkysan/formancy.ai-data/blob/v0.4.0/docs/decisions/0122-a-host-page-draws-a-saved-record-for-the-update-and-a-new-one-for-the-create.md)).
+- **Drill down's levels are in the page's memory**, so a reload starts at
+  the records
+  ([0090](https://github.com/sharkysan/formancy.ai-data/blob/v0.4.0/docs/decisions/0090-a-hosts-workspace-can-drill-down-one-level-at-a-time-with-a-trail-back.md)).
+- **As before:** a typeahead's "there are more" is heard, not seen, under
+  formancy's themes
+  ([0085](https://github.com/sharkysan/formancy.ai-data/blob/v0.4.0/docs/decisions/0085-a-lookup-says-when-its-list-goes-on-never-how-long-it-is.md));
+  no test logs in as an Entra principal or runs on Azure SQL; no host page
+  on another origin has run in a browser, nor anything through a real
+  Cloudflare Tunnel; and no lawyer has reviewed the licence.
+
+The release report attached below says what this release was tested on,
+and its *Known limitations* lists every limitation the decision records
+name, one sentence each. Every change since 0.3.0, with its reason, is in
+[CHANGELOG.md](https://github.com/sharkysan/formancy.ai-data/blob/v0.4.0/CHANGELOG.md#development-between-030-and-040)
+under *Development between 0.3.0 and 0.4.0*, which these notes summarise
+([0171](https://github.com/sharkysan/formancy.ai-data/blob/v0.4.0/docs/decisions/0171-every-releases-notes-are-a-summary-and-an-unreleased-entry-is-a-sentence-or-two.md)).
+
+## Development between 0.3.0 and 0.4.0
+
+Every entry written under *Unreleased* between 0.3.0 and 0.4.0, as it was
+written. All of it is in 0.4.0.
 
 **The legal notice and the privacy review are answered, and are no longer drafts.** The operator
 has no commercial register entry or VAT number, and the privacy review says what was read from the

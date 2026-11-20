@@ -2,11 +2,13 @@
 // what the release report says the release was tested on (0035).
 //
 // GitHub refuses a release body over 125,000 characters, and the changelog
-// grows by a long paragraph a change. So the body is one section and the
-// report's summary, never the whole file, and it is built and measured in
-// the gates workflow's report job, before anything is published: a body too
-// long, or a version with no section, fails that job rather than the last
-// step of a release, after npm already holds the version.
+// grows by an entry a change. So the body is one section and the report's
+// summary, never the whole file, and it is built and measured in the gates
+// workflow's report job, before anything is published: a body too long, or a
+// version with no section, fails that job rather than the last step of a
+// release, after npm already holds the version. A version's section is a
+// summary, and an entry under Unreleased a sentence or two, which
+// `overlongEntries` holds (0171).
 //
 // Used by `.github/workflows/gates.yml`'s report job, through
 // scripts/release-report/report.mjs, and held by
@@ -63,6 +65,52 @@ export function releaseNotes(changelog, version) {
 export function bodySection(changelog, { release, version }) {
   if (release !== '' && release !== 'dry-run') return release.replace(/^v/, '')
   return hasSection(changelog, version) ? version : 'Unreleased'
+}
+
+/**
+ * The most characters an entry under Unreleased may hold, every run of white
+ * space counted as one (0171): a sentence or two and its record's link, the
+ * detail in the record. Measured on 2026-11-20 from the 92 entries written
+ * between 0.3.0 and 0.4.0: the longest of two sentences or fewer, 0094's, is
+ * 330 characters, and the longest link to a record,
+ * `([0163](docs/decisions/…))`, 169; together 499.
+ */
+export const ENTRY_LIMIT = 500
+
+/**
+ * The entries of the Unreleased section, as written: each item at the margin
+ * with every line under it -- a lazy line, a list of its own -- and each
+ * paragraph outside a list, every run of white space made one space. A
+ * heading ends an entry and is none. Only Unreleased: a released section and
+ * the development history under its own heading are never read.
+ */
+export function unreleasedEntries(changelog) {
+  const found = []
+  let entry = []
+  const end = () => {
+    const text = entry.join(' ').replace(/\s+/g, ' ').trim()
+    if (text !== '') found.push({ text, length: text.length })
+    entry = []
+  }
+  for (const line of releaseNotes(changelog, 'Unreleased').split('\n')) {
+    const after = entry.at(-1)
+    if (line.startsWith('#')) end()
+    else if (line.startsWith('- ') || line.startsWith('* ')) {
+      end()
+      entry.push(line)
+    } else if (line.trim() === '' || /^\s/.test(line) || (after !== undefined && after.trim() !== '')) entry.push(line)
+    else {
+      end()
+      entry.push(line)
+    }
+  }
+  end()
+  return found
+}
+
+/** The entries under Unreleased longer than `limit`, each with its length. */
+export function overlongEntries(changelog, limit = ENTRY_LIMIT) {
+  return unreleasedEntries(changelog).filter(({ length }) => length > limit)
 }
 
 /**

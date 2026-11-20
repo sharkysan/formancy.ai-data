@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, test } from 'vitest'
-import { BODY_LIMIT, bodySection, hasSection, releaseBody, releaseNotes } from './release-notes.mjs'
+import { BODY_LIMIT, ENTRY_LIMIT, bodySection, hasSection, overlongEntries, releaseBody, releaseNotes, unreleasedEntries } from './release-notes.mjs'
 import { renderSummary } from './release-report/render.mjs'
 import { buildReport } from './release-report/report.mjs'
 import { greenCiRun } from './release-report/synthetic-run.mjs'
@@ -67,6 +67,65 @@ describe('bodySection', () => {
   })
 })
 
+describe('unreleasedEntries', () => {
+  // An entry that wrapped onto a lazy line, or held a list of its own, and
+  // was measured as several short ones would pass the limit however long it
+  // grew; and a heading counted as an entry would be measured for nothing.
+  test('reads each item at the margin with every line under it, and each paragraph, as one entry', () => {
+    const section = [
+      '## Unreleased',
+      '',
+      '**A paragraph** of its own,',
+      'wrapped.',
+      '',
+      '### Added',
+      '',
+      '- **One** (0001). Why:',
+      '  wrapped,',
+      'and lazily.',
+      '  - a list of its own,',
+      '',
+      '    after a blank line.',
+      '- **Two**.',
+      '',
+      '## 0.1.0 — 2026-11-01',
+    ].join('\n')
+    expect(unreleasedEntries(section).map(({ text }) => text)).toEqual([
+      '**A paragraph** of its own, wrapped.',
+      '- **One** (0001). Why: wrapped, and lazily. - a list of its own, after a blank line.',
+      '- **Two**.',
+    ])
+  })
+
+  // How a line is wrapped is the formatter's or the writer's, not what the
+  // entry says: two spaces of indentation a line would count against an
+  // entry wrapped narrowly, and not against the same words on one line.
+  test('counts every run of white space as one character', () => {
+    const [entry] = unreleasedEntries('## Unreleased\n\n- **One**\n      two\n\n  three')
+    expect(entry).toEqual({ text: '- **One** two three', length: 19 })
+  })
+})
+
+describe('overlongEntries', () => {
+  // Unreleased had grown to entries of thousands of characters, the release
+  // body to 124,979 of the 125,000 GitHub accepts (0171): the limit is what
+  // keeps each new entry a sentence or two, with the detail in its record.
+  test('names an entry over the limit with its length, and not one at it', () => {
+    const at = `- ${'a'.repeat(ENTRY_LIMIT - 2)}`
+    const over = `- ${'b'.repeat(ENTRY_LIMIT - 1)}`
+    expect(overlongEntries(`## Unreleased\n\n${at}\n${over}\n`)).toEqual([{ text: over, length: ENTRY_LIMIT + 1 }])
+  })
+
+  // The released sections and the development history kept under their
+  // own headings say what was true when they were written, at the length
+  // they were written: the limit is for the entries still to be released.
+  test('reads Unreleased alone, never a released section or the development history', () => {
+    const long = `- ${'x'.repeat(ENTRY_LIMIT * 2)}`
+    const kept = ['## Unreleased', '', '### Added', '', '## 0.4.0 — 2026-11-20', '', long, '', '## Development between 0.3.0 and 0.4.0', '', long].join('\n')
+    expect(overlongEntries(kept)).toEqual([])
+  })
+})
+
 describe('the changelog this repository keeps', () => {
   // A section grows by a long paragraph a change. Unreleased had grown to
   // 178,500 characters by the first release, and renamed to 0.1.0 as
@@ -86,5 +145,16 @@ describe('the changelog this repository keeps', () => {
       const summary = renderSummary(buildReport(greenCiRun()), { section, link })
       expect(() => releaseBody(changelog, section, summary), section).not.toThrow()
     }
+  })
+
+  // The month before 0.4.0 wrote 92 entries under Unreleased, most of them
+  // paragraphs of a thousand characters or more, and every new one failed
+  // the test above, the body at 124,979 characters (0171). Here an entry
+  // past a sentence or two fails the pull request that writes it, before
+  // the next release meets the limit; its detail belongs in its record.
+  test(`keeps every entry under Unreleased to ${String(ENTRY_LIMIT)} characters`, () => {
+    const changelog = readFileSync(new URL('../CHANGELOG.md', import.meta.url), 'utf8')
+    const overlong = overlongEntries(changelog).map(({ text, length }) => `${String(length)} characters: ${text.slice(0, 80)}…`)
+    expect(overlong).toEqual([])
   })
 })
