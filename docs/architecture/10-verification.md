@@ -656,10 +656,15 @@ Every picture in `README.md` and on the guide's pages is taken by
 the real server, and never retouched
 ([0038](../decisions/0038-readme-pictures-are-taken-by-a-script-and-held-to-the-text-they-show.md)).
 `scripts/pictures/readme.test.mjs` holds the picture regions -- the hero's
-in the README, each app's on its page of the guide, each on its own page
-and on no other, its links aimed from there
+and *How it works*' in the README, each app's on its page of the guide,
+each on its own page and on no other, its links aimed from there
 ([0154](../decisions/0154-the-readme-speaks-to-a-buyer-first-and-the-detail-lives-in-the-guide.md)) -- to
-`scripts/pictures/scenes.json` and what was captured; each app's
+`scripts/pictures/scenes.json` and what was captured, and *How it works*'
+pictures to its list, one scene per step, each under its step's item
+([0168](../decisions/0168-the-readme-pictures-the-workspace-a-buyer-meets-and-each-step-of-how-it-works.md)).
+The hero's orders are invented, inserted and deleted again by the host
+page's walk through the owner's connection, never added to the shared
+fixture model; each app's
 `pictures.mjs --check`, run by `pnpm test:pictures` in Chromium in the
 `pictures` job, walks the same states and fails when a pictured element no
 longer says what the caption quotes. What a picture looks like is held by

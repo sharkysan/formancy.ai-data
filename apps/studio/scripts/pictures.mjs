@@ -29,7 +29,14 @@
 // starting where the last one left the studio. That is scenes.json's order
 // but for studio-through, which the README shows after the order form's
 // policy and which runs last, because it signs out and in again to build a
-// form over another table. Elements are found by role and accessible name.
+// form over another table; and but for the four steps of the README's How
+// it works that are the studio's, which scenes.json lists first and which
+// run where their state is: Connect on PostgreSQL after Connect on SQL
+// Server, Generate and Govern and arrange in the states of studio-generate
+// and studio-policy, and Publish, version 1 published alone, before
+// studio-publish-conflict's conflict. This plane has no publisher roles,
+// so Publish is a publish, not a draft approved by a second administrator,
+// which a server started under review would take (0065). Elements are found by role and accessible name.
 // One exception: the host token is a password field, which has no role, so
 // it is found by its label.
 //
@@ -185,8 +192,18 @@ function actsOver(plane, scenes) {
       return { parts: { Seen: seen } }
     },
 
+    // How it works' Connect: the order form's own account, discovered within the schemas its connection approves.
+    'studio-connect-pg': async (page) => {
+      const seen = await discover(await at(page, stepOf('studio-connect'), { go: false }), FORM.connection)
+      // The caption's "as the order form's own account", which the paragraph says by its user.
+      await seen
+        .getByRole('code')
+        .filter({ hasText: /^formancy_writer$/ })
+        .waitFor()
+      return { parts: { Seen: seen } }
+    },
+
     'studio-choose': async (page, scene) => {
-      await discover(await at(page, stepOf('studio-connect'), { go: false }), FORM.connection)
       await page.getByRole('button', { name: 'Choose a root', exact: true }).click()
       const here = await at(page, scene.step, { go: false })
       await here.getByRole('combobox', { name: 'Root table or view', exact: true }).selectOption(ROOT)
@@ -215,6 +232,9 @@ function actsOver(plane, scenes) {
       return { parts: { Chose: here.getByRole('region', { name: STUDIO.chose, exact: true }) } }
     },
 
+    // How it works' Generate: the same state, the step whole -- what it was generated from, and what the generator chose.
+    'studio-choose-generate': async (page) => ({ parts: { Generate: await at(page, stepOf('studio-generate'), { go: false }) } }),
+
     'studio-policy': async (page, scene) => {
       const here = await at(page, scene.step)
       for (const operation of ['read', 'create', 'update'])
@@ -227,6 +247,12 @@ function actsOver(plane, scenes) {
           Lookup: here.getByRole('group', { name: 'Rows the Customer list may offer', exact: true }),
         },
       }
+    },
+
+    // How it works' Govern and arrange: the same state, who may do what, by the roles the host's tokens carry.
+    'studio-policy-roles': async (page) => {
+      const here = await at(page, stepOf('studio-policy'), { go: false })
+      return { parts: { Roles: here.getByRole('group', { name: 'Who may do what', exact: true }) } }
     },
 
     'studio-presentation': async (page, scene) => {
@@ -266,10 +292,24 @@ function actsOver(plane, scenes) {
       return { parts: { Preview: here } }
     },
 
-    'studio-publish-conflict': async (page, scene) => {
-      const here = await at(page, scene.step)
+    // How it works' Publish: version 1, published alone. This plane has no
+    // publisher roles, so its studio has no Review step: a draft approved by
+    // a second administrator needs a server started under review (0065).
+    'studio-publish': async (page) => {
+      const here = await at(page, stepOf('studio-publish-conflict'))
       await here.getByRole('button', { name: 'Publish version 1', exact: true }).click()
       await here.getByText(`Published version 1 of ${FORM.formId}.`, { exact: true }).waitFor()
+      // What the page says it did, asked of the server: version 1 is the one published.
+      const latest = await plane.as('ada', 'GET', `/v1/forms/${FORM.formId}/versions/latest`)
+      if (latest.statusCode !== 200 || latest.json().version !== 1)
+        throw new Error(
+          `the latest version of ${FORM.formId} answered ${String(latest.statusCode)} with version ${String(latest.json()?.version)}, not version 1`,
+        )
+      return { parts: { Publish: here } }
+    },
+
+    'studio-publish-conflict': async (page, scene) => {
+      const here = await at(page, scene.step, { go: false })
       // grace, from the same server: version 1 read and published again over it.
       const latest = await plane.as('grace', 'GET', `/v1/forms/${FORM.formId}/versions/latest`)
       const theirs = await plane.as('grace', 'POST', `/v1/forms/${FORM.formId}/versions`, { expectedBase: 1, bundle: latest.json().bundle })

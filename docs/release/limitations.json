@@ -945,7 +945,7 @@
       ]
     },
     "0038": {
-      "reviewed": "sha256:95ce8cec4e8c6c424104ac45259c0c1c62010cf018c6c8ba0e22640eadff376c",
+      "reviewed": "sha256:1ce9a4c1f2a9dec91b5ea3c8f61b53cf6b2c79f6786c27722ddfda1e2c15839c",
       "none": "Its costs are the repository's and CI's: the pictures' bytes, retaking them when a pictured sentence changes, and the pictures job's time. Nobody who installs, integrates or operates the module meets them."
     },
     "0039": {
@@ -1307,7 +1307,7 @@
       ]
     },
     "0047": {
-      "reviewed": "sha256:0bd393b5229f6323d94bb6c21445497357f9cedee44673ecb1714447619b65fb",
+      "reviewed": "sha256:74bef7b37ae18478fff11dff2bf897114e429d03f9142b662f43598720be265c",
       "limitations": [
         {
           "area": "host",
@@ -1354,7 +1354,7 @@
         },
         {
           "area": "operations",
-          "says": "The composed stack's order form account may not read sales.order_line, so the getting-started guide and the README's pictures show no child grid."
+          "says": "The composed stack's order form account may not read sales.order_line, so the getting-started guide shows no child grid, and the README's pictures show an order's deliveries but never its lines."
         }
       ]
     },
@@ -4456,7 +4456,7 @@
       ]
     },
     "0154": {
-      "reviewed": "sha256:cd38471d6ed98beac45014b9da51ca46f7705bfb917b28d1ff3ff5c05a00e027",
+      "reviewed": "sha256:58b76a63d96b7c5474fe9099d9ff134562278d5130f0533cd886d5edb8f3ef7f",
       "none": "Its costs -- two places to keep in step, a README that shows less at once, and a link from outside to a README anchor that moved, which now opens the README at its top -- fall on the documentation's readers and its maintainer; nothing a user, integrator or operator of the module installs, runs or configures changed."
     },
     "0155": {
@@ -5133,6 +5133,10 @@
           "says": "A server older than 0167 reads a snapshot that records whether a routine is called given a NULL, and its generator binds a STRICT routine whose every run is refused; its drift review reports every routine of a form published since 0167 as changed, a bound one for review and any other as a note, though nothing changed, until the form is published again from a discovery of that server."
         }
       ]
+    },
+    "0168": {
+      "reviewed": "sha256:7f92093fedb2908e9c1452c3ba2f09548db74f809c8ef0f19d6b7d0c5ebde1da",
+      "none": "Its costs are the repository's and CI's: six more pictures to retake when a pictured sentence or the look changes, two of them needing Docker, their bytes, a longer host walk in the pictures job, and step pictures drawn at 0.7 of their size that a reader may have to open to read. Nobody who installs, integrates or operates the module meets them."
     }
   }
 }

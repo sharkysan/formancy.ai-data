@@ -1,7 +1,7 @@
 {
-  "host-loaded": {
-    "file": "docs/images/readme/host-loaded.webp",
-    "captured": "2026-11-15",
+  "host-workspace": {
+    "file": "docs/images/readme/host-workspace.webp",
+    "captured": "2026-11-20",
     "viewport": {
       "width": 1440,
       "height": 900
@@ -11,10 +11,10 @@
     "timezone": "UTC",
     "css": {
       "width": 1425,
-      "height": 1608
+      "height": 1472
     },
-    "bytes": 178402,
-    "sha256": "4a722f414920710150d12fc23c6f0a239557f854060c305d72ab942cf70de77b",
+    "bytes": 208868,
+    "sha256": "d061292b5464be56fb9fa4ae068dbdedfe9efcc6af7447127dbb0d8bf1c5795c",
     "look": {
       "platform": "linux-x64",
       "playwright": "1.63.0",
@@ -26,10 +26,170 @@
       }
     },
     "database": "PostgreSQL 17.11 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit, from postgres:17-alpine, as formancy_writer",
-    "stylesheet": "sha256 6c9d25ffd66a8725a6f35e73bc04bb3421b37df0b40ea6ecae72392c66ebe46c of src/host.css with its imports, and @formancy/themes 0.13.0",
+    "stylesheet": "sha256 db2b72721337c16bf3116444b026dca21385cbd07608a824d7ee0eb5e3d3baea of src/host.css with its imports, and @formancy/themes 0.13.0",
     "text": {
-      "Forms": "- navigation \"Forms\":\n  - heading \"Forms\" [level=2]\n  - text: Find a form\n  - textbox \"Find a form\"\n  - status\n  - heading \"Sales\" [level=3]\n  - list \"Sales\":\n    - listitem:\n      - link \"Order pg-order\":\n        - /url: \"#form=pg-order&layout=stacked&view=records\"\n        - text: Order\n        - code: pg-order\n  - button \"Sign out\"",
-      "Workspace": "- main \"Order pg-order\":\n  - heading \"Order pg-order\" [level=2]:\n    - text: Order\n    - code: pg-order\n  - list \"Operations\":\n    - listitem: Read\n    - listitem: Create\n    - listitem: Update\n  - group \"Layout\":\n    - text: Layout\n    - radio \"Side by side\"\n    - text: Side by side\n    - radio \"Stacked\" [checked]\n    - text: Stacked\n    - radio \"Separate views\"\n    - text: Separate views\n    - radio \"Drill down\"\n    - text: Drill down\n  - region \"Records\":\n    - heading \"Records\" [level=3]\n    - button \"New record\"\n    - button \"Download CSV\"\n    - status \"Download CSV\"\n    - search \"Search records\":\n      - text: Search\n      - textbox \"Search\"\n      - button \"Search\"\n    - paragraph: Looks in Id, Status, Notes, Group, Created by and Approved by when you press Search.\n    - button \"Columns\"\n    - text: Filter\n    - combobox \"Filter\"\n    - paragraph: Conditions joined by and, applied with Enter. On a cell, = keeps the rows with its value.\n    - status \"Filter\"\n    - status: Rows 1–1.\n    - button \"Previous rows\" [disabled]\n    - button \"Next rows\" [disabled]\n    - grid \"Records\":\n      - rowgroup:\n        - row \"Id Customer Order date Status Amount Notes Group Created by Approved by\":\n          - columnheader \"Id\"\n          - columnheader \"Customer\"\n          - columnheader \"Order date\"\n          - columnheader \"Status\"\n          - columnheader \"Amount\"\n          - columnheader \"Notes\"\n          - columnheader \"Group\"\n          - columnheader \"Created by\"\n          - columnheader \"Approved by\"\n        - row:\n          - gridcell:\n            - textbox \"Filter Id\"\n          - gridcell:\n            - combobox \"Filter Customer\"\n          - gridcell:\n            - textbox \"Filter Order date\"\n          - gridcell:\n            - textbox \"Filter Status\"\n          - gridcell:\n            - textbox \"Filter Amount\"\n          - gridcell:\n            - textbox \"Filter Notes\"\n          - gridcell:\n            - textbox \"Filter Group\"\n          - gridcell:\n            - textbox \"Filter Created by\"\n          - gridcell:\n            - textbox \"Filter Approved by\"\n        - row \"9007199254740993 Muster AG 2026-10-08 placed 99999999999999.9999 A 1\" [selected]:\n          - gridcell \"9007199254740993\"\n          - gridcell \"Muster AG\"\n          - gridcell \"2026-10-08\"\n          - gridcell \"placed\"\n          - gridcell \"99999999999999.9999\"\n          - gridcell\n          - gridcell \"A\"\n          - gridcell \"1\"\n          - gridcell\n  - separator \"Records\"\n  - region \"Order k1:9007199254740993\":\n    - heading \"Order k1:9007199254740993\" [level=3]:\n      - text: Order\n      - code: k1:9007199254740993\n    - button \"Go to its row\"\n    - button \"Duplicate record\"\n    - status:\n      - text: Loaded record\n      - code: k1:9007199254740993\n      - text: into both forms.\n    - button \"For the demo\"\n    - region \"React\":\n      - heading \"React\" [level=4]\n      - form \"Order, React\":\n        - group \"Order\":\n          - paragraph: Order\n          - text: Customer*\n          - combobox \"Customer*\" [disabled]: Muster AG\n          - status\n          - text: Order date*\n          - textbox \"Order date*\" [disabled]: 2026-10-08\n          - text: Status\n          - combobox \"Status\":\n            - option\n            - option \"draft\"\n            - option \"placed\" [selected]\n            - option \"shipped\"\n          - text: Amount*\n          - textbox \"Amount*\" [disabled]: \"99999999999999.9999\"\n          - text: Notes\n          - textbox \"Notes\"\n          - text: Group\n          - textbox \"Group\": A\n          - paragraph: You have 49 characters remaining.\n          - status\n          - text: Created by\n          - spinbutton \"Created by\" [disabled]: \"1\"\n          - text: Approved by\n          - spinbutton \"Approved by\"\n        - group \"Record\":\n          - paragraph: Record\n          - text: Id\n          - textbox \"Id\" [disabled]: \"9007199254740993\"\n        - button \"Save\"\n    - region \"Angular\":\n      - heading \"Angular\" [level=4]\n      - form \"Order, Angular\":\n        - group \"Order\":\n          - paragraph: Order\n          - text: Customer*\n          - combobox \"Customer*\" [disabled]: Muster AG\n          - status\n          - text: Order date*\n          - textbox \"Order date*\" [disabled]: 2026-10-08\n          - text: Status\n          - combobox \"Status\":\n            - option\n            - option \"draft\"\n            - option \"placed\" [selected]\n            - option \"shipped\"\n          - text: Amount*\n          - textbox \"Amount*\" [disabled]: \"99999999999999.9999\"\n          - text: Notes\n          - textbox \"Notes\"\n          - text: Group\n          - textbox \"Group\": A\n          - paragraph: You have 49 characters remaining.\n          - status\n          - text: Created by\n          - spinbutton \"Created by\" [disabled]: \"1\"\n          - text: Approved by\n          - spinbutton \"Approved by\"\n        - group \"Record\":\n          - paragraph: Record\n          - text: Id\n          - textbox \"Id\" [disabled]: \"9007199254740993\"\n        - button \"Save\""
+      "Forms": "- navigation \"Forms\":\n  - heading \"Forms\" [level=2]\n  - text: Find a form\n  - textbox \"Find a form\"\n  - status\n  - heading \"Sales\" [level=3]\n  - list \"Sales\":\n    - listitem:\n      - link \"Delivery pg-delivery\":\n        - /url: \"#form=pg-delivery&layout=stacked&view=records\"\n        - text: Delivery\n        - code: pg-delivery\n    - listitem:\n      - link \"Order pg-order\":\n        - /url: \"#form=pg-order&layout=stacked&view=records\"\n        - text: Order\n        - code: pg-order\n  - heading \"Linked to Order\" [level=3]\n  - list \"Linked to Order\":\n    - listitem:\n      - link \"Delivery pg-delivery rows that refer to Order\":\n        - /url: \"#form=pg-delivery&layout=stacked&view=records\"\n        - text: Delivery\n        - code: pg-delivery\n        - text: rows that refer to Order\n  - button \"Sign out\"",
+      "Workspace": "- main \"Order pg-order\":\n  - heading \"Order pg-order\" [level=2]:\n    - text: Order\n    - code: pg-order\n  - list \"Operations\":\n    - listitem: Read\n    - listitem: Create\n    - listitem: Update\n  - group \"Layout\":\n    - text: Layout\n    - radio \"Side by side\"\n    - text: Side by side\n    - radio \"Stacked\" [checked]\n    - text: Stacked\n    - radio \"Separate views\"\n    - text: Separate views\n    - radio \"Drill down\"\n    - text: Drill down\n  - region \"Records\":\n    - heading \"Records\" [level=3]\n    - button \"New record\"\n    - button \"Download CSV\"\n    - status \"Download CSV\"\n    - search \"Search records\":\n      - text: Search\n      - textbox \"Search\"\n      - button \"Search\"\n    - paragraph: Looks in Id, Status, Notes, Group, Created by and Approved by when you press Search.\n    - text: View\n    - combobox \"View\":\n      - option \"All records\"\n      - option \"Online orders\" [selected]\n    - button \"Show view\"\n    - status \"Your views\"\n    - button \"Columns\"\n    - text: Filter\n    - combobox \"Filter\": group = Online\n    - paragraph: Conditions joined by and, applied with Enter. On a cell, = keeps the rows with its value.\n    - status \"Filter\"\n    - paragraph: Filtered by\n    - list \"Filtered by\":\n      - listitem:\n        - text: Group is “Online”\n        - button \"Remove Group is “Online”\"\n    - button \"Clear filter\"\n    - status: Rows 1–6. Filtered by Group.\n    - button \"Previous rows\" [disabled]\n    - button \"Next rows\" [disabled]\n    - text: This record is open.\n    - grid \"Records\":\n      - rowgroup:\n        - row \"Id Customer Order date Status Amount Notes Group Created by Approved by\":\n          - columnheader \"Id\"\n          - columnheader \"Customer\"\n          - columnheader \"Order date\"\n          - columnheader \"Status\"\n          - columnheader \"Amount\"\n          - columnheader \"Notes\"\n          - columnheader \"Group\"\n          - columnheader \"Created by\"\n          - columnheader \"Approved by\"\n        - row \"= Online\":\n          - gridcell:\n            - textbox \"Filter Id\"\n          - gridcell:\n            - combobox \"Filter Customer\"\n          - gridcell:\n            - textbox \"Filter Order date\"\n          - gridcell:\n            - textbox \"Filter Status\"\n          - gridcell:\n            - textbox \"Filter Amount\"\n          - gridcell:\n            - textbox \"Filter Notes\"\n          - gridcell \"= Online\":\n            - textbox \"Filter Group\": = Online\n          - gridcell:\n            - textbox \"Filter Created by\"\n          - gridcell:\n            - textbox \"Filter Approved by\"\n        - row \"10423 Vorlage & Partner GmbH 2026-11-19 draft 157.3500 Online 1\":\n          - gridcell \"10423\"\n          - gridcell \"Vorlage & Partner GmbH\"\n          - gridcell \"2026-11-19\"\n          - gridcell \"draft\"\n          - gridcell \"157.3500\"\n          - gridcell\n          - gridcell \"Online\"\n          - gridcell \"1\"\n          - gridcell\n        - row \"10422 Muster AG 2026-11-17 placed 1240.5000 Goods entrance Online 2\" [selected]:\n          - gridcell \"10422\"\n          - gridcell \"Muster AG\"\n          - gridcell \"2026-11-17\"\n          - gridcell \"placed\"\n          - gridcell \"1240.5000\"\n          - gridcell \"Goods entrance\"\n          - gridcell \"Online\"\n          - gridcell \"2\"\n          - gridcell\n        - row \"10421 Beispiel Logistik KG 2026-11-11 placed 4980.2000 Online 1\":\n          - gridcell \"10421\"\n          - gridcell \"Beispiel Logistik KG\"\n          - gridcell \"2026-11-11\"\n          - gridcell \"placed\"\n          - gridcell \"4980.2000\"\n          - gridcell\n          - gridcell \"Online\"\n          - gridcell \"1\"\n          - gridcell\n        - row \"10420 Café Entwurf GmbH 2026-11-04 placed 640.0000 Invoice by post Online 2\":\n          - gridcell \"10420\"\n          - gridcell \"Café Entwurf GmbH\"\n          - gridcell \"2026-11-04\"\n          - gridcell \"placed\"\n          - gridcell \"640.0000\"\n          - gridcell \"Invoice by post\"\n          - gridcell \"Online\"\n          - gridcell \"2\"\n          - gridcell\n        - row \"10419 Beispiel Logistik KG 2026-10-21 shipped 12800.0000 Two pallets Online 1 1\":\n          - gridcell \"10419\"\n          - gridcell \"Beispiel Logistik KG\"\n          - gridcell \"2026-10-21\"\n          - gridcell \"shipped\"\n          - gridcell \"12800.0000\"\n          - gridcell \"Two pallets\"\n          - gridcell \"Online\"\n          - gridcell \"1\"\n          - gridcell \"1\"\n        - row \"10418 Café Entwurf GmbH 2026-10-14 shipped 389.0000 Online 2 1\":\n          - gridcell \"10418\"\n          - gridcell \"Café Entwurf GmbH\"\n          - gridcell \"2026-10-14\"\n          - gridcell \"shipped\"\n          - gridcell \"389.0000\"\n          - gridcell\n          - gridcell \"Online\"\n          - gridcell \"2\"\n          - gridcell \"1\"\n  - separator \"Records\"\n  - region \"Order k1:10422\":\n    - heading \"Order k1:10422\" [level=3]:\n      - text: Order\n      - code: k1:10422\n    - button \"Go to its row\"\n    - button \"Duplicate record\"\n    - status:\n      - text: Opened\n      - code: k1:10422\n      - text: .\n    - button \"For the demo\"\n    - tablist \"Order k1:10422\":\n      - tab \"Order k1:10422\":\n        - text: Order\n        - code: k1:10422\n      - tab \"Delivery\" [selected]\n    - tabpanel \"Delivery\":\n      - region \"Delivery\":\n        - heading \"Delivery\" [level=4]\n        - button \"New Delivery\"\n        - button \"Download CSV\"\n        - status \"Download CSV\"\n        - paragraph:\n          - text: For Order\n          - code: k1:10422\n        - button \"Columns\"\n        - text: Filter\n        - combobox \"Filter\"\n        - paragraph: Conditions joined by and, applied with Enter. On a cell, = keeps the rows with its value.\n        - status \"Filter\"\n        - status: Delivery rows 1–2.\n        - button \"Previous rows\" [disabled]\n        - button \"Next rows\" [disabled]\n        - grid \"Delivery\":\n          - rowgroup:\n            - row \"Carrier Shipped at\":\n              - columnheader \"Carrier\"\n              - columnheader \"Shipped at\"\n            - row:\n              - gridcell:\n                - textbox \"Filter Carrier\"\n              - gridcell:\n                - textbox \"Filter Shipped at\"\n            - row \"Express 2026-11-18T09:30:00Z\":\n              - gridcell \"Express\"\n              - gridcell \"2026-11-18T09:30:00Z\"\n            - row \"Freight\":\n              - gridcell \"Freight\"\n              - gridcell"
+    }
+  },
+  "studio-connect-pg": {
+    "file": "docs/images/readme/studio-connect-pg.webp",
+    "captured": "2026-11-20",
+    "viewport": {
+      "width": 1200,
+      "height": 900
+    },
+    "deviceScaleFactor": 2,
+    "locale": "en-US",
+    "timezone": "UTC",
+    "css": {
+      "width": 874,
+      "height": 687
+    },
+    "bytes": 60282,
+    "sha256": "6c2b12ae80824e88926e3b0ed8d2b31719c4157a468387057167d2ebec12d792",
+    "look": {
+      "platform": "linux-x64",
+      "playwright": "1.63.0",
+      "chromium": "153.0.8010.12",
+      "fonts": {
+        "Archivo Variable": "@fontsource-variable/archivo 5.3.0 (v25)",
+        "IBM Plex Mono": "@fontsource/ibm-plex-mono 5.3.0 (v20)",
+        "IBM Plex Sans": "@fontsource/ibm-plex-sans 5.3.0 (v23)"
+      }
+    },
+    "database": "the captured snapshots apps/studio/src/fixtures/postgres-writer.json and postgres-owner.json (PostgreSQL 17.11) and sqlserver-reader.json (SQL Server 16.0.4295.3)",
+    "stylesheet": "sha256 d0a6e765f0e167346cc940222d68f6930372d06e8790e18ee441807b2769d598 of src/studio.css with its imports, and @formancy/themes 0.13.0",
+    "text": {
+      "Seen": "- region \"What pg can see\":\n  - heading \"What pg can see\" [level=3]\n  - paragraph:\n    - text: \"PostgreSQL 17.11, schemas sales: 8 tables and 1 view. Discovered as\"\n    - code: formancy_writer\n    - text: . Fingerprint\n    - code: \"7542817175e1\"\n    - text: .\n  - region \"What this connection could not see\":\n    - heading \"What this connection could not see\" [level=4]\n    - paragraph: \"No gap was reported: everything in the approved schemas was visible to this connection.\"\n  - heading \"Tables and views\" [level=4]\n  - list \"Tables and views\":\n    - listitem:\n      - group:\n        - code: sales.country\n        - text: table\n    - listitem:\n      - group:\n        - code: sales.customer\n        - text: table\n    - listitem:\n      - group:\n        - code: sales.customer_summary\n        - text: view\n    - listitem:\n      - group:\n        - code: sales.delivery\n        - text: table\n    - listitem:\n      - group:\n        - code: sales.employee\n        - text: table\n    - listitem:\n      - group:\n        - code: sales.order\n        - text: table\n    - listitem:\n      - group:\n        - code: sales.order_line\n        - text: table\n    - listitem:\n      - group:\n        - code: sales.parcel\n        - text: table\n    - listitem:\n      - group:\n        - code: sales.shipment\n        - text: table"
+    }
+  },
+  "studio-choose-generate": {
+    "file": "docs/images/readme/studio-choose-generate.webp",
+    "captured": "2026-11-20",
+    "viewport": {
+      "width": 1200,
+      "height": 900
+    },
+    "deviceScaleFactor": 2,
+    "locale": "en-US",
+    "timezone": "UTC",
+    "css": {
+      "width": 916,
+      "height": 1295
+    },
+    "bytes": 233786,
+    "sha256": "6c29cc3b8e5d64ddccada22a5882c7b628b217a7fb68aa0e1bad959a485cec56",
+    "look": {
+      "platform": "linux-x64",
+      "playwright": "1.63.0",
+      "chromium": "153.0.8010.12",
+      "fonts": {
+        "Archivo Variable": "@fontsource-variable/archivo 5.3.0 (v25)",
+        "IBM Plex Mono": "@fontsource/ibm-plex-mono 5.3.0 (v20)",
+        "IBM Plex Sans": "@fontsource/ibm-plex-sans 5.3.0 (v23)"
+      }
+    },
+    "database": "the captured snapshots apps/studio/src/fixtures/postgres-writer.json and postgres-owner.json (PostgreSQL 17.11) and sqlserver-reader.json (SQL Server 16.0.4295.3)",
+    "stylesheet": "sha256 d0a6e765f0e167346cc940222d68f6930372d06e8790e18ee441807b2769d598 of src/studio.css with its imports, and @formancy/themes 0.13.0",
+    "text": {
+      "Generate": "- main \"Generate\":\n  - heading \"Generate\" [level=2]\n  - paragraph:\n    - code: pg-order\n    - text: \", “Order”, generated from sales.order as the server discovered it just now: 9 fields.\"\n  - region \"What the generator chose\":\n    - heading \"What the generator chose\" [level=3]\n    - heading \"Operations\" [level=4]\n    - list \"Operations\":\n      - listitem:\n        - text: \"Create:\"\n        - strong: offered\n      - listitem:\n        - text: \"Update:\"\n        - strong: offered\n      - listitem:\n        - text: \"Delete:\"\n        - strong: offered\n    - heading \"Blocked 0\" [level=4]\n    - paragraph: An operation the form cannot offer, and why.\n    - paragraph: No operation is blocked.\n    - heading \"Read-only 5\" [level=4]\n    - paragraph: A field shown and not written, on every operation or on the one named.\n    - list \"Read-only\":\n      - listitem:\n        - code: id\n        - text: The database numbers this value (identity-always) and refuses one given to it.\n      - listitem:\n        - code: customer\n        - text: \"Read-only on update: this connection's account may not UPDATE tenant_id, customer_no.\"\n      - listitem:\n        - code: order_date\n        - text: \"Read-only on update: this connection's account may not UPDATE order_date.\"\n      - listitem:\n        - code: amount\n        - text: \"Read-only on update: this connection's account may not UPDATE amount.\"\n      - listitem:\n        - code: created_by\n        - text: \"Read-only on update: this connection's account may not UPDATE created_by.\"\n    - heading \"Excluded 0\" [level=4]\n    - paragraph: A column with no field.\n    - paragraph: No column was left without a field.\n    - heading \"Inferred 11\" [level=4]\n    - paragraph: Decided from the metadata, and editable.\n    - list \"Inferred\":\n      - listitem:\n        - code: id\n        - text: A whole number held as text, because it can exceed what JavaScript represents exactly from bigint; label from the column name.\n      - listitem:\n        - code: customer\n        - text: A lookup over fk_order_customer (tenant_id, customer_no), showing name of customer, drawn as a typeahead searching name; label from the table name.\n      - listitem:\n        - code: order_date\n        - text: A calendar date from date; label from the column name.\n      - listitem:\n        - code: status\n        - text: A select of the values ck_order_status lists, “draft”, “placed” and “shipped”, each offered as the column holds it, from character varying(20); label from the column name.\n      - listitem:\n        - code: amount\n        - text: An exact decimal held as text, never as a floating-point number from numeric(18,4); label from the column name.\n      - listitem:\n        - code: notes\n        - text: Multi-line text from text; label from the column name.\n      - listitem:\n        - code: group\n        - text: Text from character varying(50); label from the column name.\n      - listitem:\n        - code: group\n        - text: \"The browser's maxLength of 50 counts UTF-16 code units and the column counts characters: an emoji counts twice in the browser, so the form can refuse a value the column would hold, never the reverse.\"\n      - listitem:\n        - code: created_by\n        - text: A whole number from integer; label from the column name.\n      - listitem:\n        - code: approved_by\n        - text: A whole number from integer; label from the column name.\n      - listitem:\n        - code: status\n        - text: Starts with the column's default, “draft”.\n    - heading \"Access 1\" [level=4]\n    - paragraph: \"What the database itself limits for this connection: row-level security.\"\n    - list \"Access\":\n      - listitem:\n        - code: customer\n        - text: \"Row-level security applies to this connection on sales.customer: records outside its policies read as not found, a write its policies refuse is refused, and this module sets no session state a policy may read (0011).\"\n  - paragraph:\n    - button \"Write the policy\""
+    }
+  },
+  "studio-policy-roles": {
+    "file": "docs/images/readme/studio-policy-roles.webp",
+    "captured": "2026-11-20",
+    "viewport": {
+      "width": 1200,
+      "height": 900
+    },
+    "deviceScaleFactor": 2,
+    "locale": "en-US",
+    "timezone": "UTC",
+    "css": {
+      "width": 874,
+      "height": 431
+    },
+    "bytes": 35668,
+    "sha256": "72a4e9fcfd5ffd047f29b7a37549cc51b18329bba29c7b8494714174564662a9",
+    "look": {
+      "platform": "linux-x64",
+      "playwright": "1.63.0",
+      "chromium": "153.0.8010.12",
+      "fonts": {
+        "Archivo Variable": "@fontsource-variable/archivo 5.3.0 (v25)",
+        "IBM Plex Mono": "@fontsource/ibm-plex-mono 5.3.0 (v20)",
+        "IBM Plex Sans": "@fontsource/ibm-plex-sans 5.3.0 (v23)"
+      }
+    },
+    "database": "the captured snapshots apps/studio/src/fixtures/postgres-writer.json and postgres-owner.json (PostgreSQL 17.11) and sqlserver-reader.json (SQL Server 16.0.4295.3)",
+    "stylesheet": "sha256 d0a6e765f0e167346cc940222d68f6930372d06e8790e18ee441807b2769d598 of src/studio.css with its imports, and @formancy/themes 0.13.0",
+    "text": {
+      "Roles": "- group \"Who may do what\":\n  - text: Who may do what Roles that may read\n  - textbox \"Roles that may read\": clerk\n  - text: Roles that may create\n  - textbox \"Roles that may create\": clerk\n  - text: Roles that may update\n  - textbox \"Roles that may update\": clerk\n  - text: Roles that may delete\n  - textbox \"Roles that may delete\"\n  - paragraph: \"This form offers create: yes; update: yes; delete: yes. A role granted an operation the form does not offer is refused. A role that may delete must also be able to read, so its delete names the version it read.\""
+    }
+  },
+  "studio-publish": {
+    "file": "docs/images/readme/studio-publish.webp",
+    "captured": "2026-11-20",
+    "viewport": {
+      "width": 1200,
+      "height": 900
+    },
+    "deviceScaleFactor": 2,
+    "locale": "en-US",
+    "timezone": "UTC",
+    "css": {
+      "width": 916,
+      "height": 371
+    },
+    "bytes": 55376,
+    "sha256": "6bd60aab478eafabe6aa78cf89cac2cbce25f0d2b9a28edb48198fa1944e9fbd",
+    "look": {
+      "platform": "linux-x64",
+      "playwright": "1.63.0",
+      "chromium": "153.0.8010.12",
+      "fonts": {
+        "Archivo Variable": "@fontsource-variable/archivo 5.3.0 (v25)",
+        "IBM Plex Mono": "@fontsource/ibm-plex-mono 5.3.0 (v20)",
+        "IBM Plex Sans": "@fontsource/ibm-plex-sans 5.3.0 (v23)"
+      }
+    },
+    "database": "the captured snapshots apps/studio/src/fixtures/postgres-writer.json and postgres-owner.json (PostgreSQL 17.11) and sqlserver-reader.json (SQL Server 16.0.4295.3)",
+    "stylesheet": "sha256 d0a6e765f0e167346cc940222d68f6930372d06e8790e18ee441807b2769d598 of src/studio.css with its imports, and @formancy/themes 0.13.0",
+    "text": {
+      "Publish": "- main \"Publish\":\n  - heading \"Publish\" [level=2]\n  - paragraph:\n    - text: \"One bundle: the form as the presentation step left it, its bindings to sales.order on\"\n    - code: pg\n    - text: \", the policy, and the snapshot they were generated from. The server checks all of it again before it writes anything, and keeps every version it has published.\"\n  - paragraph: Version 1 of pg-order is published. Publishing makes version 2, which the runtime serves from then on.\n  - paragraph:\n    - button \"Publish version 2\"\n  - status:\n    - paragraph: Published version 1 of pg-order.\n    - button \"Check its drift\""
+    }
+  },
+  "host-record-tabs": {
+    "file": "docs/images/readme/host-record-tabs.webp",
+    "captured": "2026-11-20",
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    },
+    "deviceScaleFactor": 2,
+    "locale": "en-US",
+    "timezone": "UTC",
+    "css": {
+      "width": 513,
+      "height": 1060
+    },
+    "bytes": 50558,
+    "sha256": "0f13236cd015037fb71addab4c335101accbf96e6b641f7f95a69b43458f58ea",
+    "look": {
+      "platform": "linux-x64",
+      "playwright": "1.63.0",
+      "chromium": "153.0.8010.12",
+      "fonts": {
+        "Archivo Variable": "@fontsource-variable/archivo 5.3.0 (v25)",
+        "IBM Plex Mono": "@fontsource/ibm-plex-mono 5.3.0 (v20)",
+        "IBM Plex Sans": "@fontsource/ibm-plex-sans 5.3.0 (v23)"
+      }
+    },
+    "database": "PostgreSQL 17.11 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit, from postgres:17-alpine, as formancy_writer",
+    "stylesheet": "sha256 db2b72721337c16bf3116444b026dca21385cbd07608a824d7ee0eb5e3d3baea of src/host.css with its imports, and @formancy/themes 0.13.0",
+    "text": {
+      "Record": "- region \"Order k1:10422\":\n  - heading \"Order k1:10422\" [level=3]:\n    - text: Order\n    - code: k1:10422\n  - button \"Go to its row\"\n  - button \"Duplicate record\"\n  - status:\n    - text: Opened\n    - code: k1:10422\n    - text: .\n  - button \"For the demo\"\n  - tablist \"Order k1:10422\":\n    - tab \"Order k1:10422\" [selected]:\n      - text: Order\n      - code: k1:10422\n    - tab \"Delivery\"\n  - tabpanel \"Order k1:10422\":\n    - region \"React\":\n      - heading \"React\" [level=4]\n      - form \"Order, React\":\n        - group \"Order\":\n          - paragraph: Order\n          - text: Customer*\n          - combobox \"Customer*\" [disabled]: Muster AG\n          - status\n          - text: Order date*\n          - textbox \"Order date*\" [disabled]: 2026-11-17\n          - text: Status\n          - combobox \"Status\":\n            - option\n            - option \"draft\"\n            - option \"placed\" [selected]\n            - option \"shipped\"\n          - text: Amount*\n          - textbox \"Amount*\" [disabled]: \"1240.5000\"\n          - text: Notes\n          - textbox \"Notes\": Goods entrance\n          - text: Group\n          - textbox \"Group\": Online\n          - paragraph: You have 44 characters remaining.\n          - status\n          - text: Created by\n          - spinbutton \"Created by\" [disabled]: \"2\"\n          - text: Approved by\n          - spinbutton \"Approved by\"\n        - group \"Record\":\n          - paragraph: Record\n          - text: Id\n          - textbox \"Id\" [disabled]: \"10422\"\n        - button \"Save\""
     }
   },
   "examples-order": {
@@ -485,6 +645,39 @@
       "Keys": "- region \"Keys that now stand for something else\":\n  - heading \"Keys that now stand for something else\" [level=3]\n  - paragraph: Each grant below was written for what its key stood for when the policy was. Keep it for what the key stands for now, or remove it.\n  - paragraph: Publishing waits until each is decided, and the server refuses grants nobody decided.\n  - list \"Keys that now stand for something else\":\n    - listitem:\n      - paragraph: Grants for order_date were written for column order_date; it now stands for column order date.\n      - paragraph:\n        - button \"Keep grants for order_date\"\n        - button \"Remove grants for order_date\""
     }
   },
+  "host-loaded": {
+    "file": "docs/images/readme/host-loaded.webp",
+    "captured": "2026-11-15",
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    },
+    "deviceScaleFactor": 2,
+    "locale": "en-US",
+    "timezone": "UTC",
+    "css": {
+      "width": 1425,
+      "height": 1608
+    },
+    "bytes": 178402,
+    "sha256": "4a722f414920710150d12fc23c6f0a239557f854060c305d72ab942cf70de77b",
+    "look": {
+      "platform": "linux-x64",
+      "playwright": "1.63.0",
+      "chromium": "153.0.8010.12",
+      "fonts": {
+        "Archivo Variable": "@fontsource-variable/archivo 5.3.0 (v25)",
+        "IBM Plex Mono": "@fontsource/ibm-plex-mono 5.3.0 (v20)",
+        "IBM Plex Sans": "@fontsource/ibm-plex-sans 5.3.0 (v23)"
+      }
+    },
+    "database": "PostgreSQL 17.11 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit, from postgres:17-alpine, as formancy_writer",
+    "stylesheet": "sha256 6c9d25ffd66a8725a6f35e73bc04bb3421b37df0b40ea6ecae72392c66ebe46c of src/host.css with its imports, and @formancy/themes 0.13.0",
+    "text": {
+      "Forms": "- navigation \"Forms\":\n  - heading \"Forms\" [level=2]\n  - text: Find a form\n  - textbox \"Find a form\"\n  - status\n  - heading \"Sales\" [level=3]\n  - list \"Sales\":\n    - listitem:\n      - link \"Order pg-order\":\n        - /url: \"#form=pg-order&layout=stacked&view=records\"\n        - text: Order\n        - code: pg-order\n  - button \"Sign out\"",
+      "Workspace": "- main \"Order pg-order\":\n  - heading \"Order pg-order\" [level=2]:\n    - text: Order\n    - code: pg-order\n  - list \"Operations\":\n    - listitem: Read\n    - listitem: Create\n    - listitem: Update\n  - group \"Layout\":\n    - text: Layout\n    - radio \"Side by side\"\n    - text: Side by side\n    - radio \"Stacked\" [checked]\n    - text: Stacked\n    - radio \"Separate views\"\n    - text: Separate views\n    - radio \"Drill down\"\n    - text: Drill down\n  - region \"Records\":\n    - heading \"Records\" [level=3]\n    - button \"New record\"\n    - button \"Download CSV\"\n    - status \"Download CSV\"\n    - search \"Search records\":\n      - text: Search\n      - textbox \"Search\"\n      - button \"Search\"\n    - paragraph: Looks in Id, Status, Notes, Group, Created by and Approved by when you press Search.\n    - button \"Columns\"\n    - text: Filter\n    - combobox \"Filter\"\n    - paragraph: Conditions joined by and, applied with Enter. On a cell, = keeps the rows with its value.\n    - status \"Filter\"\n    - status: Rows 1–1.\n    - button \"Previous rows\" [disabled]\n    - button \"Next rows\" [disabled]\n    - grid \"Records\":\n      - rowgroup:\n        - row \"Id Customer Order date Status Amount Notes Group Created by Approved by\":\n          - columnheader \"Id\"\n          - columnheader \"Customer\"\n          - columnheader \"Order date\"\n          - columnheader \"Status\"\n          - columnheader \"Amount\"\n          - columnheader \"Notes\"\n          - columnheader \"Group\"\n          - columnheader \"Created by\"\n          - columnheader \"Approved by\"\n        - row:\n          - gridcell:\n            - textbox \"Filter Id\"\n          - gridcell:\n            - combobox \"Filter Customer\"\n          - gridcell:\n            - textbox \"Filter Order date\"\n          - gridcell:\n            - textbox \"Filter Status\"\n          - gridcell:\n            - textbox \"Filter Amount\"\n          - gridcell:\n            - textbox \"Filter Notes\"\n          - gridcell:\n            - textbox \"Filter Group\"\n          - gridcell:\n            - textbox \"Filter Created by\"\n          - gridcell:\n            - textbox \"Filter Approved by\"\n        - row \"9007199254740993 Muster AG 2026-10-08 placed 99999999999999.9999 A 1\" [selected]:\n          - gridcell \"9007199254740993\"\n          - gridcell \"Muster AG\"\n          - gridcell \"2026-10-08\"\n          - gridcell \"placed\"\n          - gridcell \"99999999999999.9999\"\n          - gridcell\n          - gridcell \"A\"\n          - gridcell \"1\"\n          - gridcell\n  - separator \"Records\"\n  - region \"Order k1:9007199254740993\":\n    - heading \"Order k1:9007199254740993\" [level=3]:\n      - text: Order\n      - code: k1:9007199254740993\n    - button \"Go to its row\"\n    - button \"Duplicate record\"\n    - status:\n      - text: Loaded record\n      - code: k1:9007199254740993\n      - text: into both forms.\n    - button \"For the demo\"\n    - region \"React\":\n      - heading \"React\" [level=4]\n      - form \"Order, React\":\n        - group \"Order\":\n          - paragraph: Order\n          - text: Customer*\n          - combobox \"Customer*\" [disabled]: Muster AG\n          - status\n          - text: Order date*\n          - textbox \"Order date*\" [disabled]: 2026-10-08\n          - text: Status\n          - combobox \"Status\":\n            - option\n            - option \"draft\"\n            - option \"placed\" [selected]\n            - option \"shipped\"\n          - text: Amount*\n          - textbox \"Amount*\" [disabled]: \"99999999999999.9999\"\n          - text: Notes\n          - textbox \"Notes\"\n          - text: Group\n          - textbox \"Group\": A\n          - paragraph: You have 49 characters remaining.\n          - status\n          - text: Created by\n          - spinbutton \"Created by\" [disabled]: \"1\"\n          - text: Approved by\n          - spinbutton \"Approved by\"\n        - group \"Record\":\n          - paragraph: Record\n          - text: Id\n          - textbox \"Id\" [disabled]: \"9007199254740993\"\n        - button \"Save\"\n    - region \"Angular\":\n      - heading \"Angular\" [level=4]\n      - form \"Order, Angular\":\n        - group \"Order\":\n          - paragraph: Order\n          - text: Customer*\n          - combobox \"Customer*\" [disabled]: Muster AG\n          - status\n          - text: Order date*\n          - textbox \"Order date*\" [disabled]: 2026-10-08\n          - text: Status\n          - combobox \"Status\":\n            - option\n            - option \"draft\"\n            - option \"placed\" [selected]\n            - option \"shipped\"\n          - text: Amount*\n          - textbox \"Amount*\" [disabled]: \"99999999999999.9999\"\n          - text: Notes\n          - textbox \"Notes\"\n          - text: Group\n          - textbox \"Group\": A\n          - paragraph: You have 49 characters remaining.\n          - status\n          - text: Created by\n          - spinbutton \"Created by\" [disabled]: \"1\"\n          - text: Approved by\n          - spinbutton \"Approved by\"\n        - group \"Record\":\n          - paragraph: Record\n          - text: Id\n          - textbox \"Id\" [disabled]: \"9007199254740993\"\n        - button \"Save\""
+    }
+  },
   "host-typeahead": {
     "file": "docs/images/readme/host-typeahead.webp",
     "captured": "2026-11-15",
@@ -649,7 +842,7 @@
   },
   "host-delete": {
     "file": "docs/images/readme/host-delete.webp",
-    "captured": "2026-11-19",
+    "captured": "2026-11-20",
     "viewport": {
       "width": 1440,
       "height": 900
@@ -659,10 +852,10 @@
     "timezone": "UTC",
     "css": {
       "width": 1165,
-      "height": 564
+      "height": 550
     },
-    "bytes": 81454,
-    "sha256": "82a840010187e525db3e48b7e2069564af8e198760af11f595a4a7eca0297c81",
+    "bytes": 82370,
+    "sha256": "797e59edac3151f7bc536b9b8c98817fb06344628593eb14a2fbf3134534f1b3",
     "look": {
       "platform": "linux-x64",
       "playwright": "1.63.0",

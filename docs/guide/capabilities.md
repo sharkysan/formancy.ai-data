@@ -222,7 +222,7 @@ get*](../../README.md#what-you-get) is the short version, and
 
 **For the person filling in the form, through any host:**
 
-- **Exact values travel as strings**, as [the README's picture](../../README.md) shows
+- **Exact values travel as strings**, as [the host page's first picture](./host.md) shows
   ([0008](../decisions/0008-exact-values-travel-as-strings.md)).
 - **A lookup offers only the rows the person may choose.** An option's token
   is a reference, not a permission, and the choice is checked again on save

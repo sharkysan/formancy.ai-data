@@ -1251,6 +1251,11 @@ the same day (formancy.ai 0232).
 
 ### Changed
 
+- **The README opens on the host page's workspace over invented orders,
+  and each step of How it works has its picture under it** (0168). Why: a
+  buyer looks for the product at work, and reads each step once, beside
+  what it looks like, at a size its text can be read; the edge-case digits
+  are on the host page's guide now.
 - **The generator refuses a STRICT PostgreSQL routine before
   publication** (0167). Why: no run calls one (0160), so a form bound to
   one was published and its every run refused. Discovery records whether
