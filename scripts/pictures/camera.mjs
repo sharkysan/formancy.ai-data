@@ -247,8 +247,9 @@ export function padded(area, margin, size) {
  * something drawn beside the area belongs to no part and holds none -- a
  * neighbouring panel's edge, a button's glow -- whole CSS px short of it, so
  * the bench never shows a sliver of something else. "Drawn" is a border, a
- * background, text, a control or an image, and a coloured box shadow by how
- * far it reaches; a black one is the bench darkened, and is not counted (the
+ * background, text, a control or an image, an element's or a ::before's or
+ * ::after's, and a coloured box shadow by how far it reaches; a black one is
+ * the bench darkened, and is not counted (the
  * Steps panel's reaches 30 px, and only its border was seen in the
  * pictures). Something beside two sides -- a corner -- is kept out by the
  * side that loses less. Opposite sides keep the same, the less of the two:
@@ -276,31 +277,60 @@ function bench({ area, parts, margin }) {
     return out
   }
   const sides = ['Top', 'Right', 'Bottom', 'Left']
-  const draws = (element, style) =>
-    ['input', 'textarea', 'select', 'img', 'svg', 'canvas'].includes(element.localName) ||
+  const paints = (style) =>
     !transparent(style.backgroundColor) ||
     style.backgroundImage !== 'none' ||
-    sides.some((side) => parseFloat(style[`border${side}Width`]) > 0 && style[`border${side}Style`] !== 'none' && !transparent(style[`border${side}Color`])) ||
+    sides.some((side) => parseFloat(style[`border${side}Width`]) > 0 && style[`border${side}Style`] !== 'none' && !transparent(style[`border${side}Color`]))
+  const draws = (element, style) =>
+    ['input', 'textarea', 'select', 'img', 'svg', 'canvas'].includes(element.localName) ||
+    paints(style) ||
     [...element.childNodes].some((node) => node.nodeType === Node.TEXT_NODE && node.data.trim() !== '')
+  const px = (value) => parseFloat(value) || 0
+  /**
+   * What `element`'s ::before and ::after paint, each as a box: a pseudo-element
+   * draws too -- the line Side by side draws between the records and the
+   * record is a ::before's border, 6 px beside the record (host-record-tabs,
+   * 2026-11-20) -- and has no box to ask for. An absolutely placed one's is
+   * read from its offsets in its element's padding box; any other's is taken
+   * as its element's, which holds it.
+   */
+  const pseudos = (element, box) =>
+    ['::before', '::after'].flatMap((which) => {
+      const style = getComputedStyle(element, which)
+      const glow = reach(style.boxShadow)
+      if (['none', 'normal'].includes(style.content) || style.display === 'none' || (!paints(style) && Object.values(glow).every((length) => length <= 0)))
+        return []
+      const [x, y, width, height] = [style.left, style.top, style.width, style.height].map(parseFloat)
+      if (style.position !== 'absolute' || ![x, y, width, height].every(Number.isFinite)) return [{ box, glow }]
+      // Its width and height are its content box's, unless it sizes its border box.
+      const outer = (a, b) =>
+        style.boxSizing === 'border-box' ? 0 : px(style[`padding${a}`]) + px(style[`padding${b}`]) + px(style[`border${a}Width`]) + px(style[`border${b}Width`])
+      const at = { left: box.left + px(getComputedStyle(element).borderLeftWidth) + x, top: box.top + px(getComputedStyle(element).borderTopWidth) + y }
+      return [{ box: { ...at, right: at.left + width + outer('Left', 'Right'), bottom: at.top + height + outer('Top', 'Bottom') }, glow }]
+    })
   const [left, top, right, bottom] = [area.x, area.y, area.x + area.width, area.y + area.height]
   const kept = { top: margin, right: margin, bottom: margin, left: margin }
-  for (const element of document.body.querySelectorAll('*')) {
-    if (related(element) || !element.checkVisibility({ opacityProperty: true, visibilityProperty: true })) continue
-    const style = getComputedStyle(element)
-    const glow = reach(style.boxShadow)
-    if (!draws(element, style) && Object.values(glow).every((length) => length <= 0)) continue
-    const box = element.getBoundingClientRect()
-    if (box.width === 0 || box.height === 0) continue
-    // The room left on each side the element is beyond, its glow included.
+  /** The room left on each side `box` is beyond, its glow included, given to that side of the bench. */
+  const keepShortOf = (box, glow) => {
     const rooms = [
       ...(box.bottom <= top ? [['top', top - (box.bottom + glow.bottom)]] : []),
       ...(box.top >= bottom ? [['bottom', box.top - glow.top - bottom]] : []),
       ...(box.right <= left ? [['left', left - (box.right + glow.right)]] : []),
       ...(box.left >= right ? [['right', box.left - glow.left - right]] : []),
     ]
-    if (rooms.length === 0) continue
+    if (rooms.length === 0) return
     const [side, room] = rooms.reduce((best, next) => (next[1] > best[1] ? next : best))
     kept[side] = Math.min(kept[side], room)
+  }
+  for (const element of document.body.querySelectorAll('*')) {
+    if (related(element) || !element.checkVisibility({ opacityProperty: true, visibilityProperty: true })) continue
+    const style = getComputedStyle(element)
+    const glow = reach(style.boxShadow)
+    const box = element.getBoundingClientRect()
+    for (const pseudo of pseudos(element, box)) keepShortOf(pseudo.box, pseudo.glow)
+    if (!draws(element, style) && Object.values(glow).every((length) => length <= 0)) continue
+    if (box.width === 0 || box.height === 0) continue
+    keepShortOf(box, glow)
   }
   const across = Math.max(0, Math.floor(Math.min(kept.left, kept.right)))
   const down = Math.max(0, Math.floor(Math.min(kept.top, kept.bottom)))
