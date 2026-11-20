@@ -421,6 +421,38 @@
       "Order": "- region \"Order\":\n  - heading \"Order\" [level=3]\n  - text: Section label of Order\n  - textbox \"Section label of Order\": Order\n  - list:\n    - listitem:\n      - text: Label of order_date\n      - textbox \"Label of order_date\": Order date\n      - text: Help text of order_date\n      - textbox \"Help text of order_date\"\n      - paragraph: \"No starting value: one is offered for text, a whole or exact number and yes or no, and this is a date.\"\n      - paragraph:\n        - text: Bound field\n        - code: order_date\n      - button \"Move up Order date\" [disabled]\n      - button \"Move down Order date\"\n      - button \"Move to Record Order date\"\n      - checkbox \"Full width for Order date\"\n      - text: Full width for Order date\n    - listitem:\n      - text: Label of customer\n      - textbox \"Label of customer\": Customer\n      - text: Help text of customer\n      - textbox \"Help text of customer\"\n      - paragraph: \"No starting value: a lookup's answer is a record, and the one a starting value names may be one the person filling the form in may not choose.\"\n      - paragraph:\n        - text: Bound field\n        - code: customer\n      - button \"Move up Customer\"\n      - button \"Move down Customer\"\n      - button \"Move to Record Customer\"\n      - checkbox \"Full width for Customer\"\n      - text: Full width for Customer\n    - listitem:\n      - text: Label of status\n      - textbox \"Label of status\" [invalid]\n      - paragraph: A label needs words a person can read. Until it has some, it stays “Status”.\n      - text: Help text of status\n      - textbox \"Help text of status\"\n      - text: Starting value of status\n      - textbox \"Starting value of status\": draft\n      - paragraph: \"Generated: Starts with the column's default, “draft”.\"\n      - paragraph:\n        - text: Bound field\n        - code: status\n      - button \"Move up Status\"\n      - button \"Move down Status\"\n      - button \"Move to Record Status\"\n      - checkbox \"Full width for Status\"\n      - text: Full width for Status\n    - listitem:\n      - text: Label of amount\n      - textbox \"Label of amount\": Amount\n      - text: Help text of amount\n      - textbox \"Help text of amount\"\n      - text: Starting value of amount\n      - textbox \"Starting value of amount\"\n      - paragraph: \"Generated: no starting value. Type one, and a new record starts with it.\"\n      - paragraph:\n        - text: Bound field\n        - code: amount\n      - button \"Move up Amount\"\n      - button \"Move down Amount\"\n      - button \"Move to Record Amount\"\n      - checkbox \"Full width for Amount\"\n      - text: Full width for Amount\n    - listitem:\n      - text: Label of notes\n      - textbox \"Label of notes\": Remarks\n      - text: Help text of notes\n      - textbox \"Help text of notes\"\n      - text: Starting value of notes\n      - textbox \"Starting value of notes\"\n      - paragraph: \"Generated: no starting value. Type one, and a new record starts with it.\"\n      - paragraph:\n        - text: Bound field\n        - code: notes\n      - button \"Move up Remarks\"\n      - button \"Move down Remarks\"\n      - button \"Move to Record Remarks\"\n      - checkbox \"Full width for Remarks\" [checked]\n      - text: Full width for Remarks\n    - listitem:\n      - text: Label of group\n      - textbox \"Label of group\": Group\n      - text: Help text of group\n      - textbox \"Help text of group\"\n      - text: Starting value of group\n      - textbox \"Starting value of group\"\n      - paragraph: \"Generated: no starting value. Type one, and a new record starts with it.\"\n      - paragraph:\n        - text: Bound field\n        - code: group\n      - button \"Move up Group\"\n      - button \"Move down Group\"\n      - button \"Move to Record Group\"\n      - checkbox \"Full width for Group\"\n      - text: Full width for Group\n    - listitem:\n      - text: Label of created_by\n      - textbox \"Label of created_by\": Created by\n      - text: Help text of created_by\n      - textbox \"Help text of created_by\"\n      - text: Starting value of created_by\n      - textbox \"Starting value of created_by\"\n      - paragraph: \"Generated: no starting value. Type one, and a new record starts with it.\"\n      - paragraph:\n        - text: Bound field\n        - code: created_by\n      - button \"Move up Created by\"\n      - button \"Move down Created by\"\n      - button \"Move to Record Created by\"\n      - checkbox \"Full width for Created by\"\n      - text: Full width for Created by\n    - listitem:\n      - text: Label of approved_by\n      - textbox \"Label of approved_by\": Approved by\n      - text: Help text of approved_by\n      - textbox \"Help text of approved_by\"\n      - text: Starting value of approved_by\n      - textbox \"Starting value of approved_by\"\n      - paragraph: \"Generated: no starting value. Type one, and a new record starts with it.\"\n      - paragraph:\n        - text: Bound field\n        - code: approved_by\n      - button \"Move up Approved by\"\n      - button \"Move down Approved by\" [disabled]\n      - button \"Move to Record Approved by\"\n      - checkbox \"Full width for Approved by\"\n      - text: Full width for Approved by"
     }
   },
+  "studio-starting-value": {
+    "file": "docs/images/readme/studio-starting-value.webp",
+    "captured": "2026-11-20",
+    "viewport": {
+      "width": 1200,
+      "height": 900
+    },
+    "deviceScaleFactor": 2,
+    "locale": "en-US",
+    "timezone": "UTC",
+    "css": {
+      "width": 840,
+      "height": 335
+    },
+    "bytes": 22732,
+    "sha256": "4d32da91881767d91a165c2e1f503f8a5e8e9839ad18f0d9295ee69da38bb060",
+    "look": {
+      "platform": "linux-x64",
+      "playwright": "1.63.0",
+      "chromium": "153.0.8010.12",
+      "fonts": {
+        "Archivo Variable": "@fontsource-variable/archivo 5.3.0 (v25)",
+        "IBM Plex Mono": "@fontsource/ibm-plex-mono 5.3.0 (v20)",
+        "IBM Plex Sans": "@fontsource/ibm-plex-sans 5.3.0 (v23)"
+      }
+    },
+    "database": "the captured snapshots apps/studio/src/fixtures/postgres-writer.json and postgres-owner.json (PostgreSQL 17.11) and sqlserver-reader.json (SQL Server 16.0.4295.3)",
+    "stylesheet": "sha256 d0a6e765f0e167346cc940222d68f6930372d06e8790e18ee441807b2769d598 of src/studio.css with its imports, and @formancy/themes 0.13.0",
+    "text": {
+      "Status": "- listitem:\n  - text: Label of status\n  - textbox \"Label of status\": Status\n  - text: Help text of status\n  - textbox \"Help text of status\"\n  - text: Starting value of status\n  - textbox \"Starting value of status\": placed\n  - paragraph: \"Generated: Starts with the column's default, “draft”.\"\n  - button \"Use the column’s default for status\"\n  - paragraph:\n    - text: Bound field\n    - code: status\n  - button \"Move up Status\"\n  - button \"Move down Status\"\n  - button \"Move to Record Status\"\n  - checkbox \"Full width for Status\"\n  - text: Full width for Status"
+    }
+  },
   "studio-preview": {
     "file": "docs/images/readme/studio-preview.webp",
     "captured": "2026-11-15",
@@ -935,6 +967,104 @@
     "text": {
       "Records": "- region \"Records\":\n  - heading \"Records\" [level=3]\n  - button \"New record\"\n  - button \"Download CSV\"\n  - status \"Download CSV\"\n  - search \"Search records\":\n    - text: Search\n    - textbox \"Search\"\n    - button \"Search\"\n  - paragraph: Looks in Id, Status, Notes, Group, Created by and Approved by when you press Search.\n  - button \"Columns\"\n  - text: Filter\n  - combobox \"Filter\"\n  - paragraph: Conditions joined by and, applied with Enter. On a cell, = keeps the rows with its value.\n  - status \"Filter\"\n  - status: No records.\n  - paragraph: New record starts the first one.\n  - button \"Previous rows\" [disabled]\n  - button \"Next rows\" [disabled]\n  - grid \"Records\":\n    - rowgroup:\n      - row \"Id Customer Order date Status Amount Notes Group Created by Approved by\":\n        - columnheader \"Id\"\n        - columnheader \"Customer\"\n        - columnheader \"Order date\"\n        - columnheader \"Status\"\n        - columnheader \"Amount\"\n        - columnheader \"Notes\"\n        - columnheader \"Group\"\n        - columnheader \"Created by\"\n        - columnheader \"Approved by\"\n      - row:\n        - gridcell:\n          - textbox \"Filter Id\"\n        - gridcell:\n          - combobox \"Filter Customer\"\n        - gridcell:\n          - textbox \"Filter Order date\"\n        - gridcell:\n          - textbox \"Filter Status\"\n        - gridcell:\n          - textbox \"Filter Amount\"\n        - gridcell:\n          - textbox \"Filter Notes\"\n        - gridcell:\n          - textbox \"Filter Group\"\n        - gridcell:\n          - textbox \"Filter Created by\"\n        - gridcell:\n          - textbox \"Filter Approved by\"",
       "Record": "- region \"No record open\":\n  - heading \"No record open\" [level=3]\n  - status\n  - paragraph: Choose a row under Records, or press New record.\n  - paragraph: Space opens a row. Enter opens it and moves here.\n  - button \"For the demo\" [expanded]\n  - group \"Renderer\":\n    - text: Renderer\n    - radio \"React\"\n    - text: React\n    - radio \"Angular\"\n    - text: Angular\n    - radio \"Both\" [checked]\n    - text: Both\n  - text: Record token\n  - textbox \"Record token\": k1:9007199254740993\n  - button \"Load\"\n  - alert: No such record."
+    }
+  },
+  "host-drill-down": {
+    "file": "docs/images/readme/host-drill-down.webp",
+    "captured": "2026-11-20",
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    },
+    "deviceScaleFactor": 2,
+    "locale": "en-US",
+    "timezone": "UTC",
+    "css": {
+      "width": 1165,
+      "height": 671
+    },
+    "bytes": 50524,
+    "sha256": "4220892d4f57ee33f729f22982fe9ac0d2bc4332868d7bef51e2ebeb1bd3dcfa",
+    "look": {
+      "platform": "linux-x64",
+      "playwright": "1.63.0",
+      "chromium": "153.0.8010.12",
+      "fonts": {
+        "Archivo Variable": "@fontsource-variable/archivo 5.3.0 (v25)",
+        "IBM Plex Mono": "@fontsource/ibm-plex-mono 5.3.0 (v20)",
+        "IBM Plex Sans": "@fontsource/ibm-plex-sans 5.3.0 (v23)"
+      }
+    },
+    "database": "PostgreSQL 17.11 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit, from postgres:17-alpine, as formancy_writer",
+    "stylesheet": "sha256 db2b72721337c16bf3116444b026dca21385cbd07608a824d7ee0eb5e3d3baea of src/host.css with its imports, and @formancy/themes 0.13.0",
+    "text": {
+      "Workspace": "- main \"Order pg-order\":\n  - heading \"Order pg-order\" [level=2]:\n    - text: Order\n    - code: pg-order\n  - list \"Operations\":\n    - listitem: Read\n    - listitem: Create\n    - listitem: Update\n  - group \"Layout\":\n    - text: Layout\n    - radio \"Side by side\"\n    - text: Side by side\n    - radio \"Stacked\"\n    - text: Stacked\n    - radio \"Separate views\"\n    - text: Separate views\n    - radio \"Drill down\" [checked]\n    - text: Drill down\n  - navigation \"Breadcrumb\":\n    - list:\n      - listitem:\n        - button \"Records\"\n      - listitem:\n        - button \"Order k1:10422\":\n          - text: Order\n          - code: k1:10422\n      - listitem:\n        - button \"Delivery Express\"\n      - listitem: Parcel Carton 1 of 2\n  - region \"Parcel k1:101\":\n    - heading \"Parcel k1:101\" [level=3]:\n      - text: Parcel\n      - code: k1:101\n    - status:\n      - text: Opened\n      - code: k1:101\n      - text: .\n    - region \"Parcel k1:101 React\":\n      - heading \"React\" [level=4]\n      - form \"Parcel k1:101, React\":\n        - group \"Parcel\":\n          - paragraph: Parcel\n          - text: Delivery*\n          - combobox \"Delivery*\" [disabled]: Express\n          - status\n          - text: Label*\n          - textbox \"Label*\" [disabled]: Carton 1 of 2\n          - paragraph: You have 27 characters remaining.\n          - status\n        - group \"Record\":\n          - paragraph: Record\n          - text: Id\n          - spinbutton \"Id\" [disabled]: \"101\"\n        - button \"Save\""
+    }
+  },
+  "host-views": {
+    "file": "docs/images/readme/host-views.webp",
+    "captured": "2026-11-20",
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    },
+    "deviceScaleFactor": 2,
+    "locale": "en-US",
+    "timezone": "UTC",
+    "css": {
+      "width": 1165,
+      "height": 685
+    },
+    "bytes": 104552,
+    "sha256": "3e9ee574bd79e427ea91b46de28c0545bba435044c45efe0857610f099254630",
+    "look": {
+      "platform": "linux-x64",
+      "playwright": "1.63.0",
+      "chromium": "153.0.8010.12",
+      "fonts": {
+        "Archivo Variable": "@fontsource-variable/archivo 5.3.0 (v25)",
+        "IBM Plex Mono": "@fontsource/ibm-plex-mono 5.3.0 (v20)",
+        "IBM Plex Sans": "@fontsource/ibm-plex-sans 5.3.0 (v23)"
+      }
+    },
+    "database": "PostgreSQL 17.11 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit, from postgres:17-alpine, as formancy_writer",
+    "stylesheet": "sha256 db2b72721337c16bf3116444b026dca21385cbd07608a824d7ee0eb5e3d3baea of src/host.css with its imports, and @formancy/themes 0.13.0",
+    "text": {
+      "Records": "- region \"Records\":\n  - heading \"Records\" [level=3]\n  - button \"New record\"\n  - button \"Download CSV\"\n  - status \"Download CSV\"\n  - search \"Search records\":\n    - text: Search\n    - textbox \"Search\"\n    - button \"Search\"\n  - paragraph: Looks in Id, Status, Notes, Group, Created by and Approved by when you press Search.\n  - text: View\n  - combobox \"View\":\n    - option \"All records\"\n    - option \"Online orders\"\n  - button \"Show view\"\n  - button \"Remove your view\"\n  - status \"Your views\": Saved your view “Placed orders”.\n  - button \"Columns\"\n  - text: Filter\n  - combobox \"Filter\": status = placed\n  - paragraph: Conditions joined by and, applied with Enter. On a cell, = keeps the rows with its value.\n  - status \"Filter\"\n  - paragraph: Filtered by\n  - list \"Filtered by\":\n    - listitem:\n      - text: Status is “placed”\n      - button \"Remove Status is “placed”\"\n  - button \"Clear filter\"\n  - status: Rows 1–3. Filtered by Status.\n  - button \"Previous rows\" [disabled]\n  - button \"Next rows\" [disabled]\n  - text: This record is open.\n  - grid \"Records\":\n    - rowgroup:\n      - row \"Id Customer Order date Status Amount Notes Group Created by Approved by\":\n        - columnheader \"Id\"\n        - columnheader \"Customer\"\n        - columnheader \"Order date\"\n        - columnheader \"Status\"\n        - columnheader \"Amount\"\n        - columnheader \"Notes\"\n        - columnheader \"Group\"\n        - columnheader \"Created by\"\n        - columnheader \"Approved by\"\n      - row \"= placed\":\n        - gridcell:\n          - textbox \"Filter Id\"\n        - gridcell:\n          - combobox \"Filter Customer\"\n        - gridcell:\n          - textbox \"Filter Order date\"\n        - gridcell \"= placed\":\n          - textbox \"Filter Status\": = placed\n        - gridcell:\n          - textbox \"Filter Amount\"\n        - gridcell:\n          - textbox \"Filter Notes\"\n        - gridcell:\n          - textbox \"Filter Group\"\n        - gridcell:\n          - textbox \"Filter Created by\"\n        - gridcell:\n          - textbox \"Filter Approved by\"\n      - row \"10422 Muster AG 2026-11-17 placed 1240.5000 Goods entrance Online 2\" [selected]:\n        - gridcell \"10422\"\n        - gridcell \"Muster AG\"\n        - gridcell \"2026-11-17\"\n        - gridcell \"placed\"\n        - gridcell \"1240.5000\"\n        - gridcell \"Goods entrance\"\n        - gridcell \"Online\"\n        - gridcell \"2\"\n        - gridcell\n      - row \"10421 Beispiel Logistik KG 2026-11-11 placed 4980.2000 Online 1\":\n        - gridcell \"10421\"\n        - gridcell \"Beispiel Logistik KG\"\n        - gridcell \"2026-11-11\"\n        - gridcell \"placed\"\n        - gridcell \"4980.2000\"\n        - gridcell\n        - gridcell \"Online\"\n        - gridcell \"1\"\n        - gridcell\n      - row \"10420 Café Entwurf GmbH 2026-11-04 placed 640.0000 Invoice by post Online 2\":\n        - gridcell \"10420\"\n        - gridcell \"Café Entwurf GmbH\"\n        - gridcell \"2026-11-04\"\n        - gridcell \"placed\"\n        - gridcell \"640.0000\"\n        - gridcell \"Invoice by post\"\n        - gridcell \"Online\"\n        - gridcell \"2\"\n        - gridcell"
+    }
+  },
+  "host-columns": {
+    "file": "docs/images/readme/host-columns.webp",
+    "captured": "2026-11-20",
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    },
+    "deviceScaleFactor": 2,
+    "locale": "en-US",
+    "timezone": "UTC",
+    "css": {
+      "width": 518,
+      "height": 430
+    },
+    "bytes": 48602,
+    "sha256": "0478f3c4496483a13a3b8c076e002dc5fa99ca626736371c11ec06fe70746002",
+    "look": {
+      "platform": "linux-x64",
+      "playwright": "1.63.0",
+      "chromium": "153.0.8010.12",
+      "fonts": {
+        "Archivo Variable": "@fontsource-variable/archivo 5.3.0 (v25)",
+        "IBM Plex Mono": "@fontsource/ibm-plex-mono 5.3.0 (v20)",
+        "IBM Plex Sans": "@fontsource/ibm-plex-sans 5.3.0 (v23)"
+      }
+    },
+    "database": "PostgreSQL 17.11 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit, from postgres:17-alpine, as formancy_writer",
+    "stylesheet": "sha256 db2b72721337c16bf3116444b026dca21385cbd07608a824d7ee0eb5e3d3baea of src/host.css with its imports, and @formancy/themes 0.13.0",
+    "text": {
+      "Columns": "- list \"Columns\":\n  - listitem:\n    - checkbox \"Show Id\" [checked]\n    - text: Id\n    - button \"Move Id up\" [disabled]: Up\n    - button \"Move Id down\": Down\n    - button \"Make Id narrower\"\n    - button \"Make Id wider\"\n    - button \"Fit Id to its content\": Fit\n  - listitem:\n    - checkbox \"Show Customer\" [checked]\n    - text: Customer\n    - button \"Move Customer up\": Up\n    - button \"Move Customer down\": Down\n    - button \"Make Customer narrower\"\n    - button \"Make Customer wider\"\n    - button \"Fit Customer to its content\": Fit\n  - listitem:\n    - checkbox \"Show Order date\" [checked]\n    - text: Order date\n    - button \"Move Order date up\": Up\n    - button \"Move Order date down\": Down\n    - button \"Make Order date narrower\"\n    - button \"Make Order date wider\"\n    - button \"Fit Order date to its content\": Fit\n  - listitem:\n    - checkbox \"Show Status\" [checked]\n    - text: Status\n    - button \"Move Status up\": Up\n    - button \"Move Status down\": Down\n    - button \"Make Status narrower\"\n    - button \"Make Status wider\"\n    - button \"Fit Status to its content\": Fit\n  - listitem:\n    - checkbox \"Show Amount\" [checked]\n    - text: Amount\n    - button \"Move Amount up\": Up\n    - button \"Move Amount down\": Down\n    - button \"Make Amount narrower\"\n    - button \"Make Amount wider\"\n    - button \"Fit Amount to its content\": Fit\n  - listitem:\n    - checkbox \"Show Notes\" [checked]\n    - text: Notes\n    - button \"Move Notes up\": Up\n    - button \"Move Notes down\": Down\n    - button \"Make Notes narrower\"\n    - button \"Make Notes wider\"\n    - button \"Fit Notes to its content\": Fit\n  - listitem:\n    - checkbox \"Show Group\" [checked]\n    - text: Group\n    - button \"Move Group up\": Up\n    - button \"Move Group down\": Down\n    - button \"Make Group narrower\"\n    - button \"Make Group wider\"\n    - button \"Fit Group to its content\": Fit\n  - listitem:\n    - checkbox \"Show Created by\"\n    - text: Created by\n    - button \"Move Created by up\": Up\n    - button \"Move Created by down\": Down\n    - button \"Make Created by narrower\"\n    - button \"Make Created by wider\"\n    - button \"Fit Created by to its content\": Fit\n  - listitem:\n    - checkbox \"Show Approved by\"\n    - text: Approved by\n    - button \"Move Approved by up\": Up\n    - button \"Move Approved by down\" [disabled]: Down\n    - button \"Make Approved by narrower\"\n    - button \"Make Approved by wider\"\n    - button \"Fit Approved by to its content\": Fit",
+      "Reset": "- button \"Reset columns\"",
+      "Said": "- status \"Columns\": Customer is 237 pixels wide."
     }
   }
 }

@@ -180,6 +180,18 @@
     }
   },
   {
+    "id": "studio-starting-value",
+    "app": "studio",
+    "placement": "more",
+    "title": "A starting value",
+    "caption": "On the Presentation step, under the help text of a field that takes one -- text, a whole or exact number, or yes or no -- its starting value: Status given “placed”, so a new order starts placed rather than at its column's default, draft, which the generator's note under the box names, and “Use the column’s default” gives back. It is presentation, and the column keeps its own default; where the policy holds Status to its moves it must be a state a create may start an order in ([0149](./docs/decisions/0149-a-new-record-starts-with-its-columns-constant-default.md), [0150](./docs/decisions/0150-an-administrator-gives-a-field-another-starting-value.md)).",
+    "alt": "The Presentation step's row for status: Label Status, an empty Help text, Starting value placed, the note that the generator starts it with the column's default, draft, the button Use the column’s default, Bound field status, Move up, Move down, Move to Record and Full width.",
+    "quotes": {
+      "placed": ["Status"],
+      "Use the column’s default": ["Status"]
+    }
+  },
+  {
     "id": "studio-preview",
     "app": "studio",
     "placement": "more",
@@ -381,6 +393,42 @@
     "quotes": {
       "No records.": ["Records"],
       "No such record.": ["Record"]
+    }
+  },
+  {
+    "id": "host-drill-down",
+    "app": "host",
+    "placement": "inline",
+    "title": "Drill down",
+    "caption": "Drill down, one level at a time: from the orders, clara opened order 10422, then its Express delivery from the order's Delivery tab, then that delivery's first parcel from its Parcel tab. The trail above says where she is, each level above a button back to it, and names a record by its first required text -- “Delivery Express” by its carrier, “Parcel Carton 1 of 2” by its label -- or else by its token, as “Order k1:10422” ([0090](./docs/decisions/0090-a-hosts-workspace-can-drill-down-one-level-at-a-time-with-a-trail-back.md), [0142](./docs/decisions/0142-a-records-child-forms-are-tabs-beside-it.md)). The heading above the trail, with its Read, Create and Update, stays the order form's, where the trail starts. `pg-parcel`, the parcels' form, keeps a parcel to the tenant of its delivery and grants no write, so its fields are drawn disabled ([0043](./docs/decisions/0043-a-child-forms-rows-are-reached-only-through-a-parent-its-policy-admits.md), [0117](./docs/decisions/0117-a-form-names-what-each-write-accepts-and-a-host-page-sends-nothing-none-accepts.md)); the paper still draws Save under them, and Label still counts the characters left, both [filed](./docs/images/README.md). The parcels are invented, and the capture script inserts them through the database's owner, as it does the orders.",
+    "alt": "The host page in Drill down: under the order form's heading and Layout, the trail Records, Order k1:10422, Delivery Express, then Parcel Carton 1 of 2, the level shown; below it Parcel k1:101, opened, its form drawn by React with Delivery Express, Label Carton 1 of 2 and Id 101, each disabled.",
+    "quotes": {
+      "Delivery Express": ["Workspace"],
+      "Parcel Carton 1 of 2": ["Workspace"],
+      "Order k1:10422": ["Workspace"]
+    }
+  },
+  {
+    "id": "host-views",
+    "app": "host",
+    "placement": "more",
+    "title": "Your own view",
+    "caption": "Over Online orders, the view an administrator named, clara typed `status = placed` into the filter line in place of the view's own condition, and its chip came below it; the order stayed the view's, newest first ([0105](./docs/decisions/0105-a-forms-list-offers-views-its-administrator-named.md), [0131](./docs/decisions/0131-a-person-types-a-grids-filter-as-a-line-and-sees-each-condition-as-a-chip.md)). That made the filter and the sort her own, and she kept them as a view of hers, which View now names, “Placed orders”, with “Remove your view” beside it; order 10422 is marked as the record open below the grid, out of the picture, where the workspace left it. The server keeps it for her alone and offers it in every grid of the form, on any device she signs in from; this browser keeps none of it ([0126](./docs/decisions/0126-a-person-keeps-their-own-list-views-on-the-server-for-themselves-alone.md)).",
+    "alt": "The Records panel of the order form: View showing Placed orders, with Show view and Remove your view beside it and the line that her view was saved; the filter line holding status = placed, its chip Status is placed and Clear filter; and the grid, Rows 1–3, the placed orders 10422 of Muster AG, marked as the record open below, 10421 of Beispiel Logistik KG and 10420 of Café Entwurf GmbH, newest first.",
+    "quotes": {
+      "Placed orders": ["Records"],
+      "Remove your view": ["Records"]
+    }
+  },
+  {
+    "id": "host-columns",
+    "app": "host",
+    "placement": "more",
+    "title": "Columns",
+    "caption": "Columns, under Search and above the filter line, lists the grid's columns: Show each or not, move it up or down, and make it narrower, wider or fit to its content, every one a press of a key. clara hid Created by and Approved by, the employees' numbers, and pressed Customer's plus once, which the panel's line says in pixels: “Customer is 237 pixels wide.” Her browser keeps the arrangement and the widths for the form, and the server keeps none of it ([0106](./docs/decisions/0106-a-hosts-grid-keeps-its-columns-sort-and-view-in-the-viewers-browser.md), [0151](./docs/decisions/0151-a-person-sets-a-grid-columns-width-and-the-browser-keeps-it.md)).",
+    "alt": "The Records grid's Columns panel: a Show box, Up, Down, a minus, a plus and Fit for each of Id, Customer, Order date, Status, Amount, Notes and Group, all shown, and for Created by and Approved by, not shown; Reset columns; and the line Customer is 237 pixels wide.",
+    "quotes": {
+      "Customer is 237 pixels wide.": ["Said"]
     }
   }
 ]

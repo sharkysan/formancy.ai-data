@@ -11,7 +11,10 @@
   narrows
   [0047](0047-a-hosts-workspace-lists-opens-and-edits-records-in-linked-grids.md):
   its cost that the README's pictures show no child grid holds for order
-  lines alone, since the hero shows an order's deliveries
+  lines alone, since the hero shows an order's deliveries; extended by
+  [0169](0169-the-guides-pages-picture-drill-down-a-persons-own-view-columns-and-a-starting-value-and-the-camera-waits-two-frames-between-shots.md):
+  the guide's scenes walk over its invented orders, between the
+  workspace's acts and host-delete's
 - **Date:** 2026-11-20
 - **Deciders:** Daniel Bacher
 - **Verified by:** `scripts/pictures/readme.test.mjs`, in `pnpm test:repo`,

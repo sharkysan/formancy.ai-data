@@ -493,6 +493,8 @@ export async function shoot(page, area, { keepFocus = false } = {}) {
     let last
     for (let shots = 1; shots <= SETTLE_LIMIT; shots += 1) {
       const png = await page.screenshot({ clip: area, fullPage: true, animations: 'disabled', caret: 'hide' })
+      // Two frames first: a shot begun before the last one's window was put back saw it 1×1 px (0169).
+      await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
       // Every change since the read after the shot before: during this shot, and between the two.
       const changed = await changes()
       const quiet = changed.length === 0

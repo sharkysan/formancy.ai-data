@@ -47,6 +47,18 @@ page does not restate them.
   their Columns, as a person may (0106). They are never in the shared
   fixture model, whose rows every parity suite counts
   ([0168](../decisions/0168-the-readme-pictures-the-workspace-a-buyer-meets-and-each-step-of-how-it-works.md)).
+- **The guide's scenes of the host page** walk over the same orders, after
+  the hero's and before host-delete's
+  (`apps/host/scripts/pictures-guide.mjs`): clara arranges the Records
+  grid's Columns, which her browser keeps; keeps `status = placed` as a
+  view of her own, which the server keeps for her; and goes down in Drill
+  down from order 10422 to its Express delivery and that delivery's first
+  parcel. The two parcels are invented too, inserted through the owner and
+  taken with the orders, and ada publishes `pg-parcel`, their form, read by
+  clerks, granting no write and keeping a parcel to its delivery's tenant.
+  The studio's starting value is given to Status after the preview and
+  taken back by Undo before version 1 is published
+  ([0169](../decisions/0169-the-guides-pages-picture-drill-down-a-persons-own-view-columns-and-a-starting-value-and-the-camera-waits-two-frames-between-shots.md)).
 - **The examples page** is its static build; it has no server.
 
 Every page is answered on an `http://<app>.invalid` origin by Playwright's
@@ -110,7 +122,11 @@ listens on a port.
 - **Settle.** It shoots until two shots in a row are the same bytes and the
   page's DOM did not change from before the first until after the second, and
   refuses after ten. A change outside the DOM -- a canvas, a video -- is not
-  seen; no page here has one.
+  seen; no page here has one. It waits two animation frames after each
+  shot: one begun before the last had put the window back saw the window
+  1×1 px, so every width query of the host page matched and the page drew
+  itself again, and Drill down did not settle in nine captures of ten
+  ([0169](../decisions/0169-the-guides-pages-picture-drill-down-a-persons-own-view-columns-and-a-starting-value-and-the-camera-waits-two-frames-between-shots.md)).
 - **Settled text.** A part's text is read once no element in the parts has
   been `aria-busy` -- a lookup's search out -- for 500 ms, after the blur,
   and again after the shot; a capture whose text differs between the two is
@@ -168,9 +184,24 @@ order's Delivery tab lists its two deliveries (watched failing with three
 waited for), and that its grid shows Carrier and Shipped at alone once their
 keys are hidden (watched failing with the id left shown); that `pg` is
 discovered as `formancy_writer` (watched failing with `formancy_reader`
-waited for); and that the server's latest version of `pg-order` is 1 once
-the Publish step says it published it (watched failing with 2 expected).
-They run at every capture and every `--check`.
+waited for); that the server's latest version of `pg-order` is 1 once
+the Publish step says it published it (watched failing with 2 expected);
+that the Records grid draws what Columns says, its header without the
+columns hidden (watched failing with Created by expected in it) and
+Customer as wide as the panel's line (watched failing with a pixel more);
+that View names clara's own view (watched failing with Online orders
+expected), that the server keeps it for her in the view's order (watched
+failing with it oldest first) and offers otto none (watched failing with
+clara asked in his place); that the Express delivery is order 10422's and
+holds the two invented parcels (watched failing with order 10421), that
+the parcel's paper names its delivery (watched failing with Freight) and
+that the trail names every level (watched failing with the second parcel
+last); and that the starting value's note says the column's default and
+offers it back, and that Undo gives Status that default again before the
+publish (each watched failing with another value expected), and that
+version 1, as the server answers it, gives Status no starting value of
+its own (watched failing with the Undo taken out). They run at
+every capture and every `--check`.
 
 ## Commands
 
@@ -251,6 +282,25 @@ Filed, not hidden, because a picture is the product as it is:
   theme draws the `*` from; the field still says "required" after Validate.
   That is `@formancy/react`'s fallback, at 0.3.0 to 0.13.0 alike,
   and the themes, upstream.
+- **A starting value's note and its button spell the column's apostrophe
+  two ways.** Under a starting value the generator's note says "the
+  column's default", straight, and the button beside it "Use the column’s
+  default", curly; the starting value picture shows both. The note is
+  data-core's, which the generator's other notes share, and the button the
+  studio's copy, filed.
+- **A form that grants no write draws Save.** The parcels' form grants
+  clerks no write, so every field of the parcel's paper is drawn disabled
+  ([0117](../decisions/0117-a-form-names-what-each-write-accepts-and-a-host-page-sends-nothing-none-accepts.md)),
+  and the paper still has its Save under them, which the Drill down
+  picture shows. Filed.
+- **A disabled field with a limit still counts the characters left.**
+  Under the parcel's Label, disabled because the parcels' form grants no
+  write, the paper says "You have 27 characters remaining.", an invitation
+  to type that nobody can act on; the Drill down picture shows it. The
+  sentence is `@formancy/core`'s `countSentence`, which asks only whether
+  the field's type is counted and has a `maxLength`, never whether it is
+  disabled, and `@formancy/react`'s `CharacterCount` draws it under the
+  field, both at 0.13.0: upstream's.
 
 ## What nothing checks
 

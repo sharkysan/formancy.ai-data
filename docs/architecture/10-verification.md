@@ -667,7 +667,10 @@ pictures to its list, one scene per step, each under its step's item
 ([0168](../decisions/0168-the-readme-pictures-the-workspace-a-buyer-meets-and-each-step-of-how-it-works.md)).
 The hero's orders are invented, inserted and deleted again by the host
 page's walk through the owner's connection, never added to the shared
-fixture model; each app's
+fixture model, and so are the parcels the host page's guide pictures in
+Drill down; the camera waits two animation frames after each shot, since
+a shot begun sooner saw the window 1×1 px
+([0169](../decisions/0169-the-guides-pages-picture-drill-down-a-persons-own-view-columns-and-a-starting-value-and-the-camera-waits-two-frames-between-shots.md)). Each app's
 `pictures.mjs --check`, run by `pnpm test:pictures` in Chromium in the
 `pictures` job, walks the same states and fails when a pictured element no
 longer says what the caption quotes. What a picture looks like is held by

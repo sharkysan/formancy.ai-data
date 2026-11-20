@@ -24,8 +24,10 @@
 // hidden in the deliveries' Columns, as a person who reads carriers hides
 // them (0106).
 //
-// `undo`, which host-delete's act calls first, takes the rows out again and
-// puts the line back where clara found it, so host-delete's grid holds the
+// `undo`, which host-delete's act calls first, takes the rows out again --
+// and the parcels pictures-guide.mjs gives one delivery, with it -- and
+// puts the line back where clara found it, in Stacked, from whatever
+// layout the guide's scenes left, so host-delete's grid holds the
 // fixture's one order, as its caption says. host-drift puts both renderers
 // back.
 
@@ -142,6 +144,8 @@ export function workspaceScenes(plane, { records, detail, pane, carryOn, signIn,
 
     /** The rows taken out again -- a delete of an order takes its deliveries -- and the line put back at its start, three steps of five up from its end. */
     undo: async (page) => {
+      // Stacked, where the line is, from whatever layout the scenes after the workspace's left.
+      await layout(page, 'Stacked')
       await line(page).focus()
       for (let step = 0; step < 3; step += 1) await line(page).press('ArrowUp')
       await owner`delete from sales."order" where id in ${owner(ORDERS.map((order) => order.id))}`

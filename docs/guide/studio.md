@@ -38,7 +38,7 @@ speaks only to the server's administrator plane and `/v1/whoami`
 **Step 4, Policy.** *The tenant pin becomes a row filter on the orders this form reaches and on the customers its list may offer, taken from the signed-in person's attributes “and never from the form”; a customer outside the filter is refused on save “even by somebody who knows its key” ([0011](../decisions/0011-every-operation-carries-a-trusted-policy-context.md)).*
 
 <details>
-<summary>More: Order lines through their order, Presentation, Preview</summary>
+<summary>More: Order lines through their order, Presentation, A starting value, Preview</summary>
 
 <img src="../images/readme/studio-through.webp" width="874" alt="The group Rows the Order list may offer, on the Policy step of a form over sales.order_line: a filter of tenant_id equal to the trusted attribute tenant, and the box “Only rows of sales.order_line whose Order is one of these”, ticked, with its hint.">
 
@@ -47,6 +47,10 @@ speaks only to the server's administrator plane and `/v1/whoami`
 <img src="../images/readme/studio-presentation.webp" width="874" alt="The Presentation step's Order section below Undo, Redo and the status “Moved Customer down.”: its section label, then a row each for Order date, Customer, Status with its label emptied and refused, Amount, notes labelled Remarks at full width, Group, Created by and Approved by, each with an empty Help text box under its label and its starting value under that -- Status at its column's default, draft, an empty box for the rest, and none for Order date and Customer, saying why -- naming the column it is bound to and offering Move to Record.">
 
 **Step 5, Presentation.** *Labels, help text, starting values, order, section and width are a patch over the generated form: every row names the column it is bound to and may move to the other section, nothing here adds, removes or renames a field, and an empty label is refused: “A label needs words a person can read.” ([0030](../decisions/0030-presentation-is-a-patch-over-the-generated-base.md), [0075](../decisions/0075-a-field-may-move-to-another-generated-section.md), [0150](../decisions/0150-an-administrator-gives-a-field-another-starting-value.md)).*
+
+<img src="../images/readme/studio-starting-value.webp" width="840" alt="The Presentation step's row for status: Label Status, an empty Help text, Starting value placed, the note that the generator starts it with the column's default, draft, the button Use the column’s default, Bound field status, Move up, Move down, Move to Record and Full width.">
+
+*On the Presentation step, under the help text of a field that takes one -- text, a whole or exact number, or yes or no -- its starting value: Status given “placed”, so a new order starts placed rather than at its column's default, draft, which the generator's note under the box names, and “Use the column’s default” gives back. It is presentation, and the column keeps its own default; where the policy holds Status to its moves it must be a state a create may start an order in ([0149](../decisions/0149-a-new-record-starts-with-its-columns-constant-default.md), [0150](../decisions/0150-an-administrator-gives-a-field-another-starting-value.md)).*
 
 <img src="../images/readme/studio-preview.webp" width="916" alt="The Preview step: a note that the Customer list is filled by the runtime plane once published, and the order form on white paper after Validate, with notes labelled Remarks at full width, Order date and Amount marked required, and Order date, Customer and Amount each saying required.">
 
@@ -130,6 +134,9 @@ and sorting keep them; a follow starts the other end unfiltered, and Back
 returns the page it left with its filter. A refusal is the step's alert,
 with what was typed kept
 ([0147](../decisions/0147-the-studio-browses-with-the-filter-line-its-chips-and-a-box-under-each-header.md)).
+Browse has no picture above: the studio's pictures run over captured
+snapshots, with no database to read rows from and no browse role
+([0169](../decisions/0169-the-guides-pages-picture-drill-down-a-persons-own-view-columns-and-a-starting-value-and-the-camera-waits-two-frames-between-shots.md)).
 
 On the Choose step, under a lookup whose foreign key is NOT NULL and onto
 another table, "Rows of this form are saved with their order" makes the
