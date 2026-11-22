@@ -235,7 +235,7 @@
       ]
     },
     "0015": {
-      "reviewed": "sha256:b5ca18c04942dfb07e23ff3ead0b426f43703399f8401ccaf50979557946cc5d",
+      "reviewed": "sha256:4c791b1f753096cfeedb10da9b2e2fcff34b5bb46501a4a7efd948275702b02e",
       "limitations": [
         {
           "area": "databases",
@@ -417,7 +417,7 @@
       ]
     },
     "0023": {
-      "reviewed": "sha256:ac469d49cb67564f49a3cf6ce9e63a27c992b7e5f37d2986662bb9aa5ae9e8fe",
+      "reviewed": "sha256:87d27c97a5b7e3d36b0da7b084a972b7b13a3bc5ddf5c40df0b5fdd9155e3902",
       "limitations": [
         {
           "area": "operations",
@@ -677,7 +677,7 @@
       ]
     },
     "0031": {
-      "reviewed": "sha256:ec3fab41664c15ae417941832529b6535617f6e1b3375ad3aa8a975076710823",
+      "reviewed": "sha256:49f1ba4c1741b3c218b7db700a5f36ad5d75e88f54a5e9a22bcfdef753493b4d",
       "limitations": [
         {
           "area": "writes",
@@ -5238,7 +5238,7 @@
       "none": "Its costs fall on the documentation's readers and its maintainer: a reader of the README follows a link for a condition or a number it no longer states, and the README's sketch of the architecture is redrawn by hand when a block changes, its arrows held by review alone. Nothing a user, integrator or operator of the module installs, runs or configures changed."
     },
     "0173": {
-      "reviewed": "sha256:fadcd69f3587b61631e1119093f67ce7afefd395ae6bbf08703d97c0096bfea6",
+      "reviewed": "sha256:04a542dbbb160a6f0021c3aef9cd82484407981fbdf7d9cab436b34b2c2d0ed4",
       "limitations": [
         {
           "area": "writes",
@@ -5326,6 +5326,58 @@
         {
           "area": "host",
           "says": "The live demo’s forms grant no deletion of chosen records, so its page offers none."
+        }
+      ]
+    },
+    "0175": {
+      "reviewed": "sha256:06ce5bf1ca0149091c5d625b8a24670bb9c94f50dfecc6a3af1166894b24d665",
+      "limitations": [
+        {
+          "area": "writes",
+          "says": "A change of chosen records changes each record on its own, so a refused or unsent record leaves the others changed, each named in the answer, and nothing is undone.",
+          "heldBy": "packages/data-server/src/routes/runtime-bulk-update.test.ts"
+        },
+        {
+          "area": "writes",
+          "says": "A change of chosen records sets every record to the same values in the fields its grant lists: no value per record, no expression and no preview.",
+          "heldBy": "packages/data-core/src/records/bulk-change.test.ts"
+        },
+        {
+          "area": "access",
+          "says": "A field a rule of the form reads together with another field cannot be granted to a change of chosen records, and a check, a skip that reads a field, or an expression formancy’s parser refuses, makes every field of its form ungrantable.",
+          "heldBy": "packages/data-core/src/policy/read-together.test.ts"
+        },
+        {
+          "area": "writes",
+          "says": "A change of chosen records checks each record’s move of the state field from its own state, so a change some records cannot make refuses those, and a record deleted since is refused as a move rather than not found where the change moves the state field.",
+          "heldBy": "packages/data-server/src/routes/runtime-bulk-update.test.ts"
+        },
+        {
+          "area": "operations",
+          "says": "FORMANCY_DATA_BULK_DEADLINE_MS bounds a change of chosen records too and counts its lookups’ checks, but does not cut them: checks that outlast it leave every record not sent, after as long as they take; on SQL Server a record whose read failed is four statements, which no deadline keeps inside a proxy’s 60 seconds.",
+          "heldBy": "packages/data-server/src/bulk-deadline.test.ts"
+        },
+        {
+          "area": "access",
+          "says": "A server older than this release refuses a policy that names bulk.update, and this release’s client answers unexpected to a form from a server older than it."
+        },
+        {
+          "area": "operations",
+          "says": "A change of chosen records is one audit event naming every record and what became of each, and saying no move of the state field.",
+          "heldBy": "packages/data-server/src/routes/runtime-bulk-update.test.ts"
+        },
+        {
+          "area": "host",
+          "says": "The host page and the studio offer no change of chosen records: it is sent through @formancy/data-client or a client of the deployment’s own, by a policy whose bulk.update an administrator writes by hand, which the studio keeps and shows a draft’s publisher."
+        },
+        {
+          "area": "forms",
+          "says": "@formancy/data-core installs @formancy/expressions, at the exact version of its other upstream packages, to read which fields a rule of the form reads as formancy’s engine reads them.",
+          "heldBy": "packages/data-core/src/policy/read-together.test.ts"
+        },
+        {
+          "area": "operations",
+          "says": "Behind Cloudflare the runtime door forwards a change of chosen records only once tunnel-config has run again, and refuses it until then."
         }
       ]
     }

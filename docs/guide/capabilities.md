@@ -529,6 +529,21 @@ get*](../../README.md#what-you-get) is the short version, and
   checked record by record; the studio's Policy step grants it to the
   roles given delete, nobody by default
   ([0174](../decisions/0174-the-host-page-deletes-the-chosen-records-of-a-page-and-the-studio-grants-who-may.md)).
+- **The chosen records of a page can be changed in one request**, each to
+  the same values, in the fields the policy's `bulk.update` lists for
+  roles that may update: each record changed on its own, as its update
+  alone would be -- its version, its state field's move from its own
+  state, its trigger -- in the order sent, and answered with what became
+  of each, on the same deadline as a delete of them. The values are
+  checked once, a value no column takes or a selection the lookup does
+  not offer refusing the request before any record is read. No field a
+  rule of the form reads together with another may be listed, and a set
+  can be left half changed, each record named. It is the runtime plane's
+  `POST /v1/forms/:id/records/update-chosen` and `@formancy/data-client`'s
+  `updateChosen`; the host page and the studio offer no control for it,
+  and the studio keeps a grant written by hand and shows it to a draft's
+  reviewer
+  ([0175](../decisions/0175-chosen-records-are-changed-each-on-its-own-to-the-values-given-in-fields-a-policy-names.md)).
 - **A person is shown the forms they may read**, and nothing about any
   other, each with the forms whose rows a page may list below one of its
   records, derived from the published forms' foreign keys and types without

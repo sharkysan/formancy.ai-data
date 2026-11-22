@@ -39,6 +39,7 @@ export const RUNTIME_ROUTES: readonly { method: 'GET' | 'POST'; path: string }[]
   { method: 'POST', path: '/v1/forms/:id/records/save' },
   { method: 'POST', path: '/v1/forms/:id/records/supersede' },
   { method: 'POST', path: '/v1/forms/:id/records/update' },
+  { method: 'POST', path: '/v1/forms/:id/records/update-chosen' },
   { method: 'POST', path: '/v1/forms/:id/views/remove' },
   { method: 'POST', path: '/v1/forms/:id/views/save' },
 ]

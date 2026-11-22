@@ -249,13 +249,18 @@ export function withActionRoles(policy: FormPolicy, name: string, roles: readonl
 
 /**
  * The policy with who may delete the chosen records of a page together
- * (0173) set to `roles`: `bulk` left out when it names nobody -- absent is
- * nobody's, and a policy that grants none stays one a server older than
- * 0173 still reads.
+ * (0173) set to `roles`, and who may change them (0175) kept as the policy
+ * holds it: the studio offers no control for that grant, which an
+ * administrator writes by hand, so nothing here may lose it.
+ * `bulk.delete` is left out when it names nobody, and `bulk` when it then
+ * names neither -- absent is nobody's, and a policy that grants none stays
+ * one a server older than 0173 still reads.
  */
 export function withBulkDeleteRoles(policy: FormPolicy, roles: readonly string[]): FormPolicy {
-  const { bulk: _, ...rest } = policy
-  return roles.length === 0 ? rest : { ...rest, bulk: { delete: { roles: [...roles] } } }
+  const { bulk, ...rest } = policy
+  const { delete: _, ...kept } = bulk ?? {}
+  const next: NonNullable<FormPolicy['bulk']> = roles.length === 0 ? kept : { ...kept, delete: { roles: [...roles] } }
+  return next.update === undefined && next.delete === undefined ? rest : { ...rest, bulk: next }
 }
 
 /** Action grants for names the form does not bind: left from an earlier generation, and refused until removed (`validatePolicy`). */

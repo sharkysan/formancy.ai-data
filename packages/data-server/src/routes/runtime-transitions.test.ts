@@ -106,6 +106,8 @@ let calls: { inserts: InsertRequest[]; updates: UpdateRequest[] }
 /** The ticket's state as the fake row holds it, and the version it is at. */
 let status: string
 let rowVersion: string
+/** Whether the fake update throws, as an adapter's invariant or a driver's error does. */
+let throwing: boolean
 let events: RuntimeAuditEvent[]
 let root: string
 let app: FastifyInstance
@@ -124,6 +126,7 @@ function registry(): ConnectionRegistry {
     },
     update: async (request) => {
       calls.updates.push(request)
+      if (throwing) throw new Error('the driver failed mid-statement')
       // An adapter's answer to an update guarded by a version the row no longer has.
       if (request.expectedVersion !== rowVersion) return { ok: false, code: 'stale', message: 'changed' }
       return { ok: true, values: stored(), version: NEWER }
@@ -157,6 +160,7 @@ beforeEach(async () => {
   calls = { inserts: [], updates: [] }
   status = 'open'
   rowVersion = VERSION
+  throwing = false
   events = []
   root = await mkdtemp(join(tmpdir(), 'formancy-data-runtime-transitions-'))
   const store = createFileConfigurationStore(root)
@@ -292,6 +296,19 @@ describe('a state field’s moves on the runtime plane (0112)', () => {
     expect(stale.statusCode).toBe(409)
     expect(stale.json()).toMatchObject({ code: 'stale' })
     expect(calls.updates).toHaveLength(1)
+  })
+
+  // The trail names the move as planned once the plan is made, before the
+  // statement is sent: an update that throws in the adapter -- an
+  // invariant, a driver's error -- was sent as that move, and its 500's
+  // event says so. Watched failing with `moved` set only from the answer
+  // `updateOne` returned, which a throw never returns: moved was null.
+  test('an update that throws is audited with the move it was sent as', async () => {
+    throwing = true
+    const failed = await update('clerk', { status: 'closed' })
+    expect(failed.statusCode).toBe(500)
+    expect(calls.updates).toHaveLength(1)
+    expect(trail().map(({ status: code, moved }) => ({ status: code, moved }))).toEqual([{ status: 500, moved: true }])
   })
 
   // A create starts the state where a move from nothing puts it, or leaves

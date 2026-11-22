@@ -13,13 +13,20 @@ const SPELLED: Readonly<Record<DeleteAction, string>> = { cascade: 'CASCADE', 's
 /** Roles as the end of a sentence: the list, or nobody, which is what deny by default grants. */
 const roles = (list: readonly string[] | undefined) => (list === undefined || list.length === 0 ? 'nobody' : list.join(', '))
 
+/** Fields as the Fields list names them, each by its label and key, the last after "and"; or no field. */
+const fieldsOf = (document: FormSchema, fields: readonly string[]): string => {
+  const named = fields.map((field) => `${labelOf(document, field)} (${field})`)
+  return named.length === 0 ? 'no field' : named.length === 1 ? (named[0] as string) : `${named.slice(0, -1).join(', ')} and ${named.at(-1) as string}`
+}
+
 /** Rules as the Policy step's rows have them: a column, and the trusted attribute it equals. */
 const rules = (list: readonly RowFilterRule[]) => list.map((rule) => `${rule.column} = trusted attribute ${rule.attribute}`).join(', and ')
 
 /**
  * A draft's policy, as the publisher approving it reads it (0065): who may
- * read, create, update and delete, and delete chosen records together
- * where the policy names that (0174); each field's read and write roles;
+ * read, create, update and delete, delete chosen records together where
+ * the policy names that (0174), and change them in which fields where it
+ * names that (0175); each field's read and write roles;
  * which rows of the root and of each lookup's table are in reach, and
  * through which lookups the root's are reached; the moves its state field
  * is held to (0112); and the foreign keys a delete may act through. In the Policy step's words, and nothing to edit:
@@ -48,6 +55,9 @@ export function DraftPolicy({ policy, bindings, document }: { policy: FormPolicy
           <li key={operation}>{`Roles that may ${operation}: ${roles(policy.operations[operation])}.`}</li>
         ))}
         {policy.bulk === undefined ? null : <li>{`Roles that may delete chosen records together: ${roles(policy.bulk.delete?.roles)}.`}</li>}
+        {policy.bulk?.update === undefined ? null : (
+          <li>{`Roles that may change chosen records together: ${roles(policy.bulk.update.roles)}, in ${fieldsOf(document, policy.bulk.update.fields)}.`}</li>
+        )}
       </ul>
       <h5 id="draft-fields">Fields</h5>
       <ul aria-labelledby="draft-fields">

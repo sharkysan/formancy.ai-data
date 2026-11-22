@@ -359,7 +359,7 @@ ingress:
         audTag:
           - '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
   - hostname: app.example.com
-    path: '^(?:/v1/forms|/v1/forms/[^/]+|/v1/forms/[^/]+/actions/[^/]+/run|/v1/forms/[^/]+/lookups/[^/]+/query|/v1/forms/[^/]+/lookups/[^/]+/resolve|/v1/forms/[^/]+/records/create|/v1/forms/[^/]+/records/delete|/v1/forms/[^/]+/records/delete-chosen|/v1/forms/[^/]+/records/export|/v1/forms/[^/]+/records/list|/v1/forms/[^/]+/records/read|/v1/forms/[^/]+/records/save|/v1/forms/[^/]+/records/supersede|/v1/forms/[^/]+/records/update|/v1/forms/[^/]+/views/remove|/v1/forms/[^/]+/views/save)$'
+    path: '^(?:/v1/forms|/v1/forms/[^/]+|/v1/forms/[^/]+/actions/[^/]+/run|/v1/forms/[^/]+/lookups/[^/]+/query|/v1/forms/[^/]+/lookups/[^/]+/resolve|/v1/forms/[^/]+/records/create|/v1/forms/[^/]+/records/delete|/v1/forms/[^/]+/records/delete-chosen|/v1/forms/[^/]+/records/export|/v1/forms/[^/]+/records/list|/v1/forms/[^/]+/records/read|/v1/forms/[^/]+/records/save|/v1/forms/[^/]+/records/supersede|/v1/forms/[^/]+/records/update|/v1/forms/[^/]+/records/update-chosen|/v1/forms/[^/]+/views/remove|/v1/forms/[^/]+/views/save)$'
     service: http://web:8081
   - service: http_status:404
 ```
@@ -404,6 +404,7 @@ that does, so they hold either way:
 | `POST` | `/v1/forms/:id/records/save` | runtime | behind Access | forwarded |
 | `POST` | `/v1/forms/:id/records/supersede` | runtime | behind Access | forwarded |
 | `POST` | `/v1/forms/:id/records/update` | runtime | behind Access | forwarded |
+| `POST` | `/v1/forms/:id/records/update-chosen` | runtime | behind Access | forwarded |
 | `POST` | `/v1/forms/:id/regenerations` | administrator | behind Access | not forwarded |
 | `POST` | `/v1/forms/:id/restorations` | administrator | behind Access | not forwarded |
 | `GET` | `/v1/forms/:id/versions` | administrator | behind Access | not forwarded |
@@ -417,7 +418,7 @@ that does, so they hold either way:
 The runtime door forwards a path only when it matches this pattern, which setup writes into the tunnel’s configuration and checks against cloudflared:
 
 ```text
-^(?:/v1/forms|/v1/forms/[^/]+|/v1/forms/[^/]+/actions/[^/]+/run|/v1/forms/[^/]+/lookups/[^/]+/query|/v1/forms/[^/]+/lookups/[^/]+/resolve|/v1/forms/[^/]+/records/create|/v1/forms/[^/]+/records/delete|/v1/forms/[^/]+/records/delete-chosen|/v1/forms/[^/]+/records/export|/v1/forms/[^/]+/records/list|/v1/forms/[^/]+/records/read|/v1/forms/[^/]+/records/save|/v1/forms/[^/]+/records/supersede|/v1/forms/[^/]+/records/update|/v1/forms/[^/]+/views/remove|/v1/forms/[^/]+/views/save)$
+^(?:/v1/forms|/v1/forms/[^/]+|/v1/forms/[^/]+/actions/[^/]+/run|/v1/forms/[^/]+/lookups/[^/]+/query|/v1/forms/[^/]+/lookups/[^/]+/resolve|/v1/forms/[^/]+/records/create|/v1/forms/[^/]+/records/delete|/v1/forms/[^/]+/records/delete-chosen|/v1/forms/[^/]+/records/export|/v1/forms/[^/]+/records/list|/v1/forms/[^/]+/records/read|/v1/forms/[^/]+/records/save|/v1/forms/[^/]+/records/supersede|/v1/forms/[^/]+/records/update|/v1/forms/[^/]+/records/update-chosen|/v1/forms/[^/]+/views/remove|/v1/forms/[^/]+/views/save)$
 ```
 
 <!-- end generated -->
@@ -670,6 +671,7 @@ pass  POST https://formancy.example.com/v1/forms/order/records/read  Access answ
 pass  POST https://formancy.example.com/v1/forms/order/records/save  Access answered first
 pass  POST https://formancy.example.com/v1/forms/order/records/supersede  Access answered first
 pass  POST https://formancy.example.com/v1/forms/order/records/update  Access answered first
+pass  POST https://formancy.example.com/v1/forms/order/records/update-chosen  Access answered first
 pass  POST https://formancy.example.com/v1/forms/order/regenerations  Access answered first
 pass  POST https://formancy.example.com/v1/forms/order/restorations  Access answered first
 pass  GET https://formancy.example.com/v1/forms/order/versions  Access answered first
@@ -680,7 +682,7 @@ pass  POST https://formancy.example.com/v1/forms/order/views/remove  Access answ
 pass  POST https://formancy.example.com/v1/forms/order/views/save  Access answered first
 pass  GET https://formancy.example.com/v1/whoami  Access answered first
 pass  GET http://formancy.example.com/studio/  redirected to HTTPS
-40 requests, 40 as expected, 0 not.
+41 requests, 41 as expected, 0 not.
 ```
 
 <!-- end generated -->

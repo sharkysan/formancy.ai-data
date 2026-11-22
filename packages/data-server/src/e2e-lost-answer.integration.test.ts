@@ -3,7 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { EMPTY_PRESENTATION, recordToken } from '@formancy/data-core'
-import type { ChosenAnswer, DatabaseKind, FormBindings, FormPolicy, GenerationRequest, MetadataSnapshot } from '@formancy/data-core'
+import type { ChangedAnswer, ChosenAnswer, DatabaseKind, FormBindings, FormPolicy, GenerationRequest, MetadataSnapshot } from '@formancy/data-core'
 import {
   actionToken,
   answerBytes,
@@ -115,7 +115,7 @@ beforeAll(async () => {
       tls: { enabled: false, trustServerCertificate: true },
     },
   ]
-  // A table whose key holds a text a delete's answer echoes (0050), in a schema of its own: `lost`.
+  // A table whose key holds a text a delete's answer echoes (0050), and a note a change of chosen records sets (0175), in a schema of its own: `lost`.
   connections.push(
     { ...(connections[0] as ConnectionConfig), id: 'pg-lost', schemas: ['lost'] },
     { ...(connections[1] as ConnectionConfig), id: 'ms-lost', schemas: ['lost'] },
@@ -149,13 +149,13 @@ beforeAll(async () => {
     trustServerCertificate: true,
   })
   await pgOwner.unsafe(
-    'create schema lost; create table lost.removable (id integer generated always as identity, code varchar(100) not null, version integer not null default 1, primary key (id, code))',
+    'create schema lost; create table lost.removable (id integer generated always as identity, code varchar(100) not null, note varchar(100) null, version integer not null default 1, primary key (id, code))',
   )
   await msOwner.request().batch('create schema lost')
   await msOwner
     .request()
     .batch(
-      'create table lost.removable (id int identity(1, 1) not null, code nvarchar(100) not null, version int not null constraint df_lost_removable_version default 1, constraint pk_lost_removable primary key (id, code))',
+      'create table lost.removable (id int identity(1, 1) not null, code nvarchar(100) not null, note nvarchar(100) null, version int not null constraint df_lost_removable_version default 1, constraint pk_lost_removable primary key (id, code))',
     )
   insertRemovable = async (connection, code) => {
     if (connection === 'pg')
@@ -286,6 +286,26 @@ async function publishDeleting(connection: string, formId: string, generation: R
   expect(published.statusCode, published.body).toBe(201)
 }
 
+/** A form whose clerks may read every row of lost.removable and change its note, one record at a time or the chosen ones together (0175). */
+async function publishChanging(connection: string, formId: string, generation: Record<string, unknown>): Promise<void> {
+  const proposal = await call('/v1/form-proposals', admin, { connection, formId, ...generation })
+  expect(proposal.statusCode, proposal.body).toBe(200)
+  const proposed = proposal.json<Proposal>()
+  expect(proposed.bindings.operations.update).toBe(true)
+  const policy: FormPolicy = {
+    version: 1,
+    operations: { read: ['clerk'], create: [], update: ['clerk'] },
+    fields: Object.fromEntries(
+      proposed.bindings.fields.map((binding) => [binding.field, { read: ['clerk'], write: binding.field === 'note' ? ['clerk'] : [] }]),
+    ),
+    rowFilters: [],
+    lookups: {},
+    bulk: { update: { roles: ['clerk'], fields: ['note'] } },
+  }
+  const published = await call(`/v1/forms/${formId}/versions`, admin, { expectedBase: null, bundle: asProposed(connection, proposed, policy) })
+  expect(published.statusCode, published.body).toBe(201)
+}
+
 /** `promise`, or a failure that says what never happened -- a hop that never matched is a reason, not a timeout. */
 async function bounded<T>(promise: Promise<T>, what: string): Promise<T> {
   let timer: NodeJS.Timeout | undefined
@@ -311,6 +331,10 @@ async function eventually(check: () => Promise<void>): Promise<void> {
   }
 }
 
+const REMOVABLE_NOTED = {
+  pg: 'select count(*)::int as n from lost.removable where note = $1',
+  ms: 'select count(*) as n from lost.removable where note = @text',
+}
 const REMOVABLE_CODED = {
   pg: 'select count(*)::int as n from lost.removable where code = $1',
   ms: 'select count(*) as n from lost.removable where code = @text',
@@ -621,6 +645,90 @@ describe.each([
         outcome: 'ok',
         records: [second, third].map(({ record }) => recordReference(AUDIT_KEY, record)),
         outcomes: ['not-found', 'done'],
+      },
+    ])
+  })
+
+  // Chosen records changed together (0175), the answer to the second
+  // record's update lost after the database stored it. Every record takes
+  // the same note, which is the marker, so the first is one somebody
+  // changed since it was read: its update carries the note and answers no
+  // row, and the first answer to carry the note is the second's. The first
+  // is answered stale, the second as an update alone whose answer was lost
+  // is -- 502 naming it with the version sent, inside the request's 200 --
+  // and the third is not sent, since the connection is in doubt, and keeps
+  // its note. The note crossed the hop twice, the first record's update
+  // and the second's, and the third's code never -- it was neither read
+  // nor updated -- both counted again after one more round trip: the
+  // server sent nothing again. A new request with the two left sends the
+  // note again, counted afresh, the second answered stale -- stored once --
+  // and the third changed. A loop that went on past the unknown outcome
+  // would have changed the third and counted its code.
+  test('a change of chosen records is the lost record’s 502, the records after it not sent, and nothing sent again', async () => {
+    const formId = `${connection}-removable-changed-lost`
+    await publishChanging(`${connection}-lost`, formId, {
+      root: { schema: 'lost', name: 'removable' },
+      title: 'Removable',
+      lookups: [],
+      versionColumn: 'version',
+    })
+    const codes = [randomUUID(), randomUUID(), randomUUID()]
+    const records: Array<{ record: string; version: string }> = []
+    for (const code of codes) {
+      const made = recordToken(['id', 'code'], { id: await insertRemovable(connection, code), code })
+      if (!made.ok) throw new Error(made.message)
+      records.push({ record: made.token, version: '1' })
+    }
+    const [first, second, third] = records as [(typeof records)[0], (typeof records)[0], (typeof records)[0]]
+    const since = await call(`/v1/forms/${formId}/records/update`, clerk, { ...first, answers: { note: 'changed by somebody since' } })
+    expect(since.statusCode, since.body).toBe(200)
+    const note = `lost change ${connection} ${String(Date.now())}`
+    const thirdSent = hops[connection].countSent(answerBytes(kind, codes[2] as string))
+    const { response, sent } = await sentAndLost(
+      note,
+      async () => expect(await count(connection, REMOVABLE_NOTED, note)).toBe(1),
+      () => call(`/v1/forms/${formId}/records/update-chosen`, clerk, { records, answers: { note } }),
+    )
+    expect(response.statusCode, response.body).toBe(200)
+    expect(response.json<ChangedAnswer>().records).toEqual([
+      { sent: true, status: 409, body: expect.objectContaining({ code: 'stale' }) },
+      { sent: true, status: 502, body: expect.objectContaining({ code: 'unknown-outcome', operation: 'update', record: second.record, version: '1' }) },
+      { sent: false },
+    ])
+    expect({ sent: sent(), thirdSent: thirdSent() }).toEqual({ sent: 2, thirdSent: 0 })
+    expect(await count(connection, REMOVABLE_NOTED, note)).toBe(1)
+    // Counted again after one more round trip through the same pool -- a
+    // read of the first record, which names neither marker.
+    const read = await call(`/v1/forms/${formId}/records/read`, clerk, { record: first.record })
+    expect(read.statusCode, read.body).toBe(200)
+    expect({ sent: sent(), thirdSent: thirdSent() }).toEqual({ sent: 2, thirdSent: 0 })
+
+    // The new request sends the note again, once for each record's update:
+    // counted afresh, from here, and not against the lost one, whose count
+    // ends above.
+    const resent = hops[connection].countSent(answerBytes(kind, note))
+    const again = await call(`/v1/forms/${formId}/records/update-chosen`, clerk, { records: [second, third], answers: { note } })
+    expect(again.statusCode, again.body).toBe(200)
+    expect(again.json<ChangedAnswer>().records.map((outcome) => (outcome.sent ? outcome.status : 'not sent'))).toEqual([409, 200])
+    expect(resent()).toBe(2)
+    expect(await count(connection, REMOVABLE_NOTED, note)).toBe(2)
+    const trail = events.filter((event): event is RuntimeAuditEvent => event.plane === 'runtime' && event.form === formId)
+    expect(trail.map(({ operation, status, outcome, records: named, outcomes }) => ({ operation, status, outcome, records: named, outcomes }))).toEqual([
+      { operation: 'update', status: 200, outcome: 'ok', records: undefined, outcomes: undefined },
+      {
+        operation: 'update-chosen',
+        status: 200,
+        outcome: 'ok',
+        records: records.map(({ record }) => recordReference(AUDIT_KEY, record)),
+        outcomes: ['stale', 'unknown-outcome', 'not-sent'],
+      },
+      { operation: 'read', status: 200, outcome: 'ok', records: undefined, outcomes: undefined },
+      {
+        operation: 'update-chosen',
+        status: 200,
+        outcome: 'ok',
+        records: [second, third].map(({ record }) => recordReference(AUDIT_KEY, record)),
+        outcomes: ['stale', 'done'],
       },
     ])
   })

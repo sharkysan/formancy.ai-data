@@ -24,6 +24,7 @@
     "check:pkg": "publint && attw --pack . --profile esm-only"
   },
   "dependencies": {
+    "@formancy/expressions": "0.13.0",
     "@formancy/spec": "0.13.0"
   },
   "devDependencies": {

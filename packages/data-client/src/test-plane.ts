@@ -381,14 +381,16 @@ export async function startPlane(
       snapshot,
       generation: generated,
     } = await admin('/v1/form-proposals', { connection, formId, title: 'Removable', lookups: [], versionColumn: 'version', ...generation })
-    const base = clerkPolicy((bindings as { fields: FieldBinding[] }).fields)
-    // Clerks delete one at a time, and the chosen records of a page together (0173).
+    const fields = (bindings as { fields: FieldBinding[] }).fields
+    const base = clerkPolicy(fields)
+    // Clerks delete one at a time, and the chosen records of a page together (0173); where the table has a note, they change it together too (0175).
+    const noted = fields.some((binding) => binding.field === 'note')
     const policy: FormPolicy = {
       ...base,
       operations: { ...base.operations, delete: ['clerk'] },
       rowFilters,
       lookups: {},
-      bulk: { delete: { roles: ['clerk'] } },
+      bulk: { delete: { roles: ['clerk'] }, ...(noted ? { update: { roles: ['clerk'], fields: ['note'] } } : {}) },
     }
     await admin(`/v1/forms/${formId}/versions`, {
       expectedBase: null,

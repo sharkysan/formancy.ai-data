@@ -25,7 +25,7 @@ export interface ServedConfiguration {
   saveDeadlineMs: number
   /** `FORMANCY_DATA_ACTION_DEADLINE_MS`, parsed: how long a run of an action may take before the database stops it (0161). */
   actionDeadlineMs: number
-  /** `FORMANCY_DATA_BULK_DEADLINE_MS`, parsed: how long a request that deletes chosen records may go on sending them (0173). */
+  /** `FORMANCY_DATA_BULK_DEADLINE_MS`, parsed: how long a request that deletes or changes chosen records may go on sending them (0173, 0175). */
   bulkDeadlineMs: number
   /** The server's log, looked up when an event fires: the server does not exist yet while its options are built. */
   log: () => FastifyBaseLogger

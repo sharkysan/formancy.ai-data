@@ -197,11 +197,27 @@ async function created(
   return { status: 201, body: done, record: done.record ?? undefined }
 }
 
+/** What one update asks of the runtime plane: who is asking, how a lost answer and a planner's refusal are said, the root's description, and the lookups' deadline. */
+export type UpdateSteps = Pick<WriteRouteSteps, 'context' | 'lost' | 'refusal' | 'describedRoot' | 'lookupDeadlineMs'>
+
+/** A membership check as one of a request's, by what it asks: its field, its tokens and the filter they are checked under. */
+export function vouchedAs(check: MembershipCheck): string {
+  return canonicalize([check.field, check.tokens, check.filters])
+}
+
 /**
  * One update, from the read that tells an echo from a change to the write,
  * answered rather than sent: the update route runs it once per sending, so
  * a write id that arrives again is answered with this answer and asks the
- * database nothing, its read included (0031).
+ * database nothing, its read included (0031). Each chosen record of a
+ * request that changes several (0175, `runtime-bulk.ts`) is this, called
+ * once for it, so one record of such a request is a single update and the
+ * two cannot answer it apart. `planned` hears whether the update, as
+ * planned, moves the policy's state field (0112) -- `null` where the policy
+ * names none -- which the update route's trail names, as soon as the plan
+ * is made and before any check or statement, so an update that throws
+ * after it is named as the move it was sent as; it is not called for one
+ * refused before it was planned.
  *
  * The policy is asked first, before any statement (0041). The record as it
  * stands is read next, and the read carries the table's description, which
@@ -214,16 +230,21 @@ async function created(
  * the read failed, whatever the failure, that failure is the answer: sent
  * anyway, a read that failed and a write that did not would store the cut
  * value.
+ *
+ * Every selection is checked before the update is sent -- but one in
+ * `vouched` (`vouchedAs`), which the request it belongs to has checked
+ * already, under the same filter, and which a request over chosen records
+ * checks once for all of them.
  */
-async function updated(
-  steps: WriteRouteSteps,
+export async function updateOne(
+  steps: UpdateSteps,
   request: FastifyRequest<{ Params: { id: string } }>,
   bundle: PublishedBundle,
   open: OpenConnection,
-  record: string,
-  version: string,
-  answers: Record<string, unknown>,
+  change: { record: string; version: string; answers: Record<string, unknown> },
+  { vouched = new Set(), planned }: { vouched?: ReadonlySet<string>; planned?: (moved: boolean | null) => void } = {},
 ): Promise<WriteAnswer> {
+  const { record, version, answers } = change
   const actor = steps.context(request)
   const authorized = authorizeOperation(bundle.policy, actor, 'update')
   if (!authorized.ok) return planRefusal(authorized.code, authorized.message)
@@ -249,8 +270,9 @@ async function updated(
     if (plan.code === 'record-not-read' && unread !== undefined) return recordFailure(bundle.bindings, unread)
     return steps.refusal(request, 'update', plan)
   }
-  if (request.auditTrail !== undefined) request.auditTrail.moved = plan.moved
-  const refused = await memberships(open, plan.memberships, request.log, steps.lookupDeadlineMs)
+  planned?.(plan.moved)
+  const unchecked = plan.memberships.filter((check) => !vouched.has(vouchedAs(check)))
+  const refused = await memberships(open, unchecked, request.log, steps.lookupDeadlineMs)
   if (refused !== undefined) return refused
   const outcome = await open.records.update(plan.request)
   if (!outcome.ok && outcome.code === 'unknown-outcome') return steps.lost(request, 'update', record, version, outcome.message)
@@ -328,6 +350,11 @@ export function registerWriteRoutes(app: FastifyInstance, steps: WriteRouteSteps
     const open = await steps.connection(bundle, reply)
     if (open === undefined) return reply
     const { record, version, answers } = body
-    return steps.answered(reply, await steps.sendOnce(request, 'update', id, () => updated(steps, request, bundle, open, record, version, answers)))
+    // Whether the update, as planned, moves the state field (0112), named once it is planned; a write refused before then names none.
+    const planned = (moved: boolean | null): void => {
+      if (request.auditTrail !== undefined) request.auditTrail.moved = moved
+    }
+    const updated = () => updateOne(steps, request, bundle, open, { record, version, answers }, { planned })
+    return steps.answered(reply, await steps.sendOnce(request, 'update', id, updated))
   })
 }

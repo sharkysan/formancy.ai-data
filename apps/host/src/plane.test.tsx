@@ -285,8 +285,10 @@ describe.each(JOURNEYS)('what the page sends on $engine, through $door', ({ conn
     // these two are the exceptions: the demo publishes no form over
     // versions, and none of its forms grants a deletion of chosen records
     // -- apps/live-demo/src/image/forms.ts writes no `bulk` -- so the page
-    // there never offers Delete the chosen….
-    const UNSENT: ReadonlySet<string> = new Set(door === undefined ? [] : ['supersede', 'delete-chosen'])
+    // there never offers Delete the chosen…. A change of chosen records
+    // (0175) is unsent on every door until the page has a control that
+    // sends it: the runtime plane and the client offer it first.
+    const UNSENT: ReadonlySet<string> = new Set(door === undefined ? ['update-chosen'] : ['supersede', 'delete-chosen', 'update-chosen'])
     expect(
       ROUTES.filter(({ matches, operation }) => !UNSENT.has(operation) && !sent.some((request) => matches.test(line(request)))).map(
         ({ operation }) => operation,

@@ -146,35 +146,49 @@ export function authorizeAction(policy: FormPolicy, context: PolicyContext, bind
 }
 
 /**
- * Whether the actor may delete the chosen records of a page in one request
- * (0173): a role of theirs is in the policy's `bulk.delete`, and the delete
- * is theirs and can be scoped -- `operations.delete`, the root's row filter
- * and every through, as `authorizeOperation` asks of a delete. Asked before
- * any statement. The policy is fitted to the form, so a grant on a form
- * that offers no delete, or to a role `operations.delete` does not name, is
- * refused as the policy that holds it is. Each record is then authorised
- * again as a delete of it alone, which this answers the same for.
+ * Whether the actor may delete (0173) or change (0175) the chosen records
+ * of a page in one request: a role of theirs is in the policy's
+ * `bulk.delete`, or `bulk.update`'s roles, and the operation is theirs and
+ * can be scoped -- `operations.delete` or `operations.update`, the root's
+ * row filter and every through, as `authorizeOperation` asks of it. Asked
+ * before any statement. The policy is fitted to the form, so a grant on a
+ * form that offers no such write alone, or to a role the operation's grant
+ * does not name, is refused as the policy that holds it is. Each record is
+ * then authorised again as a write of it alone, which this answers the
+ * same for. Which fields a change may set is `bulkAnswers`' to hold.
  */
-export function authorizeBulk(policy: FormPolicy, context: PolicyContext, bindings: FormBindings): PolicyDecision {
+export function authorizeBulk(policy: FormPolicy, context: PolicyContext, bindings: FormBindings, operation: 'delete' | 'update'): PolicyDecision {
   const prepared = prepare(policy, context, bindings)
   if (!prepared.ok) return prepared
-  const roles = prepared.policy.bulk?.delete
-  if (roles === undefined || !holds(roles, prepared.actor))
-    return refuse('operation-denied', 'no role of this actor may delete chosen records together with this form')
-  const scoped = authorise(prepared.policy, prepared.actor, 'delete')
+  const bulk = prepared.policy.bulk
+  const roles = operation === 'delete' ? bulk?.delete : bulk?.update?.roles
+  if (roles === undefined || roles === null || !holds(roles, prepared.actor)) {
+    const doing = operation === 'delete' ? 'delete' : 'change'
+    return refuse('operation-denied', `no role of this actor may ${doing} chosen records together with this form`)
+  }
+  const scoped = authorise(prepared.policy, prepared.actor, operation)
   if (!scoped.ok) return scoped
   const through = resolveThrough(prepared.policy, prepared.actor)
   return through.ok ? { ok: true } : through
 }
 
 /**
- * What this actor may do to the chosen records of a page together (0173),
- * as `GET /v1/forms/:id` says it before the database's own narrowing:
- * `delete` exactly where `authorizeBulk` lets them through, so what a page
- * offers is that check's answer and not a second list of it (0117).
+ * What this actor may do to the chosen records of a page together, as
+ * `GET /v1/forms/:id` says it before the database's own narrowing:
+ * `delete` exactly where `authorizeBulk` lets them through (0173); and
+ * `update`, where it lets them through a change (0175), the fields of the
+ * grant this actor may write on update, in the bindings' order -- each one
+ * the over-posting check accepts alone, as `writableFields` lists them, so
+ * a page offers no field each record would refuse -- or `null` where they
+ * may change none. What a page offers is these checks' answers and not a
+ * second list of them (0117).
  */
-export function bulkOffered(policy: FormPolicy, context: PolicyContext, bindings: FormBindings): { delete: boolean } {
-  return { delete: authorizeBulk(policy, context, bindings).ok }
+export function bulkOffered(policy: FormPolicy, context: PolicyContext, bindings: FormBindings): { delete: boolean; update: string[] | null } {
+  const granted = readPolicy(policy).parsed?.bulk?.update?.fields ?? []
+  const fields = authorizeBulk(policy, context, bindings, 'update').ok
+    ? writableFields(policy, context, bindings, 'update').filter((field) => granted.includes(field))
+    : []
+  return { delete: authorizeBulk(policy, context, bindings, 'delete').ok, update: fields.length === 0 ? null : fields }
 }
 
 /**

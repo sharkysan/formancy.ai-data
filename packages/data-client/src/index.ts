@@ -3,7 +3,7 @@
  * forms a person may read (0045), a published form's records -- one by its
  * token, or a page at a time (0044), or every page as one CSV file (0079),
  * created, updated and deleted (0050), the chosen records of a page deleted
- * each on its own (0173) -- and the views a person keeps of a
+ * (0173) or changed (0175) each on its own -- and the views a person keeps of a
  * form (0126), a record saved with the rows of its together children in
  * one transaction (0155), an action run over the open record (0161), and lookups, the option sources both formancy renderers
  * take, and a refusal's field problems as a renderer applies them -- and,
@@ -18,7 +18,7 @@ export type { SaveOutcome, SaveRefused } from './saves.js'
 export { isUnknownAction } from './actions.js'
 export type { ActionOutcome, ActionRefusal, UnknownAction } from './actions.js'
 export { isUnknownChosen } from './chosen.js'
-export type { ChosenRecordOutcome, ChosenRefusal, DeleteChosenOutcome, NotSent, UnknownChosen } from './chosen.js'
+export type { ChangedRecordOutcome, ChosenRecordOutcome, ChosenRefusal, DeleteChosenOutcome, NotSent, UnknownChosen, UpdateChosenOutcome } from './chosen.js'
 export type { Reconciliation } from './reconcile.js'
 export { lookupSources, sourceNames } from './lookups.js'
 export type { LookupOperation, LookupRequest, LookupSource } from './lookups.js'

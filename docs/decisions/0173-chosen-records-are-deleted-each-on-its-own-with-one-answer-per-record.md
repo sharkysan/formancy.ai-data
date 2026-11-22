@@ -1,6 +1,6 @@
 # 0173 — Chosen records are deleted each on its own, with one answer per record
 
-- **Status:** accepted; extended by [0174](0174-the-host-page-deletes-the-chosen-records-of-a-page-and-the-studio-grants-who-may.md): the host page sends a deletion of chosen records from Delete the chosen…, and the studio's Policy step grants `bulk.delete`, so its cost that only a client of the deployment's own sends one, and plane.test's exception for the route, hold no longer but on the live demo's door, whose forms grant none
+- **Status:** accepted; extended by [0174](0174-the-host-page-deletes-the-chosen-records-of-a-page-and-the-studio-grants-who-may.md): the host page sends a deletion of chosen records from Delete the chosen…, and the studio's Policy step grants `bulk.delete`, so its cost that only a client of the deployment's own sends one, and plane.test's exception for the route, hold no longer but on the live demo's door, whose forms grant none; extended by [0175](0175-chosen-records-are-changed-each-on-its-own-to-the-values-given-in-fields-a-policy-names.md): `bulk.update` is read: the chosen records of a page are changed together, each an update of its own, through the same loop, stop rule, first-record rule, deadline and trail; and a `bulk` that names no operation fits a form that offers an update or a delete alone
 - **Date:** 2026-11-22
 - **Deciders:** Daniel Bacher
 - **Verified by:** the server's half of deleting chosen records -- the

@@ -552,6 +552,26 @@ outcome, those not deleted left chosen with why on their boxes; the
 studio's Policy step grants it to roles given delete, nobody by default
 ([0174](../decisions/0174-the-host-page-deletes-the-chosen-records-of-a-page-and-the-studio-grants-who-may.md)).
 
+**Chosen records are changed each on its own, to the same answers**
+([0175](../decisions/0175-chosen-records-are-changed-each-on-its-own-to-the-values-given-in-fields-a-policy-names.md)). A request changes one to `LIST_PAGE_SIZE` chosen records in the
+fields the policy's `bulk.update` lists, by the single update's own code
+(`updateOne`) through the delete's loop (`eachChosen`): what is the same
+for every record -- the answers, decoded by `planUpdate`'s own
+`decodeAnswers`, and each selection's membership -- is checked once,
+before any record is read, and what is each record's -- its version, its
+echoes, its state's move -- by its own read. No field a rule of the form
+reads together with another may be granted, since the page cannot run that
+rule over each record's other answers and the server runs none; the
+bundle's check refuses one, reading each expression as formancy's own
+parser does (`@formancy/expressions`), every field for one it refuses. Write-once keeps each record's answer, the
+record as stored: a page of 50 changed orders about 14.3 KB, so the byte
+cap fills before the count. One deadline for both requests, counted from
+the sending's start, a change's checks counted in it and not cut by it. **Held by** `packages/data-server/src/routes/runtime-bulk-update.test.ts`
+over fake ports and, on both engines, `e2e-bulk.integration.test.ts` and
+`e2e-lost-answer.integration.test.ts`, first run in CI. **What it
+costs.** A set can be left half changed; one value for every record; and
+a record whose read failed is four statements on SQL Server.
+
 
 ## 8.7 Audit
 
@@ -582,7 +602,9 @@ A `delete-chosen` event carries `records` and `rows` the same way, and
 `outcomes`, each record's code in the same order -- `done`, the code its
 delete was refused with, `unknown-outcome`, `not-sent` -- never a
 message, and `null` where the request was answered as a whole or answered
-again ([0173](../decisions/0173-chosen-records-are-deleted-each-on-its-own-with-one-answer-per-record.md)).
+again ([0173](../decisions/0173-chosen-records-are-deleted-each-on-its-own-with-one-answer-per-record.md)); an `update-chosen` event the same, a
+refused move `transition-denied` among its codes and `moved` `null`, since a
+move is one record's ([0175](../decisions/0175-chosen-records-are-changed-each-on-its-own-to-the-values-given-in-fields-a-policy-names.md)).
 And `moved`: whether a create or an update moved its policy's state field,
 never from where or to where
 ([0112](../decisions/0112-a-policy-holds-a-state-field-to-the-moves-it-lists.md)).

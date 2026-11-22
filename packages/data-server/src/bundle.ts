@@ -3,6 +3,7 @@ import {
   createSnapshot,
   deleteProblems,
   findObject,
+  readTogetherProblems,
   rowFilterColumnProblem,
   throughProblems,
   togetherPolicyProblems,
@@ -159,6 +160,8 @@ function checkedBundle(document: unknown): BundleValidation {
   // A snapshot no catalog could produce cannot be searched for filter columns.
   if (wellFormed) problems.push(...policyProblems(snapshot, bindings, policy))
   else problems.push(...fitProblems(policy, bindings))
+  // A field a rule of the form reads together with another is no field chosen records are changed in (0175): the form's to say, not the bindings'.
+  if (form.valid) problems.push(...readTogetherProblems(form.schema, policy).map((problem) => `policy: ${problem}`))
   if (format === 2 && form.valid && Array.isArray(bindings.fields))
     problems.push(...format2Problems(document, form.schema, bindings, wellFormed ? snapshot : null))
 

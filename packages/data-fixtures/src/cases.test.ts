@@ -177,7 +177,7 @@ const NOT_CASES: Readonly<Record<string, string>> = {
   STATES_MODEL: 'what discovery of the states schema must report (0170), held by the shared comparator on PostgreSQL alone, which has an enum',
   STATES_SCOPE: 'a discovery scope',
   BULK_PARITY:
-    "what the server's e2e-bulk suite expects of a delete of chosen records on both engines (0173), held on the default images alone, as the server's suites run, so a family would be missing on every other image of the matrix",
+    "what the server's e2e-bulk suite expects of a delete (0173) or a change (0175) of chosen records on both engines, held on the default images alone, as the server's suites run, so a family would be missing on every other image of the matrix",
 }
 
 /** What a call made while a file is collected gave: its options, or the sentence it threw. */

@@ -37,6 +37,12 @@ which are kept unchanged under a heading of their own below it (0171).
   Delete the chosen… above the grid asks in the form's own words, then
   names each record not deleted, which stays chosen. The studio's Policy
   step offers it to roles given delete, and to nobody by default.
+- **The chosen records of a page are changed in one request, each on its
+  own** ([0175](docs/decisions/0175-chosen-records-are-changed-each-on-its-own-to-the-values-given-in-fields-a-policy-names.md)):
+  `update-chosen` and `updateChosen` set the fields `bulk.update` lists
+  to one value for every record, checked once, each record answered as its
+  update alone, so a refused one leaves the rest changed.
+  `@formancy/data-core` now depends on `@formancy/expressions` 0.13.0.
 
 ### Changed
 

@@ -2,8 +2,8 @@ import { createSecretKey } from 'node:crypto'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { EMPTY_PRESENTATION, recordToken } from '@formancy/data-core'
-import type { ChosenAnswer, FieldBinding, FormBindings, FormPolicy, GenerationRequest, MetadataSnapshot } from '@formancy/data-core'
+import { EMPTY_PRESENTATION, recordToken, REFUSAL_PREFIX } from '@formancy/data-core'
+import type { ChangedAnswer, ChosenAnswer, FieldBinding, FormBindings, FormPolicy, GenerationRequest, MetadataSnapshot } from '@formancy/data-core'
 import { BULK_PARITY, PARITY_CASCADES, POSTGRES_IMAGE, SQLSERVER_IMAGE, startPostgresFixture, startSqlServerFixture } from '@formancy/data-fixtures'
 import type { BulkCase, PostgresFixture, SqlServerFixture } from '@formancy/data-fixtures'
 import { createIdentityVerifier } from '@formancy/data-identity'
@@ -22,19 +22,22 @@ import { createConnectionRegistry } from './connections.js'
 import { DRIVER_FACTORIES } from './drivers.js'
 
 /*
- * Deleting the chosen records of a page (0173), end to end on both
- * engines: HTTP into the real server, through the real drivers, into the
- * parity schema on real databases. Each record of a request is a delete of
- * its own, in its own transaction, in the order sent; what each answers is
- * the database's, and BULK_PARITY writes it once for both engines. The
- * route's own decisions -- who may send one, when it stops, what a write
- * id does -- are runtime-bulk.test.ts's, over fake ports.
+ * Deleting (0173) and changing (0175) the chosen records of a page, end to
+ * end on both engines: HTTP into the real server, through the real
+ * drivers, into the parity schema and the shared fixture's orders on real
+ * databases. Each record of a request is a write of its own, in its own
+ * transaction, in the order sent; what each answers is the database's, and
+ * BULK_PARITY writes it once for both engines. The route's own decisions
+ * -- who may send one, when it stops, what a write id does -- are
+ * runtime-bulk.test.ts's and runtime-bulk-update.test.ts's, over fake
+ * ports.
  *
  * Not declared with `covers()`: BULK_PARITY is no family of shared cases,
  * because this suite runs on the default images alone and a case the
  * report holds must pass on every image of the matrix (data-fixtures'
  * bulk.ts says why). Each record's delete is held on every image by the
- * adapters' DELETE_PARITY and CASCADE_PARITY suites.
+ * adapters' DELETE_PARITY and CASCADE_PARITY suites, and each record's
+ * update by their update cases.
  *
  * Its own containers and its own audit sink with a key, so the rows it
  * leaves behind are no other suite's business and the trail is checked.
@@ -102,6 +105,11 @@ beforeAll(async () => {
       tls: { enabled: false, trustServerCertificate: true },
     },
   ]
+  // The shared fixture's orders, which a change of chosen records is about (0175).
+  connections.push(
+    { ...(connections[0] as ConnectionConfig), id: 'pg-sales', schemas: ['sales'] },
+    { ...(connections[1] as ConnectionConfig), id: 'ms-sales', schemas: ['sales'] },
+  )
   registry = createConnectionRegistry(connections, DRIVER_FACTORIES, {
     env: { PG_PASSWORD: decodeURIComponent(pgUrl.password), MS_PASSWORD: String(ms.admin.password) },
     readFile: async () => '',
@@ -215,7 +223,7 @@ async function publish(connection: string, formId: string, table: string, scoped
 }
 
 /** Each record's outcome as the trail names it: `done`, the code it was refused with, or `not-sent`. */
-function outcomesOf(answer: ChosenAnswer): string[] {
+function outcomesOf(answer: ChosenAnswer<unknown>): string[] {
   return answer.records.map((outcome) => (!outcome.sent ? 'not-sent' : outcome.status === 200 ? 'done' : String((outcome.body as { code?: unknown }).code)))
 }
 
@@ -355,5 +363,206 @@ describe.each([
     expect(response.statusCode, response.body).toBe(200)
     expect(outcomesOf(response.json<ChosenAnswer>())).toEqual([BULK_PARITY['cascade-taken'], 'done'])
     expect((await read(cascading, next.record)).statusCode).toBe(404)
+  })
+})
+
+/** What the trigger the change cases add says, after the prefix, when it keeps an order noted `kept` as it is. */
+const KEPT = 'This order is kept as it is.'
+
+describe.each([
+  { engine: 'PostgreSQL', connection: 'pg-sales', db: 'pg' as const, versionColumn: 'row_version' },
+  { engine: 'SQL Server', connection: 'ms-sales', db: 'ms' as const, versionColumn: undefined },
+])('changing chosen records on $engine', ({ connection, db, versionColumn }) => {
+  const formId = `${connection}-order-chosen`
+  let customer: string
+  let theirCustomer: string
+
+  // The order form, published with a policy under which clerks read,
+  // create and update the orders of their tenant, move an order's status
+  // draft to placed to shipped and never back, and change the chosen ones
+  // of a page together in their status, amount, notes and customer. And a
+  // trigger, this suite's own, that keeps an order noted `kept` as it is,
+  // in the deployment's own words (0156): PostgreSQL's BEFORE UPDATE with
+  // RAISE EXCEPTION, SQL Server's AFTER UPDATE with THROW 50001.
+  beforeAll(async () => {
+    const proposal = await call('POST', '/v1/form-proposals', admin, {
+      connection,
+      root: { schema: 'sales', name: 'order' },
+      formId,
+      title: 'Order',
+      lookups: [{ foreignKey: 'fk_order_customer', display: ['name'] }],
+      ...(versionColumn === undefined ? {} : { versionColumn }),
+    })
+    expect(proposal.statusCode, proposal.body).toBe(200)
+    const { form, bindings, snapshot, generation } = proposal.json<Proposal>()
+    const clerks = ['clerk']
+    const policy: FormPolicy = {
+      version: 1,
+      operations: { read: clerks, create: clerks, update: clerks },
+      fields: Object.fromEntries(
+        bindings.fields.map((binding) => [binding.field, { read: clerks, write: binding.writes.create || binding.writes.update ? clerks : [] }]),
+      ),
+      rowFilters: [{ column: 'tenant_id', attribute: 'tenant' }],
+      lookups: { customer: [{ column: 'tenant_id', attribute: 'tenant' }] },
+      transitions: {
+        field: 'status',
+        moves: [
+          { from: null, to: 'draft', roles: clerks },
+          { from: null, to: 'placed', roles: clerks },
+          { from: 'draft', to: 'placed', roles: clerks },
+          { from: 'placed', to: 'shipped', roles: clerks },
+        ],
+      },
+      bulk: { update: { roles: clerks, fields: ['status', 'amount', 'notes', 'customer'] } },
+    }
+    const published = await call('POST', `/v1/forms/${formId}/versions`, admin, {
+      expectedBase: null,
+      bundle: { format: 2, connection, generation, base: form, presentation: EMPTY_PRESENTATION, form, bindings, policy, snapshot },
+    })
+    expect(published.statusCode, published.body).toBe(201)
+    await owners[db].run(
+      db === 'pg'
+        ? [
+            'create function sales.keep_order() returns trigger language plpgsql as $kept$',
+            'begin',
+            `  if old.notes = 'kept' then raise exception using message = '${REFUSAL_PREFIX}${KEPT}'; end if;`,
+            '  return new;',
+            'end',
+            '$kept$;',
+            'create trigger tr_order_kept before update on sales."order" for each row execute function sales.keep_order()',
+          ].join('\n')
+        : [
+            'create trigger sales.tr_order_kept on sales.[order] after update as begin set nocount on;',
+            `  if exists (select 1 from deleted where notes = N'kept') throw 50001, N'${REFUSAL_PREFIX}${KEPT}', 1; end`,
+          ].join('\n'),
+    )
+    const source = (await call('GET', `/v1/forms/${formId}`, clerk)).json().form.model.fields.find((field: { key: string }) => field.key === 'customer')
+      .optionsSource as string
+    const first = async (bearer: string) =>
+      (await call('POST', `/v1/forms/${formId}/lookups/${source}/query`, bearer, { operation: 'update', search: '' })).json().rows[0].token as string
+    customer = await first(clerk)
+    theirCustomer = await first(otherClerk)
+  })
+
+  /** An order created through the form, by its token and the version it was created at. */
+  async function order(status: string, notes: string, bearer = clerk): Promise<{ record: string; version: string }> {
+    const made = await call('POST', `/v1/forms/${formId}/records/create`, bearer, {
+      answers: { customer: bearer === clerk ? customer : theirCustomer, order_date: '2026-11-22', status, amount: '1', notes },
+    })
+    expect(made.statusCode, made.body).toBe(201)
+    const { record, version } = made.json<{ record: string; version: string }>()
+    return { record, version }
+  }
+  const read = (record: string, bearer = clerk) => call('POST', `/v1/forms/${formId}/records/read`, bearer, { record })
+  const changed = (records: Array<{ record: string; version: string }>, answers: Record<string, unknown>) =>
+    call('POST', `/v1/forms/${formId}/records/update-chosen`, clerk, { records, answers })
+
+  // One request over five orders, each the case BULK_PARITY names: each is
+  // changed or refused as its update alone would be, in the order sent, and
+  // a refusal stops nothing. The one changed takes every answer, its amount
+  // in the column's spelling; the one updated since is stale and keeps what
+  // it holds; the shipped one may not move back to placed, from its own
+  // state; the one the trigger keeps is refused in the trigger's words. The
+  // trail names every record by its hash and what became of each by its
+  // code, never a value.
+  test('changes each record on its own in the order sent, each as its update alone would be', async () => {
+    const draft = await order('draft', 'chosen: changed')
+    const since = await order('draft', 'chosen: changed since')
+    const placed = await order('placed', 'chosen: shipped since')
+    const kept = await order('draft', 'kept')
+    const spelled = await order('draft', 'chosen: spelled')
+    const updated = await call('POST', `/v1/forms/${formId}/records/update`, clerk, { ...since, answers: { notes: 'changed since it was read' } })
+    expect(updated.statusCode, updated.body).toBe(200)
+    const shipped = await call('POST', `/v1/forms/${formId}/records/update`, clerk, { ...placed, answers: { status: 'shipped' } })
+    expect(shipped.statusCode, shipped.body).toBe(200)
+    const shippedAt = { record: placed.record, version: shipped.json<{ version: string }>().version }
+
+    const cases: Array<[BulkCase, { record: string; version: string }]> = [
+      ['changed', draft],
+      ['stale', since],
+      ['move-refused', shippedAt],
+      ['declined', kept],
+      ['spelled', spelled],
+    ]
+    const response = await changed(
+      cases.map(([, sent]) => sent),
+      { status: 'placed', amount: '12.5', notes: 'changed together', customer },
+    )
+    expect(response.statusCode, response.body).toBe(200)
+    const answer = response.json<ChangedAnswer>()
+    expect(outcomesOf(answer)).toEqual(cases.map(([name]) => BULK_PARITY[name]))
+    expect(answer.records[0]).toMatchObject({
+      sent: true,
+      status: 200,
+      body: { record: draft.record, answers: { status: 'placed', amount: '12.5000', notes: 'changed together', customer } },
+    })
+    expect(answer.records[3]).toMatchObject({ sent: true, status: 422, body: { code: 'declined', message: KEPT } })
+
+    expect((await read(spelled.record)).json()).toMatchObject({ answers: { status: 'placed', amount: '12.5000', notes: 'changed together' } })
+    expect((await read(since.record)).json()).toMatchObject({ answers: { status: 'draft', notes: 'changed since it was read' } })
+    expect((await read(placed.record)).json()).toMatchObject({ answers: { status: 'shipped', notes: 'chosen: shipped since' } })
+    expect((await read(kept.record)).json()).toMatchObject({ answers: { status: 'draft', notes: 'kept' } })
+
+    const trail = events.filter(
+      (event): event is RuntimeAuditEvent => event.plane === 'runtime' && event.form === formId && event.operation === 'update-chosen',
+    )
+    expect(trail.map(({ status, outcome, record, rows, records, outcomes, moved }) => ({ status, outcome, record, rows, records, outcomes, moved }))).toEqual([
+      {
+        status: 200,
+        outcome: 'ok',
+        record: null,
+        rows: 5,
+        records: cases.map(([, sent]) => recordReference(AUDIT_KEY, sent.record)),
+        outcomes: ['done', 'stale', 'transition-denied', 'declined', 'done'],
+        moved: null,
+      },
+    ])
+    expect(JSON.stringify(trail)).not.toContain(KEPT)
+  })
+
+  // A record deleted since the page read it, and another tenant's, are not
+  // found -- a change of their notes alone, of which no move is checked --
+  // and the record after them is changed; the other tenant's order keeps
+  // what it holds.
+  test('answers a record deleted since and another tenant’s not found, and changes the next', async () => {
+    const gone = await order('draft', 'chosen: deleted since')
+    const theirs = await order('draft', 'chosen: another tenant', otherClerk)
+    const next = await order('draft', 'chosen: after them')
+    const table = db === 'pg' ? 'sales."order"' : 'sales.[order]'
+    await owners[db].run(`delete from ${table} where id = ${gone.record.slice('k1:'.length)}`)
+
+    const response = await changed([gone, theirs, next], { notes: 'changed after the gone' })
+    expect(response.statusCode, response.body).toBe(200)
+    expect(outcomesOf(response.json<ChangedAnswer>())).toEqual([BULK_PARITY['not-found'], BULK_PARITY['other-tenant'], 'done'])
+    expect((await read(next.record)).json()).toMatchObject({ answers: { notes: 'changed after the gone' } })
+    expect((await read(theirs.record, otherClerk)).json()).toMatchObject({ answers: { notes: 'chosen: another tenant' } })
+  })
+
+  // A selection is refused for the request, before any record is read, in
+  // either of the two ways an update alone refuses it: another tenant's
+  // customer as the answers are decoded, since its key carries the tenant
+  // the row filter pins, before any statement; and a customer number of
+  // the clerk's own tenant that names no row by the membership check, run
+  // once. Each is 422 for the request, and no order changed.
+  test('refuses the request once for another tenant’s customer and for one that names no row, changing no order', async () => {
+    const first = await order('draft', 'chosen: kept by its lookup')
+    const second = await order('draft', 'chosen: kept by its lookup too')
+    const theirs = await changed([first, second], { customer: theirCustomer, notes: 'never written' })
+    expect([theirs.statusCode, theirs.json()]).toEqual([
+      422,
+      expect.objectContaining({ code: 'invalid-values', fieldErrors: [expect.objectContaining({ field: 'customer', code: 'not-an-option' })] }),
+    ])
+    const missing = await changed([first, second], { customer: 'k1:1,999999', notes: 'never written' })
+    expect([missing.statusCode, missing.json()]).toEqual([
+      422,
+      {
+        code: 'invalid-values',
+        message: 'A selection is not one of the options.',
+        fieldErrors: [{ field: 'customer', code: 'not-an-option', message: 'This is not one of the options this form offers.' }],
+      },
+    ])
+    for (const { record, version } of [first, second]) {
+      expect((await read(record)).json()).toMatchObject({ version, answers: { notes: expect.stringMatching(/^chosen: kept by its lookup/) } })
+    }
   })
 })

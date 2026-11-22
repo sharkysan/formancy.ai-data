@@ -142,7 +142,7 @@ describe('when the data server is not what answers', () => {
       opens: [],
       together: null,
       actions: [],
-      bulk: { delete: false },
+      bulk: { delete: false, update: null },
     }
     let body: unknown = FORM
     const { base } = await serve((_request, response) => {
@@ -465,6 +465,7 @@ describe('across origins (0060)', () => {
       supersede: () => client.supersede('pg-order', CHANGE),
       delete: () => client.delete('pg-order', { record: 'k1:7', version: '00000000000007d1' }),
       deleteChosen: () => client.deleteChosen('pg-order', { records: [{ record: 'k1:7', version: '00000000000007d1' }] }),
+      updateChosen: () => client.updateChosen('pg-order', { records: [{ record: 'k1:7', version: '00000000000007d1' }], answers: { notes: 'a' } }),
       save: () => client.save('pg-order', { record: { create: { answers: { notes: 'a' } } }, rows: [] }),
       runAction: () => client.runAction('pg-order', 'close', { records: [{ record: 'k1:7', version: '00000000000007d1' }], answers: { note: 'a' } }),
       reconcile: () => client.reconcile('pg-order', lost),
@@ -783,7 +784,7 @@ describe('a delete (0050)', () => {
       opens: [],
       together: null,
       actions: [],
-      bulk: { delete: false },
+      bulk: { delete: false, update: null },
     }
     const DELETING = { cascades: false, clears: false, restricted: true }
     let body: unknown = FORM
@@ -827,7 +828,7 @@ describe('a delete (0050)', () => {
       opens: [],
       together: null,
       actions: [],
-      bulk: { delete: false },
+      bulk: { delete: false, update: null },
     }
     const writes = (operations: readonly string[]) => ({ create: operations.includes('create') ? ['note'] : null, update: null })
     let body: unknown = FORM
@@ -875,7 +876,7 @@ describe('a delete (0050)', () => {
       opens: [],
       together: null,
       actions: [],
-      bulk: { delete: false },
+      bulk: { delete: false, update: null },
     }
     const writes = (operations: readonly string[]) => ({
       create: operations.includes('create') ? ['valid_from'] : null,
@@ -925,7 +926,7 @@ describe('a delete (0050)', () => {
       opens: [],
       together: null,
       actions: [],
-      bulk: { delete: false },
+      bulk: { delete: false, update: null },
     }
     let body: unknown = FORM
     const { base } = await serve((_request, response) => {
@@ -973,7 +974,7 @@ describe('a delete (0050)', () => {
       opens: [],
       together: null,
       actions: [],
-      bulk: { delete: false },
+      bulk: { delete: false, update: null },
     }
     let body: unknown = FORM
     const { base } = await serve((_request, response) => {
@@ -1028,7 +1029,7 @@ describe('a delete (0050)', () => {
       moves: null,
       together: null,
       actions: [],
-      bulk: { delete: false },
+      bulk: { delete: false, update: null },
     }
     let body: unknown = FORM
     const { base } = await serve((_request, response) => {
@@ -1306,7 +1307,7 @@ describe('a save of a record with its rows (0155)', () => {
       moves: null,
       opens: [],
       actions: [],
-      bulk: { delete: false },
+      bulk: { delete: false, update: null },
     }
     let body: unknown = FORM
     const { base } = await serve((_request, response) => {
@@ -1521,7 +1522,7 @@ describe('a run of an action (0161)', () => {
       moves: null,
       opens: [],
       together: null,
-      bulk: { delete: false },
+      bulk: { delete: false, update: null },
     }
     const CLOSE = {
       name: 'close',
@@ -1600,11 +1601,53 @@ describe('a run of an action (0161)', () => {
       expect(await client.form('pg-ticket'), JSON.stringify(malformed)).toMatchObject({ ok: false, code: 'unexpected' })
     }
     for (const taken of [
-      { ...FORM, bulk: { delete: true } },
-      { ...FORM, bulk: { delete: false } },
-      { ...reading, bulk: { delete: false } },
+      { ...FORM, bulk: { delete: true, update: null } },
+      { ...FORM, bulk: { delete: false, update: null } },
+      { ...reading, bulk: { delete: false, update: null } },
     ]) {
       body = taken
+      expect(await client.form('pg-ticket')).toEqual({ ok: true, value: body })
+    }
+  })
+
+  // What a person may change chosen records in (0175) is `null` or the
+  // fields, never empty, each once and each one the form's update accepts
+  // from them (`writable.update`), and only where it offers them update: a
+  // page drawing "Change the chosen…" from a field the update would refuse
+  // offers a request every record of which is refused. A reply whose
+  // `bulk` has no `update` is from a server older than 0175, which this
+  // client takes for no server it knows, as it takes one with no `bulk`.
+  // Watched failing with `update` read as any list: the field outside
+  // `writable.update` was taken.
+  test("a form's bulk update is null or the fields its update accepts, and only where it offers update", async () => {
+    const FORM = {
+      form: { model: {} },
+      operations: ['read', 'update'],
+      readable: ['id', 'note'],
+      list: null,
+      deleting: null,
+      copied: null,
+      versions: null,
+      writable: { create: null, update: ['status', 'note'] },
+      moves: null,
+      opens: [],
+      together: null,
+      actions: [],
+    }
+    let body: unknown = FORM
+    const { base } = await serve((_request, response) => {
+      response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(body))
+    })
+    const client = createDataClient({ token: () => 't', base })
+    const reading = { ...FORM, operations: ['read'], writable: { create: null, update: null } }
+    for (const update of [undefined, [], ['title'], ['note', 'note'], [7], 'note']) {
+      body = { ...FORM, bulk: { delete: false, ...(update === undefined ? {} : { update }) } }
+      expect(await client.form('pg-ticket'), JSON.stringify(body)).toMatchObject({ ok: false, code: 'unexpected' })
+    }
+    body = { ...reading, bulk: { delete: false, update: ['note'] } }
+    expect(await client.form('pg-ticket')).toMatchObject({ ok: false, code: 'unexpected' })
+    for (const update of [null, ['note'], ['status', 'note']]) {
+      body = { ...FORM, bulk: { delete: false, update } }
       expect(await client.form('pg-ticket')).toEqual({ ok: true, value: body })
     }
   })

@@ -5,9 +5,9 @@ import type { ConnectionRegistry } from './connections.js'
 import { SQLSERVER_REQUEST_TIMEOUT_MS } from './save-deadline.js'
 
 /*
- * `FORMANCY_DATA_BULK_DEADLINE_MS` (0173): what the composition root
- * accepts for how long a request that deletes chosen records may go on
- * sending them, by the rule every deadline of this server is read by.
+ * `FORMANCY_DATA_BULK_DEADLINE_MS` (0173, 0175): what the composition root
+ * accepts for how long a request that deletes or changes chosen records may
+ * go on sending them, by the rule every deadline of this server is read by.
  */
 
 describe('FORMANCY_DATA_BULK_DEADLINE_MS', () => {
@@ -32,12 +32,26 @@ describe('FORMANCY_DATA_BULK_DEADLINE_MS', () => {
   // which the composed stack leaves as it is (bulk-deadline.ts). On SQL
   // Server that record is up to three statements, each bounded by mssql's
   // request timeout: the root's description, the delete, and, where it
-  // deleted nothing, the read that says why. A default raised past that
+  // deleted nothing, the read that says why -- or, for a change (0175), the
+  // read that carries the description, the update, and where it changed
+  // nothing the read that says why. A default raised past that
   // would have the proxy cut answers the server still writes. Watched
   // failing with the first default of 20 s, chosen while the count was
   // two statements: 20 s and three timeouts are 65 s.
   test('leaves a last record on SQL Server room to answer before the proxy gives up', () => {
     expect(DEFAULT_BULK_DEADLINE_MS + 3 * SQLSERVER_REQUEST_TIMEOUT_MS).toBeLessThan(60_000)
+  })
+
+  // A change of a chosen record whose read failed describes the root in a
+  // statement of its own before its update, as an update alone does (0040):
+  // four statements on SQL Server, and four of mssql's timeouts reach
+  // nginx's 60 s by themselves, so no deadline could keep that answer from
+  // the proxy -- which 0175 accepts, for a record whose read has already
+  // failed, and says. A timeout lowered so four fit makes this fail, and
+  // that sentence untrue. Watched failing with SQLSERVER_REQUEST_TIMEOUT_MS
+  // at 14 s: four were 56 s.
+  test('names the path no default could hold: a change whose read failed is four statements on SQL Server', () => {
+    expect(4 * SQLSERVER_REQUEST_TIMEOUT_MS).toBeGreaterThanOrEqual(60_000)
   })
 
   // An embedder's option is held to the variable's rule, so a server is
