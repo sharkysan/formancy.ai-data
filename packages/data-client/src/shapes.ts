@@ -266,14 +266,27 @@ function isActions(value: unknown): value is PublishedForm['actions'] {
 }
 
 /**
- * What a person may do to a page's chosen records together (0173):
- * `delete` a yes or no, and a yes only where the form offers them delete,
- * so a page never offers a request each record of which is refused. A
- * reply without it is from a server older than 0173, whose page would
- * offer no such delete.
+ * What a person may do to a page's chosen records together: `delete` a
+ * yes or no, and a yes only where the form offers them delete (0173); and
+ * `update` the fields they may change them in, or `null` (0175) -- a list
+ * only where the form offers them update, never empty, each field one
+ * `writable.update` holds, once -- so a page never offers a request each
+ * record of which is refused. A reply without `bulk` is from a server
+ * older than 0173, and one without `bulk.update` from one older than
+ * 0175, whose page would offer neither.
  */
-function isBulk(value: unknown, operations: readonly unknown[]): boolean {
-  return isRecord(value) && typeof value['delete'] === 'boolean' && (!value['delete'] || operations.includes('delete'))
+function isBulk(value: unknown, operations: readonly unknown[], writable: unknown): boolean {
+  if (!isRecord(value) || typeof value['delete'] !== 'boolean' || (value['delete'] && !operations.includes('delete'))) return false
+  const fields = value['update']
+  if (fields === null) return true
+  const writes = isRecord(writable) && Array.isArray(writable['update']) ? (writable['update'] as unknown[]) : []
+  return (
+    Array.isArray(fields) &&
+    fields.length > 0 &&
+    operations.includes('update') &&
+    new Set(fields).size === fields.length &&
+    fields.every((field) => typeof field === 'string' && writes.includes(field))
+  )
 }
 
 export function isPublishedForm(body: unknown): body is PublishedForm {
@@ -292,7 +305,7 @@ export function isPublishedForm(body: unknown): body is PublishedForm {
     isOpens(body['opens']) &&
     isTogether(body['together']) &&
     isActions(body['actions']) &&
-    isBulk(body['bulk'], body['operations'] as unknown[])
+    isBulk(body['bulk'], body['operations'] as unknown[], body['writable'])
   )
 }
 

@@ -6,9 +6,10 @@ import type { Plane } from './test-plane.js'
 /*
  * Deleting a record through the client, on both engines (0050), across real
  * HTTP into the real server and its drivers, over the parity schema's table
- * a clerk may delete from within their tenant. What stale is, and whether a
- * second deletion finds anything, are database answers, so they are asked
- * of the databases.
+ * a clerk may delete from within their tenant -- and the chosen records of
+ * a page deleted (0173) or changed (0175) together. What stale is, and
+ * whether a second deletion finds anything, are database answers, so they
+ * are asked of the databases.
  */
 
 let plane: Plane
@@ -93,5 +94,42 @@ describe.each(ENGINES)('a deletion through the client on $engine', ({ connection
     })
     expect(await clerk.read(formId, first.record)).toMatchObject({ ok: false, status: 404 })
     expect(expectOk(await clerk.read(formId, changed.record))).toMatchObject({ record: changed.record })
+  })
+
+  // The chosen records of a page changed together (0175): the form says a
+  // clerk may, in the note, and each record is read as its update alone
+  // would be -- the clerk's own changed and answered as stored, one changed
+  // since it was read stale, another tenant's not found -- in the order
+  // sent, the request going on past the two it could not change. A field
+  // ticked and sent empty, `null`, clears it.
+  test('changes chosen records each on its own, and reads each as an update of it alone', async () => {
+    const clerk = plane.client()
+    expect(expectOk(await clerk.form(formId))).toMatchObject({ bulk: { update: ['note'] } })
+    const created = async (note: string, as = clerk) => {
+      const made = expectOk(await as.create(formId, { note }))
+      return { record: made.record ?? '', version: made.version ?? '' }
+    }
+    const first = await created(`changed through the client ${connection}`)
+    const since = await created(`changed since it was read ${connection}`)
+    const theirs = await created(`another tenant's to change ${connection}`, plane.client(plane.tokens.otherClerk))
+    const last = await created(`changed last ${connection}`)
+    expectOk(await clerk.update(formId, { ...since, answers: { note: 'changed' } }))
+
+    const outcome = await clerk.updateChosen(formId, { records: [first, since, theirs, last], answers: { note: 'changed together' } })
+    expect(outcome).toMatchObject({
+      ok: true,
+      value: [
+        { ok: true, value: { record: first.record, answers: { note: 'changed together' } } },
+        { ok: false, status: 409, code: 'stale' },
+        { ok: false, status: 404, code: 'not-found', message: 'No such record.' },
+        { ok: true, value: { record: last.record, answers: { note: 'changed together' } } },
+      ],
+    })
+    expect(expectOk(await clerk.read(formId, since.record))).toMatchObject({ answers: { note: 'changed' } })
+    const cleared = await clerk.updateChosen(formId, {
+      records: [{ record: last.record, version: expectOk(await clerk.read(formId, last.record)).version ?? '' }],
+      answers: { note: null },
+    })
+    expect(cleared).toMatchObject({ ok: true, value: [{ ok: true, value: { answers: { note: null } } }] })
   })
 })
