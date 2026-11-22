@@ -4,6 +4,7 @@ import type { HostIdentity, IdentityVerifier } from '@formancy/data-identity'
 import Fastify, { LogController } from 'fastify'
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 import { actionDeadlineProblem, DEFAULT_ACTION_DEADLINE_MS } from './action-deadline.js'
+import { DEFAULT_BULK_DEADLINE_MS } from './bulk-deadline.js'
 import { CONFIGURATION_ID_MAX_LENGTH } from './config-store.js'
 import type { ConfigurationStore } from './config-store.js'
 import type { ConnectionRegistry } from './connections.js'
@@ -118,6 +119,13 @@ export interface DataServerOptions {
    * whole number from 1 to 2147483647, or the server is not built. Default
    * `DEFAULT_ACTION_DEADLINE_MS`, 15 s, chosen and not measured; the
    * runnable server reads `FORMANCY_DATA_ACTION_DEADLINE_MS` for it.
+   *
+   * `bulkDeadlineMs`: how long a request that deletes the chosen records of
+   * a page may go on sending them, checked before each record and never
+   * during one: every record after it is answered not sent (0173). A whole
+   * number from 1 to 2147483647, or the server is not built. Default
+   * `DEFAULT_BULK_DEADLINE_MS`, 20 s, chosen and not measured; the runnable
+   * server reads `FORMANCY_DATA_BULK_DEADLINE_MS` for it.
    */
   runtime?: {
     registry: ConnectionRegistry
@@ -127,6 +135,7 @@ export interface DataServerOptions {
     lookupDeadlineMs?: number
     saveDeadlineMs?: number
     actionDeadlineMs?: number
+    bulkDeadlineMs?: number
   }
 }
 
@@ -213,6 +222,10 @@ export async function createDataServer(options: DataServerOptions): Promise<Fast
   const actionDeadlineMs = options.runtime?.actionDeadlineMs ?? DEFAULT_ACTION_DEADLINE_MS
   const actionRefused = actionDeadlineProblem('runtime.actionDeadlineMs', actionDeadlineMs)
   if (actionRefused !== undefined) throw new Error(actionRefused)
+  // A request's over chosen records by the lookup deadline's rule (bulk-deadline.ts): 0 would answer every record not sent.
+  const bulkDeadlineMs = options.runtime?.bulkDeadlineMs ?? DEFAULT_BULK_DEADLINE_MS
+  const bulkRefused = lookupDeadlineProblem('runtime.bulkDeadlineMs', bulkDeadlineMs)
+  if (bulkRefused !== undefined) throw new Error(bulkRefused)
   // The proxies by the setting's rule (trusted-proxies.ts, 0071): a list
   // that would believe every client about itself stops the server here. A
   // copy is checked and handed to Fastify, as the origins are.
@@ -317,8 +330,15 @@ export async function createDataServer(options: DataServerOptions): Promise<Fast
   }
 
   if (options.runtime !== undefined) {
-    const { origins: _offered, lookupDeadlineMs: _checked, saveDeadlineMs: _saveChecked, actionDeadlineMs: _actionChecked, ...runtime } = options.runtime
-    await app.register(runtimeRoutes, { ...runtime, authenticate, lookupDeadlineMs, saveDeadlineMs, actionDeadlineMs })
+    const {
+      origins: _offered,
+      lookupDeadlineMs: _checked,
+      saveDeadlineMs: _saveChecked,
+      actionDeadlineMs: _actionChecked,
+      bulkDeadlineMs: _bulkChecked,
+      ...runtime
+    } = options.runtime
+    await app.register(runtimeRoutes, { ...runtime, authenticate, lookupDeadlineMs, saveDeadlineMs, actionDeadlineMs, bulkDeadlineMs })
   }
 
   return app

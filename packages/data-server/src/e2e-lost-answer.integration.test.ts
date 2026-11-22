@@ -3,7 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { EMPTY_PRESENTATION, recordToken } from '@formancy/data-core'
-import type { DatabaseKind, FormBindings, FormPolicy, GenerationRequest, MetadataSnapshot } from '@formancy/data-core'
+import type { ChosenAnswer, DatabaseKind, FormBindings, FormPolicy, GenerationRequest, MetadataSnapshot } from '@formancy/data-core'
 import {
   actionToken,
   answerBytes,
@@ -268,7 +268,7 @@ async function publish(connection: string, formId: string, generation: Record<st
   expect(published.statusCode, published.body).toBe(201)
 }
 
-/** A form whose clerks may read and delete every row: lost.removable has no tenant (0050). */
+/** A form whose clerks may read and delete every row, one at a time or the chosen ones together (0173): lost.removable has no tenant (0050). */
 async function publishDeleting(connection: string, formId: string, generation: Record<string, unknown>): Promise<void> {
   const proposal = await call('/v1/form-proposals', admin, { connection, formId, ...generation })
   expect(proposal.statusCode, proposal.body).toBe(200)
@@ -280,6 +280,7 @@ async function publishDeleting(connection: string, formId: string, generation: R
     fields: Object.fromEntries(proposed.bindings.fields.map((binding) => [binding.field, { read: ['clerk'], write: [] }])),
     rowFilters: [],
     lookups: {},
+    bulk: { delete: { roles: ['clerk'] } },
   }
   const published = await call(`/v1/forms/${formId}/versions`, admin, { expectedBase: null, bundle: asProposed(connection, proposed, policy) })
   expect(published.statusCode, published.body).toBe(201)
@@ -541,6 +542,73 @@ describe.each([
     expect(trail.map(({ operation, status, outcome }) => ({ operation, status, outcome }))).toEqual([
       { operation: 'delete', status: 502, outcome: 'unknown-outcome' },
       { operation: 'delete', status: 404, outcome: 'not-found' },
+    ])
+  })
+
+  // Chosen records deleted together (0173), the answer to the second
+  // record's delete lost after the database deleted it: the first is
+  // answered deleted, the second as a delete alone whose answer was lost
+  // is -- 502 naming it with the version sent, inside the request's 200 --
+  // and the third is not sent, since the connection is in doubt, and stays.
+  // The second's marker crossed the hop once, and the third's never: the
+  // server sent nothing again. A new request with the two left answers the
+  // second not found and deletes the third. The trail names the three each
+  // time, and what became of each. A loop that went on past the unknown
+  // outcome would have deleted the third and counted its marker.
+  test('a delete of chosen records is the lost record’s 502, the records after it not sent, and nothing sent again', async () => {
+    const formId = `${connection}-removable-chosen-lost`
+    await publishDeleting(`${connection}-lost`, formId, {
+      root: { schema: 'lost', name: 'removable' },
+      title: 'Removable',
+      lookups: [],
+      versionColumn: 'version',
+    })
+    const codes = [randomUUID(), randomUUID(), randomUUID()]
+    const records: Array<{ record: string; version: string }> = []
+    for (const code of codes) {
+      const made = recordToken(['id', 'code'], { id: await insertRemovable(connection, code), code })
+      if (!made.ok) throw new Error(made.message)
+      records.push({ record: made.token, version: '1' })
+    }
+    const [first, second, third] = records as [(typeof records)[0], (typeof records)[0], (typeof records)[0]]
+    const thirdSent = hops[connection].countSent(answerBytes(kind, codes[2] as string))
+    const { response, sent } = await sentAndLost(
+      codes[1] as string,
+      async () => expect(await count(connection, REMOVABLE_CODED, codes[1] as string)).toBe(0),
+      () => call(`/v1/forms/${formId}/records/delete-chosen`, clerk, { records }),
+    )
+    expect(response.statusCode, response.body).toBe(200)
+    expect(response.json<ChosenAnswer>().records).toEqual([
+      { sent: true, status: 200, body: { record: first.record, deleted: true } },
+      { sent: true, status: 502, body: expect.objectContaining({ code: 'unknown-outcome', operation: 'delete', record: second.record, version: '1' }) },
+      { sent: false },
+    ])
+    expect(sent()).toBe(1)
+    expect(thirdSent()).toBe(0)
+    expect(await count(connection, REMOVABLE_CODED, codes[0] as string)).toBe(0)
+    expect(await count(connection, REMOVABLE_CODED, codes[2] as string)).toBe(1)
+
+    const again = await call(`/v1/forms/${formId}/records/delete-chosen`, clerk, { records: [second, third] })
+    expect(again.statusCode, again.body).toBe(200)
+    expect(again.json<ChosenAnswer>().records.map((outcome) => (outcome.sent ? outcome.status : 'not sent'))).toEqual([404, 200])
+    expect(sent()).toBe(1)
+    expect(await count(connection, REMOVABLE_CODED, codes[2] as string)).toBe(0)
+    const trail = events.filter((event): event is RuntimeAuditEvent => event.plane === 'runtime' && event.form === formId)
+    expect(trail.map(({ operation, status, outcome, records: named, outcomes }) => ({ operation, status, outcome, records: named, outcomes }))).toEqual([
+      {
+        operation: 'delete-chosen',
+        status: 200,
+        outcome: 'ok',
+        records: records.map(({ record }) => recordReference(AUDIT_KEY, record)),
+        outcomes: ['done', 'unknown-outcome', 'not-sent'],
+      },
+      {
+        operation: 'delete-chosen',
+        status: 200,
+        outcome: 'ok',
+        records: [second, third].map(({ record }) => recordReference(AUDIT_KEY, record)),
+        outcomes: ['not-found', 'done'],
+      },
     ])
   })
 

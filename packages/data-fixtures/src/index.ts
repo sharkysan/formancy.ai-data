@@ -56,6 +56,8 @@ export { DECLINE_PARITY, DECLINING_MESSAGES, DECLINING_REMOVABLE, DECLINING_TABL
 export type { DeclineAnswer, DeclineCase } from './declines.js'
 export type { DefaultCase } from './defaults.js'
 export { DELETE_PARITY, deleteAnswer, UPDATE_RECREATED } from './deletes.js'
+export { BULK_PARITY } from './bulk.js'
+export type { BulkCase, BulkOutcome } from './bulk.js'
 export { BROWSE_PARITY } from './browse.js'
 export type { BrowseCase } from './browse.js'
 export { COLUMN_FILTER_PARITY, COLUMN_FILTER_ROWS, COLUMN_FILTER_TENANT } from './column-filters.js'

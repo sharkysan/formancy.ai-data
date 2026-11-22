@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import { resolveSecret } from '@formancy/data-identity'
 import { actionDeadlineSetting } from './action-deadline.js'
+import { bulkDeadlineSetting } from './bulk-deadline.js'
 import { createDataServer } from './app.js'
 import type { DataServerOptions } from './app.js'
 import { createFileConfigurationStore } from './config-store.js'
@@ -48,6 +49,9 @@ import { trustedProxiesSetting } from './trusted-proxies.js'
  *   FORMANCY_DATA_ACTION_DEADLINE_MS               how long a run of an action may take before the database stops
  *                                                  it, 1 to 2147483647 ms; default DEFAULT_ACTION_DEADLINE_MS, 15 s
  *                                                  (0161)
+ *   FORMANCY_DATA_BULK_DEADLINE_MS                 how long a request that deletes chosen records may go on
+ *                                                  sending them, checked before each record, 1 to 2147483647 ms;
+ *                                                  default DEFAULT_BULK_DEADLINE_MS, 20 s, chosen (0173)
  *   PORT                                           default 4390
  */
 function required(name: string): string {
@@ -116,6 +120,15 @@ if (!saveDeadline.ok) {
 const actionDeadline = actionDeadlineSetting(process.env['FORMANCY_DATA_ACTION_DEADLINE_MS'])
 if (!actionDeadline.ok) {
   console.error(actionDeadline.problem)
+  process.exit(1)
+}
+
+// Read before anything opens, by the lookup deadline's rule: a deadline of
+// 0, junk, or one longer than a timer holds stops the process here
+// (bulk-deadline.ts, 0173).
+const bulkDeadline = bulkDeadlineSetting(process.env['FORMANCY_DATA_BULK_DEADLINE_MS'])
+if (!bulkDeadline.ok) {
+  console.error(bulkDeadline.problem)
   process.exit(1)
 }
 
@@ -252,6 +265,7 @@ if (storeDirectory !== undefined && connectionsFile !== undefined) {
     lookupDeadlineMs: deadline.ms,
     saveDeadlineMs: saveDeadline.ms,
     actionDeadlineMs: actionDeadline.ms,
+    bulkDeadlineMs: bulkDeadline.ms,
     log: () => app.log,
   })
 }

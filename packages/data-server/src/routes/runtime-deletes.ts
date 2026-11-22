@@ -7,6 +7,9 @@ import { deleteFailure, planRefusal } from './runtime-errors.js'
 import { INVALID_WRITE_ID, writeId } from './write-once.js'
 import type { WriteAnswer } from './write-once.js'
 
+/** What one delete asks of the runtime plane: who is asking, and how a lost answer and a planner's refusal are said. */
+export type DeleteSteps = Pick<DeleteRouteSteps, 'context' | 'lost' | 'refusal'>
+
 /** What the delete route borrows from the runtime plane, so it decides each step as the update route does. */
 export interface DeleteRouteSteps {
   /** The published bundle, or a reply already sent. */
@@ -37,7 +40,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * One delete, from the description it is decided over to the statement,
  * answered rather than sent: the route runs it once per sending, so a write
  * id that arrives again is answered with this answer and asks the database
- * nothing (0031).
+ * nothing (0031). Each chosen record of a request that deletes several
+ * (0173, `runtime-bulk.ts`) is this, called once for it, so one record of
+ * such a request is a single delete and the two cannot answer it apart.
  *
  * The policy is asked first, before any statement (0041); then the root is
  * described, and the delete is planned over that description and sent with
@@ -46,8 +51,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * case-insensitive key may be spelled otherwise than the token sent (0028)
  * -- and holds no value of it, so a resend's kept answer holds none either.
  */
-async function deleted(
-  steps: DeleteRouteSteps,
+export async function deleteOne(
+  steps: DeleteSteps,
   request: FastifyRequest<{ Params: { id: string } }>,
   bundle: PublishedBundle,
   open: OpenConnection,
@@ -106,6 +111,6 @@ export function registerDeleteRoute(app: FastifyInstance, steps: DeleteRouteStep
     const open = await steps.connection(bundle, reply)
     if (open === undefined) return reply
     const { record, version } = body
-    return steps.answered(reply, await steps.sendOnce(request, 'delete', id, () => deleted(steps, request, bundle, open, record, version)))
+    return steps.answered(reply, await steps.sendOnce(request, 'delete', id, () => deleteOne(steps, request, bundle, open, record, version)))
   })
 }

@@ -221,6 +221,10 @@ export interface Deleting {
  * (`runnableActions`), less those the root as described now stops
  * (`DriftVerdict.actions`, 0041). A routine is not described here: its run
  * describes it, and refuses one that changed. `[]` where none (0161).
+ * `bulk` is what this person may do to the chosen records of a page in one
+ * request (0173): `delete` exactly when `operations` holds `delete` and the
+ * policy's `bulk.delete` grants a role of theirs (`bulkOffered`), each
+ * record then a delete of its own; `false` otherwise.
  */
 export interface PublishedForm {
   form: FormSchema
@@ -235,6 +239,7 @@ export interface PublishedForm {
   opens: LookupOpen[]
   together: { field: string; min: number; max: number } | null
   actions: FormAction[]
+  bulk: { delete: boolean }
 }
 
 /**
