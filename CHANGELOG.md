@@ -29,8 +29,8 @@ which are kept unchanged under a heading of their own below it (0171).
   own** ([0173](docs/decisions/0173-chosen-records-are-deleted-each-on-its-own-with-one-answer-per-record.md)):
   `POST …/records/delete-chosen` and the client's `deleteChosen`, under the
   policy's new `bulk.delete`, answer each record as its delete alone would,
-  so a refused one leaves the rest deleted; a server older than this
-  refuses such a policy.
+  so a refused one leaves the rest deleted. An older server refuses such a
+  policy, and this client an older server's form: upgrade the server first.
 
 ### Changed
 

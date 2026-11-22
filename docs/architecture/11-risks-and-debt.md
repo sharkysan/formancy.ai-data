@@ -162,10 +162,13 @@ by another application can leave a gap or an overlap
 ([0113](../decisions/0113-a-form-over-versions-changes-the-open-one-from-a-date.md)).
 A delete of chosen records can leave a set half deleted, by design, each
 record named in the answer, and stops at the first record whose answer
-was lost, the rest not sent; `FORMANCY_DATA_BULK_DEADLINE_MS`'s 20 s is
-chosen, not measured, until `bulk-sized.integration.test.ts` has run in
-CI, and bounds nothing inside one record -- on PostgreSQL a record's wait
-for another's lock is unbounded, as a delete alone's is; and only a
+was lost, the rest not sent; `FORMANCY_DATA_BULK_DEADLINE_MS`'s 14 s is
+chosen, not measured, until the timings `bulk-sized.integration.test.ts`
+prints to a CI run's log have been read, and bounds nothing inside one
+record -- on PostgreSQL a record's wait for another's lock is unbounded,
+as a delete alone's is, so the proxy in front can cut that answer; a
+first record refused `schema-changed` or `permission-denied` refuses the
+request, though a trigger can meet either for some rows alone; and only a
 client of the deployment's own sends one, the host page and the studio
 offering none ([0173](../decisions/0173-chosen-records-are-deleted-each-on-its-own-with-one-answer-per-record.md)).
 

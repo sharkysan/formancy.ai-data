@@ -314,10 +314,14 @@ rule taken out: the grant and the body
 the route, its deadline and the trail over fake ports
 (`packages/data-server/src/routes/runtime-bulk.test.ts`,
 `bulk-deadline.test.ts`), the built server's start
-(`scripts/server-start.test.mjs`) and the doors (`scripts/cloudflare/doors.test.mjs`).
-`bulk-sized.integration.test.ts` measures a page on the default images and
-holds a page done within the default deadline, which is chosen until its
-report is read.
+(`scripts/server-start.test.mjs`), the doors (`scripts/cloudflare/doors.test.mjs`)
+and the form's `bulk` as the client takes it
+(`packages/data-client/src/transport.test.ts`, run alone without the
+package's database setup, which it does not use).
+`bulk-sized.integration.test.ts` measures a page on the default images,
+prints its timings to the log, which is what a CI run keeps of them, and
+holds a page done within the default deadline, which is chosen until
+those lines are read.
 
 The studio's offer of the scope and the host page's choice of rows
 ([0166](../decisions/0166-a-person-chooses-a-pages-records-by-a-column-of-boxes-and-runs-an-action-over-them-from-a-bar-above-the-grid.md)) were

@@ -17,7 +17,10 @@
   failing with `bulkFitProblems` left out of `fitProblems`: every grant
   was accepted); `bulk.update`, `bulk.delete.purge` and a grant of the
   wrong shape are refused as properties this release does not read
-  (watched failing with `bulk`'s properties unchecked).
+  (watched failing with `bulk`'s properties unchecked); a grant on a
+  together child, whose rows are deleted only in a save, is refused
+  (watched failing with `offers()` asked in place of `offeredFor`: the
+  grant was accepted).
   `packages/data-core/src/records/bulk.test.ts` -- `readBulkBody` takes
   one to a page of `{ record, version }` and refuses none and one more
   (watched failing with the bound taken out); `chosenTwice` names the
@@ -44,7 +47,13 @@
   (watched failing with the duplicate check left out); a form drift
   stops answered once, 409, at the first record, and drift found later
   that record's (watched failing with the first record's drift kept as
-  its outcome); a resend answered as the first sending, asking nothing
+  its outcome); a first record refused `schema-changed` or
+  `permission-denied` answered so once (watched failing with those codes
+  kept as the record's: the vanished table's request answered 200); a
+  record whose delete throws answered 500 in the server's words, the
+  records before it kept and none after it sent (watched failing with
+  the loop uncaught: a bare 500 with the error's words, the first
+  record's deletion in neither the answer nor the trail); a resend answered as the first sending, asking nothing
   (watched failing with the loop outside `sendOnce`); the trail's one
   event, every record by its keyed hash and `outcomes` by code, a
   declined record's words in neither the trail nor the log (watched
@@ -54,7 +63,9 @@
   alone). `packages/data-server/src/bulk-deadline.test.ts` -- the
   setting by the lookup deadline's rule (watched failing with the
   digits-only rule taken out), the default's room before nginx's
-  `proxy_read_timeout` (watched failing with a default of 40 s), and
+  `proxy_read_timeout` for a last record of three statements on SQL
+  Server (watched failing with a default of 40 s, and with the first
+  default of 20 s: 20 s and three timeouts are 65 s), and
   `runtime.bulkDeadlineMs` held to the rule (watched failing with it
   unchecked). `scripts/server-start.test.mjs` -- the built server stops
   at start on a deadline that is not a whole number (watched failing with
@@ -65,7 +76,11 @@
   and doors.json forwards the route at the runtime door.
   `packages/data-fixtures/src/cases.test.ts` -- `BULK_PARITY` is an export
   with its reason for being no family of shared cases (watched failing
-  without it).
+  without it). `packages/data-client/src/transport.test.ts`, run alone
+  under a configuration without the package's database setup, since it
+  asks no database -- `form()` takes `bulk` only as a yes or no, and a
+  yes only where `operations` holds `delete` (watched failing with
+  `isBulk` left out: a reply without `bulk` was taken).
   First run in CI, never run:
   `packages/data-server/src/e2e-bulk.integration.test.ts`, on both engines
   through the real server, `BULK_PARITY`'s cases -- one request over six
@@ -79,10 +94,11 @@
   its TCP hop on both engines -- the second record's answer swallowed after
   the database deleted it: the first `done`, the second 502 naming it with
   its version, the third `{ sent: false }` and kept, the second's marker
-  sent once and the third's never, and a new request answering the second
-  `not-found`. `packages/data-server/src/bulk-sized.integration.test.ts`
-  on the default images -- the timings a default is set from, and a page
-  deleted whole within the default. `packages/data-client/src/chosen.test.ts`
+  sent once and the third's never, counted again after one more round
+  trip, and a new request sending the second a delete of its own,
+  answered `not-found`. `packages/data-server/src/bulk-sized.integration.test.ts`
+  on the default images -- the timings a default is set from, printed to
+  the log, and a page deleted whole within the default. `packages/data-client/src/chosen.test.ts`
   over a fake `fetch`, and `deletes.integration.test.ts` on both engines --
   each record read as a delete of it alone, a lost request an unknown
   delete of every record with its version, and `reconcileChosen` reading
@@ -105,7 +121,10 @@ said nothing of who may do it.
 
 1. **A grant.** `FormPolicy.bulk`, optional, absent nobody's:
    `{ delete: { roles } }`, each role one `operations.delete` grants too,
-   on a form that offers delete (`validatePolicy`'s `bulkFitProblems`). It
+   on a form that offers a delete alone (`validatePolicy`'s
+   `bulkFitProblems`) -- not a together child, whose rows are deleted only
+   in a save of their record (0155), and whose every delete alone is
+   refused. It
    narrows the delete grant to the roles that may send a page of deletes at
    once, and widens nothing. `update` is not reserved: a property this
    release accepted and nothing enforced would be the rule 0011 refuses,
@@ -131,25 +150,36 @@ said nothing of who may do it.
    `not-found`, `referenced`, `declined` and the rest -- and the request
    goes on. `unknown-outcome` or `unavailable`, and it stops: the
    connection is then in doubt, and every record after it is
-   `{ sent: false }`. A first record refused for what the form is -- drift
-   (409), or a configuration the server cannot apply (500) -- is the
-   request's answer, once, nothing sent: every other record would be
-   refused the same way. Drift found at a later record is that record's. 200
+   `{ sent: false }`. A delete that throws -- a programming error, nothing
+   a delete is answered with -- stops it too, that record answered 500
+   `internal` in the server's own words, never the error's, which a client
+   reads as its delete unknown, and the error said in the log. A first
+   record refused for what the form or its connection is -- drift or the
+   table gone or changed (409 `drift`, `schema-changed`), a configuration
+   the server cannot apply (500), a connection the database will not let
+   delete (403 `permission-denied`) -- is the request's answer, once,
+   nothing deleted: every other record would be refused the same way.
+   Found at a later record, each is that record's. 200
    `{ records }` in the order sent, once per write id (0031), the
    authorisation inside the sending, as a single delete's is, so a resend
    is answered as the first sending was.
 4. **A deadline.** `FORMANCY_DATA_BULK_DEADLINE_MS`, read in `main.ts` and
    parsed by the lookup deadline's rule (`bulk-deadline.ts`), held to it as
    `runtime.bulkDeadlineMs`, checked before each record and never during
-   one. **The default is 20,000 ms, chosen and not measured**: a request
-   answers within it and one record more, a record on SQL Server two
-   statements each bounded by mssql's 15 s request timeout, and 20 s and
-   those 30 s end before nginx's default `proxy_read_timeout` of 60 s,
-   which the composed stack leaves as it is. `bulk-sized.integration.test.ts`
-   measures a page on the default images -- 20 runs at 1, 10 and 50
-   records, as `save-limits.ts` was measured -- in CI, its report the
-   figure the default is to be set from, and holds a page done within the
-   default.
+   one. **The default is 14,000 ms, chosen and not measured**: a request
+   answers within it and one record more, a record on SQL Server up to
+   three statements -- the root's description, the delete, and where it
+   deleted nothing the read that says why -- each bounded by mssql's 15 s
+   request timeout, and 14 s and those 45 s end before nginx's default
+   `proxy_read_timeout` of 60 s, which the composed stack leaves as it is.
+   A page the deadline cuts short costs a second request for the records
+   not sent; an answer the proxy cuts, a read of every record.
+   `bulk-sized.integration.test.ts` measures a page on the default images
+   -- 20 runs at 1, 10 and 50 records, as `save-limits.ts` was measured --
+   and prints its timings to the log, one line per engine starting
+   `bulk-sized`, which is what a CI run keeps of them: the figure the
+   default is to be set from, read from the data-server test job's log.
+   It holds a page done within the default.
 5. **The trail.** One event per request, operation `delete-chosen`:
    `records`, each record by its keyed hash in the order sent, `rows` their
    count, `record` `null`, and `outcomes`, each record's code -- `done`, the
@@ -185,13 +215,19 @@ is checked by a read of each. Nothing new is asked of either engine.
   answer, record by record, and nothing is undone. A set that must go
   whole is an action's (0165).
 - **A deadline chosen, not measured,** until `bulk-sized` has run in CI on
-  the default images and its figure has been read. It bounds the request
-  only between records: on PostgreSQL nothing bounds a record's wait for
-  another's lock, as for a delete alone, and on SQL Server mssql's 15 s
+  the default images and the lines it prints have been read. It bounds
+  the request only between records: on PostgreSQL nothing bounds a
+  record's wait for another's lock, as for a delete alone, so the proxy
+  in front can still cut an answer there, and on SQL Server mssql's 15 s
   does, past which that record is `unknown-outcome` and the request stops.
-- **A page of deletes is two statements a record**, the root's description
-  and the delete, one after another: up to a hundred round trips for a
-  page, none measured until `bulk-sized` has run.
+  Held below 15 s for SQL Server's sake, it leaves a slow page more often
+  half sent than a longer one would.
+- **A page of deletes is two statements a record, three for one not
+  deleted**: the root's description, the delete, and the read that says
+  why nothing was deleted, one after another -- and on PostgreSQL a
+  delete past its root is a locked transaction of several round trips.
+  Up to a hundred and fifty statements for a page, none measured until
+  `bulk-sized` has run.
 - **An older server refuses the policy.** A server before 0173 refuses a
   policy naming `bulk`, as it refuses every property it does not read, so
   a version published with the grant cannot be imported to one, and a
@@ -200,7 +236,15 @@ is checked by a read of each. Nothing new is asked of either engine.
 - **A first record's 500 is the request's.** A form the server cannot
   apply refuses the request once with 500, which `heard` reads as an
   unknown delete of every record, though nothing was sent; a single
-  delete's 500 is read the same.
+  delete's 500 is read the same. A record whose delete throws is that
+  record's unknown delete, though nothing may have been sent for it, and
+  every record after it is not sent.
+- **A first record's refusal can be the request's for one row's
+  reason.** `schema-changed` and `permission-denied` are about the table
+  and the connection, and stand for every record; but a trigger can meet
+  either for some rows alone -- a table it writes for closed tickets
+  only -- and the first record refused so refuses the request, nothing
+  deleted, where the others, each sent alone, would have been deleted.
 - **A cascade onto another record of the same form is not tested.** SQL
   Server refuses a key that cascades onto its own table, and every cycle
   of cascading keys, so no shared fixture has one; on PostgreSQL such a

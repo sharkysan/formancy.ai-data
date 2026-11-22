@@ -517,7 +517,7 @@ get*](../../README.md#what-you-get) is the short version, and
   may delete: each record deleted on its own, as a delete of it alone
   would be, in the order sent, and answered with what became of each --
   deleted, refused in its delete's own words, or not sent once a record's
-  answer was lost or `FORMANCY_DATA_BULK_DEADLINE_MS`, 20 s unset and
+  answer was lost or `FORMANCY_DATA_BULK_DEADLINE_MS`, 14 s unset and
   chosen, has passed. A set can be left half deleted, each record named.
   It is the runtime plane's `POST /v1/forms/:id/records/delete-chosen` and
   `@formancy/data-client`'s `deleteChosen`, which reads a lost request

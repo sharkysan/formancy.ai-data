@@ -539,12 +539,14 @@ stops it, the records after it not sent, since the connection is then in
 doubt. The request is sent once per write id, its answer every record's
 outcome, which write-once keeps whole -- a page of deletes about 3.7 KB,
 of stale refusals about 7.7 KB, counted from the server's own sentences.
-`FORMANCY_DATA_BULK_DEADLINE_MS`, 20 s unset, chosen and not measured, is
-checked between records. **Held by** `packages/data-server/src/routes/runtime-bulk.test.ts`
+`FORMANCY_DATA_BULK_DEADLINE_MS`, 14 s unset, chosen and not measured, is
+checked between records, and leaves a last record's three statements on
+SQL Server room before nginx's 60 s. **Held by** `packages/data-server/src/routes/runtime-bulk.test.ts`
 over fake ports and, on both engines, `e2e-bulk.integration.test.ts`
 and `e2e-lost-answer.integration.test.ts`, first run in CI. **What it
 costs.** A set can be left half deleted, each record named; the deadline
-bounds nothing inside one record; and a page is two statements a record.
+bounds nothing inside one record; and a page is two statements a record,
+three for one not deleted.
 
 
 ## 8.7 Audit

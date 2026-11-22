@@ -1291,10 +1291,13 @@ own, one after another in the order sent, each exactly as 6.7 deletes one
    first; then `deleteOne`, the body of 6.7's route -- the policy, the
    root described, `planDelete`, one guarded statement. Its status and
    body are the record's outcome. A refusal about the record and the
-   request goes on; `unknown-outcome` or `unavailable` and it stops. Past
-   the deadline, or after a stop, a record is `{ sent: false }`. A first
-   record refused for what the form is -- drift, a configuration the
-   server cannot apply -- is the request's answer, once.
+   request goes on; `unknown-outcome` or `unavailable` and it stops, as it
+   does at a delete that throws, that record answered 500 `internal` in
+   the server's own words. Past the deadline, or after a stop, a record
+   is `{ sent: false }`. A first record refused for what the form or its
+   connection is -- drift, the table changed, a configuration the server
+   cannot apply, a connection the database will not let delete -- is the
+   request's answer, once.
 4. The answer is 200 `{ records }` in the order sent. The trail's one
    event, `delete-chosen`, names every record by its keyed hash in
    `records`, their count in `rows`, and each record's code in `outcomes`.
@@ -1311,5 +1314,6 @@ over fake ports and `bulk-deadline.test.ts`; on both engines by
 and `deletes.integration.test.ts`. The container suites were written
 without a database, and CI is their first run. What it costs: a set left
 half deleted, named record by record; a deadline chosen and not measured
-until `bulk-sized` has run; two statements a record; and no control on the
-host page or in the studio (§11).
+until the timings `bulk-sized` prints have been read; two statements a
+record, three for one not deleted; and no control on the host page or in
+the studio (§11).
