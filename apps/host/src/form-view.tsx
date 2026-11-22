@@ -16,13 +16,12 @@ import { DrillLevel } from './drill-level.js'
 import { FormHead, savedWith } from './form-head.js'
 import { columnsOf } from './grid-datasource.js'
 import type { GridRow } from './grid-datasource.js'
-import { paneEntry, useGuardContext, useRegistered } from './guard.js'
-import type { PaneEntry } from './guard.js'
+import { useGuardContext } from './guard.js'
 import type { Said } from './leave.js'
 import type { Layout, View } from './layout.js'
 import { levelOpens } from './lookup-opens.js'
+import { useMasterPanes } from './master-panes.js'
 import { isOpen, nextLine, nextOf } from './next-version.js'
-import { useOpening } from './opening.js'
 import { renderersOf } from './panes.js'
 import { axisOf } from './prefs.js'
 import type { Axis, RendererChoice, Shares } from './prefs.js'
@@ -32,11 +31,9 @@ import { Records } from './records.js'
 import { RecordTabs, useTabStart } from './record-tabs.js'
 import { focusChoice } from './segmented.js'
 import { useActions } from './selection-bar.js'
-import { createSession } from './session.js'
 import type { SaveResult, Session } from './session.js'
 import { laneStyle, Split, useLine } from './split.js'
 import { Trail } from './trail.js'
-import { useSaveSet } from './together.js'
 import { useDrill } from './use-drill.js'
 import type { FormOf } from './use-drill.js'
 
@@ -59,7 +56,7 @@ const DISCARDED: Said = ['Discarded the unsaved changes. ']
  * over the open record the server serves too (0162, action-flow.ts), and the bar above
  * the grid each over the records chosen of its page (0166, selection-bar.tsx). Each lookup
  * of the record offers Open under its field, which goes a Drill down level below it, from
- * any layout (0141).
+ * any layout (0141). The record's own forms are made in master-panes.ts.
  */
 export function FormView({
   client,
@@ -150,24 +147,7 @@ export function FormView({
   /** Where a version may be changed from a date (0113): the fields it starts and ends at, and the chain's key; else null. */
   const versions = definition.versions
   const columns = useMemo(() => columnsOf(definition, null), [definition])
-  // The rows of the record's together children, held for its Save, which every pane's save carries (0155).
-  const saveSet = useSaveSet(client, formId, entry.title, childForms)
-  const sessions = useMemo(
-    () => (['react', 'angular'] as const).map((which) => createSession({ client, formId, definition, renderer: which, rows: saveSet.rows })),
-    [client, formId, definition, saveSet],
-  )
-  const entries = useMemo<PaneEntry[]>(
-    () =>
-      sessions.map((session) =>
-        paneEntry('master', session, (): Said => {
-          const now = openRef.current
-          return now?.kind === 'record' ? [`${title} `, { code: now.token }] : now?.kind === 'next' ? ['Next version of ', { code: now.of }] : ['New record']
-        }),
-      ),
-    [sessions, title],
-  )
-  useRegistered(entries)
-  const opening = useOpening({ client, formId, owner: 'master', sessions })
+  const { saveSet, sessions, opening } = useMasterPanes({ client, formId, definition, title, childForms, open: openRef })
   const canDelete = definition.operations.includes('delete') && definition.deleting !== null
   const removal = useDeleteFlow({
     client,
