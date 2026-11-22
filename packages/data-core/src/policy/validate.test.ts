@@ -286,6 +286,36 @@ describe('validatePolicy', () => {
     expect(problems(deleting, DELETABLE_ORDER)).toEqual([])
   })
 
+  // A together child's rows are deleted only inside a save of the record
+  // they belong to (0155): its policy may grant the delete a save uses,
+  // and every delete alone is refused `operation-unavailable`. A bulk
+  // grant there names a request no record of which could ever be deleted,
+  // and GET /v1/forms/:id would say `bulk.delete: false` to everybody it
+  // names. Watched failing with `offers()` asked in place of
+  // `offeredFor(…, null)`: the grant on the together line was accepted.
+  test('refuses a bulk delete on a form whose rows are deleted only in a save of their record', () => {
+    const lines: FormPolicy = {
+      version: 1,
+      operations: { read: BOTH, create: [], update: [], delete: BOTH },
+      fields: { order: { read: BOTH, write: [] }, line_no: { read: BOTH, write: [] }, quantity: { read: BOTH, write: [] } },
+      rowFilters: [],
+      lookups: { order: TENANT },
+      through: ['order'],
+      bulk: { delete: { roles: ['manager'] } },
+    }
+    const together: FormBindings = {
+      ...DELETABLE_LINE,
+      fields: DELETABLE_LINE.fields.map((binding) => (binding.field === 'order' ? { ...binding, together: { min: 0, max: 10 } } : binding)),
+    }
+    expect(problems(lines, DELETABLE_LINE)).toEqual([])
+    expect(problems(lines, together)).toEqual([
+      "bulk names who may delete chosen records together, and this form's rows are deleted only with the record they belong to, in one save",
+    ])
+    // The delete the save uses is still the policy's to grant.
+    const { bulk: _bulk, ...granting } = lines
+    expect(problems(granting, together)).toEqual([])
+  })
+
   // Delete is the one operation `bulk` names: a change of chosen records
   // to values (`update`) is not read by this release, and a grant nothing
   // enforces is refused as every unread property is -- which is also why

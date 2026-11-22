@@ -451,6 +451,28 @@ field to its default unchecked -- and says on the plan whether it `moved`,
 for the audit. A move to NULL is refused; an update read at a newer version
 than it names is left to the version guard, which answers it stale.
 
+The chosen records of a page can be deleted in one request, each a delete
+of its own, by the roles `bulk.delete` names
+([0173](../../docs/decisions/0173-chosen-records-are-deleted-each-on-its-own-with-one-answer-per-record.md)):
+
+```ts
+const ticketPolicy = { …, operations: { …, delete: ['clerk', 'supervisor'] }, bulk: { delete: { roles: ['supervisor'] } } }
+authorizeBulk(ticketPolicy, clerkContext, bindings)
+// { ok: false, code: 'operation-denied', message: 'no role of this actor may delete chosen records together with this form' }
+bulkOffered(ticketPolicy, supervisorContext, bindings) // { delete: true }
+```
+
+`validatePolicy` refuses a role `operations.delete` does not grant, and a
+grant on a form that offers no delete alone: one that offers none, and a
+together child, whose rows are deleted in a save of their record.
+`authorizeBulk` asks it before any statement, with the scoping a delete
+needs, and `bulkOffered` is what `PublishedForm.bulk` says. `readBulkBody`
+reads a request -- one to `LIST_PAGE_SIZE` of `{ record, version }`, the
+`ChosenBody` -- and `chosenTwice` finds a key named twice; each record is
+then planned by `planDelete`, as one sent alone, and answered as a
+`ChosenOutcome` of the `ChosenAnswer`. Optional: a policy without it means
+what it meant, and a server older than it refuses a policy that uses it.
+
 ## Record requests
 
 The one place a browser's request becomes an adapter's: the policy, the
