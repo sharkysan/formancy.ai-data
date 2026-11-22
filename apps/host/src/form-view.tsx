@@ -54,9 +54,10 @@ const DISCARDED: Said = ['Discarded the unsaved changes. ']
  * Where the server offers delete, the record's header and each row of the grid ask for
  * one, in place, under what asked (0053, delete-flow.ts); the header offers each action
  * over the open record the server serves too (0162, action-flow.ts), and the bar above
- * the grid each over the records chosen of its page (0166, selection-bar.tsx). Each lookup
- * of the record offers Open under its field, which goes a Drill down level below it, from
- * any layout (0141). The record's own forms are made in master-panes.ts.
+ * the grid each over the records chosen of its page (0166, selection-bar.tsx) and, where
+ * the server offers it, their deletion (0174). Each lookup of the record offers Open under
+ * its field, which goes a Drill down level below it, from any layout (0141). The record's
+ * own forms are made in master-panes.ts.
  */
 export function FormView({
   client,
@@ -184,8 +185,22 @@ export function FormView({
     childFormsOf,
     formOf,
   })
-  // The record's actions (0162), and those over a selection (0166): a run reads the record again into its panes, and its row and the sections it names.
-  const actions = useActions({ client, entry, definition, sessions, opening, renderer, grid, drill, onReread: storedIn, onLoad: load, onShow: reveal })
+  // The record's actions (0162), and those over a selection (0166): a run reads the record again into its panes, and its row and the sections it names;
+  // a deletion of the records chosen (0174) closes the open one where it deleted it, as a delete does.
+  const actions = useActions({
+    client,
+    entry,
+    definition,
+    sessions,
+    opening,
+    renderer,
+    grid,
+    drill,
+    onReread: storedIn,
+    onLoad: load,
+    onGone: dropRecord,
+    onShow: reveal,
+  })
   const drilling = layout === 'drill'
   const nameOf = (session: Session): string | null => recordName(definition.form.model.fields, session.saved().answers, null)
 
@@ -408,21 +423,25 @@ export function FormView({
    * when the person moved on before the answer: the grid alone hears it.
    */
   function recordGone(target: DeleteTarget, word: 'Deleted' | 'Closed', quiet: boolean): void {
-    drill.levels.recordGone(formId, target.record)
-    const now = openRef.current
-    if (now?.kind === 'record' && now.token === target.record) {
-      opening.replaced()
-      drill.dropAll()
-      for (const session of sessions) session.open()
-      openRef.current = null
-      setOpen(null)
-      setLoadRefusal(null)
-      say([])
-    }
+    dropRecord(target.record)
     grid.current?.removed(gone(target, word))
     if (quiet) return
     if (paged) onView('records', true)
     after(() => recordsHeading.current?.focus())
+  }
+
+  /** A record gone from the page dropped from every Drill down level that holds it, and closed where it is the open one: its forms emptied (0053, 0094, 0174). */
+  function dropRecord(token: string): void {
+    drill.levels.recordGone(formId, token)
+    const now = openRef.current
+    if (now?.kind !== 'record' || now.token !== token) return
+    opening.replaced()
+    drill.dropAll()
+    for (const session of sessions) session.open()
+    openRef.current = null
+    setOpen(null)
+    setLoadRefusal(null)
+    say([])
   }
 
   // Back or Forward between the two views of Separate views: the half the

@@ -8,13 +8,18 @@
 // it leaving the grid in one stop, as from a row's Delete (0053); and the
 // run from the bar, through its dialog and its confirmation, from the
 // keyboard, the keyboard then on what the server did and the order closed
-// in the database, the other not.
+// in the database, the other not. Then Delete the chosen… (0174) over two
+// more, one changed beside the page: its confirmation in place, the
+// keyboard on it and the next Tab on Keep them, and Delete them from the
+// keyboard, the keyboard then on what the server answered -- the one
+// deleted, the other named and still chosen -- each state measured at
+// every width as every state is.
 //
 // PostgreSQL only, as the gate is. What the engines answer -- a refusal
 // naming a record changed since, paging clearing the choice, a second
 // press while the run is out -- is the jsdom suites', on both
-// (actions.test.tsx), and the boxes' keyboard path without a server is
-// choose-column.test.tsx's.
+// (actions.test.tsx, bulk-delete.test.tsx), and the boxes' keyboard path
+// without a server is choose-column.test.tsx's.
 
 import { landsOn } from './deleting.mjs'
 import { describeFocus, focusedOn, until, WITHIN } from './measure.mjs'
@@ -29,6 +34,8 @@ const status = (page) => records(page).getByRole('status', { name: /^$/ }).first
 const bar = (page) => records(page).getByRole('group', { name: 'Chosen records', exact: true })
 const box = (page, record) => grid(page).getByRole('checkbox', { name: `Choose Order ${record}`, exact: true })
 const chosenRegion = (page, confirming = false) => page.getByRole('region', { name: `${CLOSE_ALL_LABEL}: 1 record${confirming ? '?' : ''}`, exact: true })
+/** The deletion of two chosen orders: its confirmation, and without the question mark what the server answered (0174). */
+const deletingTwo = (page, confirming = false) => page.getByRole('region', { name: `Delete 2 chosen Order records${confirming ? '?' : ''}`, exact: true })
 
 /** The row of the Records grid whose cells include one that says `id`. */
 const row = (page, id) =>
@@ -49,7 +56,14 @@ const onBox = (page, name) =>
 
 /** The states, in order; `run` holds this width's pass. */
 export function choosingJourney(plane, { check }, run) {
-  const at = { chosen: '', other: '', note: `chosen at width ${String(run.customer)}` }
+  const at = {
+    chosen: '',
+    other: '',
+    note: `chosen at width ${String(run.customer)}`,
+    gone: '',
+    kept: '',
+    deleting: `deleted together at width ${String(run.customer)}`,
+  }
   return [
     [
       'Records chosen, above the grid',
@@ -123,6 +137,47 @@ export function choosingJourney(plane, { check }, run) {
           'and the order chosen is closed in the database, the other not',
           chosen.status === 'closed' && other.status === 'open' ? null : JSON.stringify({ chosen, other }),
         )
+      },
+    ],
+    [
+      'Delete the chosen…, confirming',
+      async (page) => {
+        at.gone = await plane.actionOrder(at.deleting)
+        at.kept = await plane.actionOrder(at.deleting)
+        await records(page).getByRole('textbox', { name: 'Search' }).fill(at.deleting)
+        await records(page).getByRole('button', { name: 'Search' }).click()
+        await until(async () => (await status(page).textContent()) === 'Rows 1–2.', 'the search never listed the two orders to delete')
+        await box(page, at.gone).click()
+        await box(page, at.kept).click()
+        // Changed beside the page once it was read: this one is refused, by name, and the other deleted.
+        await plane.touchActionOrder(at.kept)
+        await bar(page).getByRole('button', { name: 'Delete the chosen…', exact: true }).click()
+        const confirming = deletingTwo(page, true)
+        await confirming.waitFor(WITHIN)
+        check('Delete the chosen…: the keyboard is on its confirmation', await landsOn(page, confirming))
+        await page.keyboard.press('Tab')
+        check(
+          'the next Tab reaches Keep them, never the button that deletes',
+          await focusedOn(page, confirming.getByRole('button', { name: 'Keep them', exact: true })),
+        )
+      },
+    ],
+    [
+      'Delete the chosen…, answered',
+      async (page) => {
+        // From the keyboard: Delete them, the Tab after Keep them, and Enter.
+        await page.keyboard.press('Tab')
+        await page.keyboard.press('Enter')
+        const answered = deletingTwo(page)
+        await answered.getByText('Deleted 1 of 2 records.', { exact: true }).waitFor(WITHIN)
+        check('chosen records deleted: the keyboard is on what the server answered', await landsOn(page, answered))
+        const [gone, kept] = [await plane.actionOrderOf(at.gone), await plane.actionOrderOf(at.kept)]
+        check(
+          'and the one read at its version is deleted in the database, the other not',
+          gone === undefined && kept !== undefined ? null : JSON.stringify({ gone, kept }),
+        )
+        await until(async () => (await bar(page).getByRole('status').textContent())?.startsWith('1 chosen.') === true, 'the bar never said one is still chosen')
+        check('the order not deleted is still chosen', (await box(page, at.kept).isChecked()) ? null : 'its box was unticked')
       },
     ],
     [

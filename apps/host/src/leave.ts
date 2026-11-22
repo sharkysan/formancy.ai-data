@@ -28,7 +28,8 @@ import type { Renderer } from './session.js'
  * goes where they go, but for a renderer hidden: it is drawn by none; so is
  * an action's run out, or unknown, over the open record (0162). One
  * asked from a grid's row that is not the record open in the detail is its
- * grid's (`gridOwner`): the records grid's goes only with the grid --
+ * grid's (`gridOwner`), as a run over the records chosen of its page is
+ * (0166) and a deletion of them (0174): the records grid's goes only with the grid --
  * another form, Back or Forward, Sign out -- and a child grid's with its
  * section, as that child's panes do but for its own rows and its New.
  *

@@ -229,6 +229,8 @@ export interface Plane {
  * reads nor writes. With `starting` (0150), the order form is published
  * again as `starting` of `ENGINES`, with `STARTING` chosen over its base.
  * With `actions` (0162), each engine's action order (test-actions.ts).
+ * With `deletes` and `bulk` (0174), the clerk may delete the chosen records
+ * of the forms `bulk` names together.
  */
 export async function startPlane(
   options: {
@@ -249,12 +251,23 @@ export async function startPlane(
     /** An order and its lines saved with it, one to three of them, over the parity schema (0155). */
     saves?: boolean
     actions?: boolean
+    /**
+     * With `deletes`, the forms whose chosen records the clerk may delete
+     * together (0173, 0174): `removable`, which other rows refer to with NO
+     * ACTION, and the order form, whose delete cascades to its lines. Each
+     * then draws its grid with the boxes' column first, which a suite's
+     * cell-by-index reads must allow for.
+     */
+    bulk?: ReadonlyArray<'removable' | 'order'>
   } = {},
 ): Promise<Plane> {
   const { pg, ms } = inject('databases')
   // 32 random bytes as base64url: the shape of the key a Durable Object starts its container with.
   const demoKey = options.demo === true ? randomBytes(32).toString('base64url') : undefined
   const deletes = options.deletes === true
+  /** Who may delete a form's chosen records together, where `bulk` names it. */
+  const together = (form: 'removable' | 'order'): Pick<FormPolicy, 'bulk'> =>
+    options.bulk?.includes(form) === true ? { bulk: { delete: { roles: ['clerk'] } } } : {}
   const connections: ConnectionConfig[] = [
     { id: 'pg', kind: 'postgres', ...pg, password: 'env:PG_PASSWORD', schemas: ['sales'], tls: { enabled: false } },
     { id: 'ms', kind: 'sqlserver', ...ms, password: 'env:MS_PASSWORD', schemas: ['sales'], tls: { enabled: false, trustServerCertificate: true } },
@@ -345,7 +358,7 @@ export async function startPlane(
               : formId === unread
                 ? { ...base, fields: { ...base.fields, status: { read: [], write: [] } } }
                 : deletes
-                  ? { ...base, operations: { ...base.operations, delete: ['clerk'] }, cascades: ORDER_CASCADES }
+                  ? { ...base, operations: { ...base.operations, delete: ['clerk'] }, cascades: ORDER_CASCADES, ...(formId === order ? together('order') : {}) }
                   : base
       // A presentation of views alone: the form is its base (0030, 0105).
       const named = !views ? undefined : formId === order ? ORDER_VIEWS : formId === withheld ? WITHHELD_VIEWS : undefined
@@ -377,6 +390,7 @@ export async function startPlane(
       fields: { id: { read: ['clerk'], write: [] }, tenant_id: { read: ['clerk'], write: [] }, note: { read: ['clerk'], write: ['clerk'] } },
       rowFilters: [{ column: 'tenant_id', attribute: 'tenant' }],
       lookups: {},
+      ...together('removable'),
     }
     await admin(`/v1/forms/${formId}/versions`, {
       expectedBase: null,

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from 'vitest'
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
+import { computeAccessibleDescription } from 'dom-accessibility-api'
 import { userEvent } from '@testing-library/user-event'
 import { AgGridReact } from 'ag-grid-react'
 import { useState } from 'react'
@@ -280,5 +281,30 @@ describe('the boxes a person chooses records with', () => {
     expect(focusedName()).toBe('Delete Order k1:2')
     await user.keyboard('=')
     expect(examples).toEqual(['status'])
+  })
+
+  // A record a deletion of the choice did not delete stays chosen, and its
+  // box says why: its description, which is read as the keyboard reaches
+  // it, and its title for a pointer -- until the choice changes. A box
+  // with no mark is described by nothing, and the grid with a mark passes
+  // axe (0174; watched failing with the mark left off the box's title:
+  // "expected '' to be 'Not deleted. Other records still refe…'").
+  test('are described by why a deletion left their record chosen, until the choice changes', async () => {
+    const { choice } = mount()
+    const user = userEvent.setup()
+    const kept = await waitFor(() => screen.getByRole<HTMLInputElement>('checkbox', { name: 'Choose Order k1:2' }))
+    const mark = 'Not deleted. Other records still refer to this one, so the database keeps it. Nothing was deleted.'
+    act(() => {
+      choice.all()
+      choice.settle(new Set(['k1:1']), new Map([['k1:2', mark]]), '1 chosen. Still chosen after the deletion: Order k1:2.')
+    })
+    await waitFor(() => expect(computeAccessibleDescription(kept)).toBe(mark))
+    expect([kept.checked, kept.title]).toEqual([true, mark])
+    expect(computeAccessibleDescription(screen.getByRole('checkbox', { name: 'Choose Order k1:1' }))).toBe('')
+    expect(unnamed()).toEqual([])
+    expect(await audit()).toEqual([])
+    await user.click(kept)
+    await waitFor(() => expect(computeAccessibleDescription(kept)).toBe(''))
+    expect(kept.title).toBe('')
   })
 })

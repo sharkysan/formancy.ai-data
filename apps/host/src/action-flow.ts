@@ -3,7 +3,7 @@ import type { RefObject } from 'react'
 import { createFormEngine } from '@formancy/core'
 import type { DataClient, FormAction, FormMenuEntry, PublishedForm } from '@formancy/data-client'
 import { useAfterRender } from './after-render.js'
-import { hearForms } from './chosen-rows.js'
+import { holdsAsked } from './chosen-rows.js'
 import type { ChosenRows } from './chosen-rows.js'
 import { useHeard, useSaving } from './delete-flow.js'
 import { formsAtRisk, useGuardContext, useRegistered } from './guard.js'
@@ -185,10 +185,6 @@ function newest(flow: FlowState, target: RunTarget, heard: (record: string) => s
   return target.records.map(({ record, version }) => ({ record, version: heard(record) ?? version }))
 }
 
-/** The same records, by their tokens: a page drawn again in another order chooses the same ones, and a run sends them in the page's order. */
-const sameRecords = (left: readonly RunRecord[], right: readonly RunRecord[]): boolean =>
-  left.length === right.length && left.every((each) => right.some((other) => other.record === each.record))
-
 /**
  * A question over a selection -- its dialog, or its confirmation -- whose
  * records are no longer the ones chosen closed, nothing run, and the
@@ -199,7 +195,7 @@ function dropped(flow: FlowState): boolean {
   const now = flow.current.current
   const { chosen } = flow.latest.current
   if (chosen === undefined || (now.state !== 'asking' && now.state !== 'confirming')) return false
-  if (sameRecords(chosen.records(), now.target.records)) return false
+  if (holdsAsked(chosen.records(), now.target.records)) return false
   const held = flow.regionRef.current?.contains(document.activeElement) === true
   flow.set(IDLE)
   if (held) back(flow, now.target)
@@ -237,11 +233,10 @@ export function useActionFlow(options: ActionFlowOptions): ActionFlow {
   const savingNow = useSaving(options.sessions)
   const entry = useRunEntry(flow)
   const { definition, chosen } = options
-  // What the record's forms hear, the choice hears too, and a question over it stands only while it holds what it asked over.
-  useEffect(() => (chosen === undefined ? undefined : hearForms(chosen, options.sessions)), [chosen, options.sessions])
+  // A question over the choice stands only while it holds what it asked over.
   useEffect(() => chosen?.subscribe(() => void dropped(flow)), [chosen, flow])
-  useRunFocus(
-    run,
+  useRegionFocus(
+    run.state === 'idle' ? 0 : run.n,
     regionRef,
     () => latest.current.onShow(chosen === undefined ? 'record' : 'records'),
     () => guard.waiting(),
@@ -371,20 +366,20 @@ function useRunEntry(flow: FlowState): PaneEntry {
 }
 
 /**
- * Each new state that asks something of the person takes the keyboard,
- * once the detail is shown where a layout hid it -- but while the guard
- * asks the person something, which keeps it: they are answering that. The
- * run out from Run it keeps the confirmation's number, so the keyboard
- * stays on Run it; a run again, or the action asked again while it is out,
- * is a new one. Not scrolled sideways: a region scrolled into view
- * horizontally moves the whole page by the scrollbar's gutter
- * (unsaved-notice.tsx).
+ * Each new state that asks something of the person takes the keyboard --
+ * `n`, its number, 0 while there is none -- once the half it is in is
+ * shown where a layout hid it, but while the guard asks the person
+ * something, which keeps it: they are answering that. A run out from Run
+ * it keeps the confirmation's number, so the keyboard stays on Run it; a
+ * run again, or the action asked again while it is out, is a new one; and
+ * so for a deletion of chosen records (chosen-delete-flow.ts, 0174). Not
+ * scrolled sideways: a region scrolled into view horizontally moves the
+ * whole page by the scrollbar's gutter (unsaved-notice.tsx).
  */
-function useRunFocus(run: Run, regionRef: RefObject<HTMLDivElement | null>, show: () => boolean, waiting: () => boolean): void {
+export function useRegionFocus(n: number, regionRef: RefObject<HTMLDivElement | null>, show: () => boolean, waiting: () => boolean): void {
   const after = useAfterRender()
-  const n = run.state === 'idle' ? 0 : run.n
   useEffect(() => {
-    if (run.state === 'idle' || waiting()) return
+    if (n === 0 || waiting()) return
     const focus = (): void => {
       const region = regionRef.current
       region?.focus({ preventScroll: true })

@@ -7,8 +7,8 @@ import { headerFloor } from './widths.js'
 
 /*
  * The column a person chooses a page's records with, for an action over a
- * selection (0166): drawn first, and only on a form that offers this
- * person such an action. The grid's own row selection is the open row
+ * selection (0166) or a deletion of them (0174): drawn first, and only on a
+ * form that offers this person one. The grid's own row selection is the open row
  * (grid-options.tsx), so the choice is a column of real checkboxes, on
  * the pattern of a row's Delete (0053): a cell the arrow keys reach, which
  * hands the keyboard to its box whenever the cell is focused; the box is
@@ -37,7 +37,13 @@ const BOX_LOOK: CSSProperties = {
   cursor: 'pointer',
 }
 
-/** The box of one row, named for its record as its Delete names it, and ticked while the record is chosen. */
+/**
+ * The box of one row, named for its record as its Delete names it, and
+ * ticked while the record is chosen; after a deletion of the choice that
+ * did not delete it, described by why until the choice changes (0174): its
+ * title, which is its description -- its name being its label -- and what a
+ * pointer resting on it shows.
+ */
 function ChooseCell(params: ICellRendererParams<GridRow> & { choice: ChosenRows }): ReactElement | null {
   const box = useRef<HTMLInputElement>(null)
   const cell = params.eGridCell
@@ -45,6 +51,7 @@ function ChooseCell(params: ICellRendererParams<GridRow> & { choice: ChosenRows 
   const row = params.data
   const token = row?.record ?? null
   const chosen = useSyncExternalStore(choice.subscribe, () => token !== null && choice.now().chosen.has(token))
+  const mark = useSyncExternalStore(choice.subscribe, () => (token === null ? undefined : choice.now().marks.get(token)))
   useEffect(() => {
     const forward = (event: FocusEvent): void => {
       if (event.target === cell) box.current?.focus({ preventScroll: true })
@@ -62,6 +69,7 @@ function ChooseCell(params: ICellRendererParams<GridRow> & { choice: ChosenRows 
       ref={box}
       style={BOX_LOOK}
       aria-label={`Choose ${choice.name(token)}`}
+      title={mark}
       checked={chosen}
       onChange={() => choice.toggle(row)}
     />
