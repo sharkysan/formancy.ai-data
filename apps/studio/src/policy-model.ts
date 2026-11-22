@@ -247,6 +247,17 @@ export function withActionRoles(policy: FormPolicy, name: string, roles: readonl
   return Object.keys(actions).length === 0 ? rest : { ...rest, actions }
 }
 
+/**
+ * The policy with who may delete the chosen records of a page together
+ * (0173) set to `roles`: `bulk` left out when it names nobody -- absent is
+ * nobody's, and a policy that grants none stays one a server older than
+ * 0173 still reads.
+ */
+export function withBulkDeleteRoles(policy: FormPolicy, roles: readonly string[]): FormPolicy {
+  const { bulk: _, ...rest } = policy
+  return roles.length === 0 ? rest : { ...rest, bulk: { delete: { roles: [...roles] } } }
+}
+
 /** Action grants for names the form does not bind: left from an earlier generation, and refused until removed (`validatePolicy`). */
 export function orphanActions(policy: FormPolicy, bindings: FormBindings): string[] {
   const bound = new Set((bindings.actions ?? []).map((action) => action.name))
