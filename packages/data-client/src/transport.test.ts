@@ -1521,6 +1521,7 @@ describe('a run of an action (0161)', () => {
       moves: null,
       opens: [],
       together: null,
+      bulk: { delete: false },
     }
     const CLOSE = {
       name: 'close',
@@ -1556,6 +1557,55 @@ describe('a run of an action (0161)', () => {
     ]) {
       body = { ...FORM, actions }
       expect(await client.form('pg-order')).toEqual({ ok: true, value: body })
+    }
+  })
+
+  // What a person may do to a page's chosen records together (0173) is a
+  // yes or no, and a yes only where the form offers them delete: a page
+  // drawing Delete the chosen… from a yes the form's own operations
+  // contradict would offer a request every record of which is refused. A
+  // reply without `bulk` is from a server older than 0173, which this
+  // client takes for no server it knows. Watched failing with `isBulk`
+  // left out of `isPublishedForm`: the reply without `bulk` was taken as
+  // a form.
+  test("a form's bulk delete is a yes or no, and a yes only where it offers delete", async () => {
+    const FORM = {
+      form: { model: {} },
+      operations: ['read', 'delete'],
+      readable: ['id'],
+      list: null,
+      deleting: { cascades: false, clears: false, restricted: false },
+      copied: null,
+      versions: null,
+      writable: { create: null, update: null },
+      moves: null,
+      opens: [],
+      together: null,
+      actions: [],
+    }
+    let body: unknown = FORM
+    const { base } = await serve((_request, response) => {
+      response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(body))
+    })
+    const client = createDataClient({ token: () => 't', base })
+    const reading = { ...FORM, operations: ['read'], deleting: null }
+    for (const malformed of [
+      FORM,
+      { ...FORM, bulk: null },
+      { ...FORM, bulk: { delete: 'yes' } },
+      { ...FORM, bulk: {} },
+      { ...reading, bulk: { delete: true } },
+    ]) {
+      body = malformed
+      expect(await client.form('pg-ticket'), JSON.stringify(malformed)).toMatchObject({ ok: false, code: 'unexpected' })
+    }
+    for (const taken of [
+      { ...FORM, bulk: { delete: true } },
+      { ...FORM, bulk: { delete: false } },
+      { ...reading, bulk: { delete: false } },
+    ]) {
+      body = taken
+      expect(await client.form('pg-ticket')).toEqual({ ok: true, value: body })
     }
   })
 })

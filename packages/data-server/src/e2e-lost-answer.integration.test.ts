@@ -550,11 +550,13 @@ describe.each([
   // answered deleted, the second as a delete alone whose answer was lost
   // is -- 502 naming it with the version sent, inside the request's 200 --
   // and the third is not sent, since the connection is in doubt, and stays.
-  // The second's marker crossed the hop once, and the third's never: the
-  // server sent nothing again. A new request with the two left answers the
-  // second not found and deletes the third. The trail names the three each
-  // time, and what became of each. A loop that went on past the unknown
-  // outcome would have deleted the third and counted its marker.
+  // The second's marker crossed the hop once, and the third's never, both
+  // counted again after one more round trip: the server sent nothing
+  // again. A new request with the two left sends the second a delete of
+  // its own, answered not found, and deletes the third. The trail names
+  // the records each time, and what became of each. A loop that went on
+  // past the unknown outcome would have deleted the third and counted its
+  // marker.
   test('a delete of chosen records is the lost record’s 502, the records after it not sent, and nothing sent again', async () => {
     const formId = `${connection}-removable-chosen-lost`
     await publishDeleting(`${connection}-lost`, formId, {
@@ -587,11 +589,21 @@ describe.each([
     expect(thirdSent()).toBe(0)
     expect(await count(connection, REMOVABLE_CODED, codes[0] as string)).toBe(0)
     expect(await count(connection, REMOVABLE_CODED, codes[2] as string)).toBe(1)
+    // Counted again after one more round trip through the same pool -- a
+    // read of the first record, which names neither marker -- so a send
+    // scheduled for after the answer has had its turn on the wire too.
+    const read = await call(`/v1/forms/${formId}/records/read`, clerk, { record: first.record })
+    expect(read.statusCode, read.body).toBe(404)
+    expect({ sent: sent(), thirdSent: thirdSent() }).toEqual({ sent: 1, thirdSent: 0 })
 
+    // The new request sends the second record a delete of its own, which
+    // carries its marker again: counted afresh, from here, and not against
+    // the lost one, whose count ends above.
+    const resent = hops[connection].countSent(answerBytes(kind, codes[1] as string))
     const again = await call(`/v1/forms/${formId}/records/delete-chosen`, clerk, { records: [second, third] })
     expect(again.statusCode, again.body).toBe(200)
     expect(again.json<ChosenAnswer>().records.map((outcome) => (outcome.sent ? outcome.status : 'not sent'))).toEqual([404, 200])
-    expect(sent()).toBe(1)
+    expect(resent()).toBeGreaterThanOrEqual(1)
     expect(await count(connection, REMOVABLE_CODED, codes[2] as string)).toBe(0)
     const trail = events.filter((event): event is RuntimeAuditEvent => event.plane === 'runtime' && event.form === formId)
     expect(trail.map(({ operation, status, outcome, records: named, outcomes }) => ({ operation, status, outcome, records: named, outcomes }))).toEqual([
@@ -602,6 +614,7 @@ describe.each([
         records: records.map(({ record }) => recordReference(AUDIT_KEY, record)),
         outcomes: ['done', 'unknown-outcome', 'not-sent'],
       },
+      { operation: 'read', status: 404, outcome: 'not-found' },
       {
         operation: 'delete-chosen',
         status: 200,
