@@ -5,13 +5,15 @@ import { cleanup, render, screen, waitFor, within } from '@testing-library/react
 import { userEvent } from '@testing-library/user-event'
 import { computeAccessibleDescription } from 'dom-accessibility-api'
 import { createBuilderSession } from '@formancy/builder-core'
-import { EMPTY_PRESENTATION, validatePolicy } from '@formancy/data-core'
+import { EMPTY_PRESENTATION, readTogetherReason, unsettableField, validatePolicy } from '@formancy/data-core'
 import type { FormBindings, FormPolicy } from '@formancy/data-core'
 import { createAdminClient } from './api.js'
 import type { Bundle, Proposal, ProposalRequest } from './api.js'
+import { labelOf } from './document.js'
 import { DraftPolicy } from './draft-policy.js'
 import { PolicyStep } from './policy.js'
 import { NO_DELETE, NOBODY_DELETES, SAVED_WITH, TOGETHER_NOTE } from './policy-bulk.js'
+import { CHANGE_NOTE, NO_UPDATE, NOBODY_UPDATES, NOTHING_YET } from './policy-bulk-change.js'
 import {
   audit,
   discover,
@@ -36,7 +38,9 @@ import type { TestPlane } from './test-server.js'
  * 0174): who may, from the roles given delete, nobody until a box is
  * ticked, nothing offered where a delete of one record is not, and a
  * grant the form cannot offer listed to remove; and a change of them
- * written by hand (0175) kept through every edit -- against the real server
+ * written by hand (0175) kept through every edit, and who may change them,
+ * in which fields, from the roles given update and the fields the server's
+ * checks let a change set (0176) -- against the real server
  * behind a fake `fetch`, as every suite here runs, and published through
  * it; and the grant as a draft's publisher reads it (0065). Elements are
  * found by role and name.
@@ -103,8 +107,20 @@ const ORDER_CASCADES: FormPolicy['cascades'] = [
   { table: { schema: 'sales', name: 'parcel' }, foreignKey: 'fk_parcel_delivery', onDelete: 'cascade' },
 ]
 
-/** A change of chosen records' notes granted to clerks, as an administrator writes it by hand (0175): the studio offers no control for it. */
+/** A change of chosen records' notes granted to clerks, as an administrator wrote it by hand before the studio offered a control for it (0175). */
 const CHANGING = { roles: ['clerk'], fields: ['notes'] }
+
+const CHANGE_LEGEND = 'Who may change chosen records together, and in which fields'
+const changes = (policy: HTMLElement): HTMLElement => within(policy).getByRole('group', { name: CHANGE_LEGEND })
+const changeRoles = (policy: HTMLElement): HTMLElement => within(changes(policy)).getByRole('group', { name: 'Roles that may change them' })
+const changeFields = (policy: HTMLElement): HTMLElement => within(changes(policy)).getByRole('group', { name: 'Fields they may set' })
+
+/** Clerks may do everything with the order, and write its notes and amount: what a change of chosen orders is granted over. */
+const WRITING: FormPolicy = {
+  ...FITTING,
+  fields: { notes: { read: ['clerk'], write: ['clerk'] }, amount: { read: ['clerk'], write: ['clerk'] } },
+  cascades: ORDER_CASCADES,
+}
 
 /**
  * The Policy step over a proposal, holding the policy it is given as the
@@ -334,9 +350,171 @@ describe('who may delete chosen records together', () => {
   })
 })
 
+describe('who may change chosen records together, and in which fields', () => {
+  // Nobody, until a role and a field are both ticked: a box for clerk,
+  // who is given update, and one for each field of the order, none ticked,
+  // each read with what changing together does; every field the server's
+  // checks refuse a change of chosen records -- the key, a pinned or
+  // database-written column among them -- shown unticked and not offered,
+  // described by the check's own reason (`unsettableField`), and one nobody
+  // given update writes said so. A role alone grants nothing and says so;
+  // with Notes it publishes exactly `bulk.update { roles, fields }`, beside
+  // a deletion's grant, which the real server accepts; Notes unticked again,
+  // no `bulk.update` is left. Axe and a name on every control in each state
+  // (watched failing with the field's tick left unwritten: "expected
+  // undefined to deeply equal { roles: [ 'clerk' ], …(1) }").
+  test('is nobody by default, refuses each field the checks refuse in their words, and publishes exactly what is ticked', async () => {
+    const user = userEvent.setup()
+    const { proposal, latest } = await policyOver(VERSIONED, WRITING)
+    const policy = screen.getByRole('main', { name: 'Policy' })
+    await fits(policy)
+    const clerk = within(changeRoles(policy)).getByRole<HTMLInputElement>('checkbox', { name: 'clerk' })
+    expect(clerk.checked).toBe(false)
+    expect(computeAccessibleDescription(clerk)).toBe(CHANGE_NOTE)
+    const { bindings, form } = proposal
+    for (const { field } of bindings.fields) {
+      const label = labelOf(form, field)
+      const box = within(changeFields(policy)).getByRole<HTMLInputElement>('checkbox', { name: label })
+      const refused = unsettableField(WRITING, bindings, field)
+      const why = refused !== null ? `${label} ${refused}.` : ['notes', 'amount'].includes(field) ? null : `Nobody given update may write ${label}.`
+      expect({ field, checked: box.checked, disabled: box.disabled, description: computeAccessibleDescription(box) }).toEqual({
+        field,
+        checked: false,
+        disabled: why !== null,
+        description: why === null ? CHANGE_NOTE : `${why} ${CHANGE_NOTE}`,
+      })
+    }
+    expect(within(changeFields(policy)).getByRole<HTMLInputElement>('checkbox', { name: labelOf(form, 'id') }).disabled).toBe(true)
+    expect([...(await audit()), ...unnamed()]).toEqual([])
+
+    await user.click(clerk)
+    expect(latest()).not.toHaveProperty('bulk')
+    expect(within(changes(policy)).getByText(NOTHING_YET)).toBeTruthy()
+    await user.click(within(changeFields(policy)).getByRole('checkbox', { name: labelOf(form, 'notes') }))
+    expect(latest().bulk?.update).toEqual({ roles: ['clerk'], fields: ['notes'] })
+    expect(within(changes(policy)).queryByText(NOTHING_YET)).toBeNull()
+    await user.click(within(grants(policy)).getByRole('checkbox', { name: 'clerk' }))
+    expect(latest().bulk).toEqual({ update: { roles: ['clerk'], fields: ['notes'] }, delete: { roles: ['clerk'] } })
+    await fits(policy)
+    expect([...(await audit()), ...unnamed()]).toEqual([])
+    const stored = await publishedWith(proposal, latest())
+    expect(stored.bulk).toEqual({ update: { roles: ['clerk'], fields: ['notes'] }, delete: { roles: ['clerk'] } })
+    expect(validatePolicy(stored, bindings)).toEqual({ ok: true })
+
+    await user.click(within(changeFields(policy)).getByRole('checkbox', { name: labelOf(form, 'notes') }))
+    expect(latest().bulk).toEqual({ delete: { roles: ['clerk'] } })
+    expect(within(changeRoles(policy)).getByRole<HTMLInputElement>('checkbox', { name: 'clerk' }).checked).toBe(true)
+  })
+
+  // A field a rule of the form reads together with another is no field a
+  // change of chosen records may set (0175): the page cannot run that rule
+  // over each record's other answers. Both the rule's target and what it
+  // reads are shown unticked and not offered, in the bundle check's words
+  // (`readTogetherReason`), and a field no rule reads is still offered
+  // (watched failing with `readTogether` left unasked: Notes offered,
+  // "expected false to be true").
+  test('does not offer a field a rule reads together with another, saying why in the check’s words', async () => {
+    servedDocument()
+    const outcome = await createAdminClient({ token: TOKENS.admin, fetch: plane.fetch }).propose(VERSIONED)
+    if (!outcome.ok) throw new Error(outcome.message)
+    const ruled = {
+      ...outcome.value,
+      form: { ...outcome.value.form, logic: { rules: [{ target: 'notes', kind: 'visible' as const, cel: 'status == "shipped"' }] } },
+    }
+    render(<PolicyOf proposal={ruled} initial={WRITING} />)
+    const policy = screen.getByRole('main', { name: 'Policy' })
+    const box = (field: string): HTMLInputElement => within(changeFields(policy)).getByRole<HTMLInputElement>('checkbox', { name: labelOf(ruled.form, field) })
+    for (const field of ['notes', 'status']) {
+      expect(box(field).disabled).toBe(true)
+      expect(computeAccessibleDescription(box(field))).toBe(`${labelOf(ruled.form, field)} ${readTogetherReason('notes')}. ${CHANGE_NOTE}`)
+    }
+    expect(box('amount').disabled).toBe(false)
+    expect([...(await audit()), ...unnamed()]).toEqual([])
+  })
+
+  // Nothing to tick where an update of one record alone is not offered --
+  // the order without its version column, which offers neither write --
+  // nor while nobody may update with the form, each said why before
+  // anybody looks for a box. A delivery saved with its order (0155) keeps
+  // an update of a row alone, so a change of its rows is offered, as
+  // 0175's check accepts it, but never of the field that names the order
+  // they are saved with (watched failing with `offeredFor` asked of
+  // delete, as the deletion's grant asks it: the delivery offered no box,
+  // "Unable to find an accessible element with the role "group" and name
+  // "Fields they may set"").
+  test('offers nothing where no update alone is, nor while nobody may update, and never the together field', async () => {
+    await policyOver(UNVERSIONED, FITTING)
+    const plain = screen.getByRole('main', { name: 'Policy' })
+    expect(within(changes(plain)).getByText(NO_UPDATE)).toBeTruthy()
+    expect(within(changes(plain)).queryAllByRole('checkbox')).toEqual([])
+    expect([...(await audit()), ...unnamed()]).toEqual([])
+    cleanup()
+
+    await policyOver(VERSIONED, { ...WRITING, operations: { ...WRITING.operations, update: [] } })
+    const nobody = screen.getByRole('main', { name: 'Policy' })
+    expect(within(changes(nobody)).getByText(NOBODY_UPDATES)).toBeTruthy()
+    expect(within(changes(nobody)).queryAllByRole('checkbox')).toEqual([])
+    cleanup()
+
+    const delivery: ProposalRequest = {
+      connection: 'fixture',
+      root: { schema: 'sales', name: 'delivery' },
+      formId: 'sales-delivery',
+      title: 'Delivery',
+      lookups: [{ foreignKey: 'fk_delivery_order', display: ['order_date'], together: { min: 0, max: 10 } }],
+      pinned: [],
+      versionColumn: 'row_version',
+    }
+    const saved: FormPolicy = {
+      version: 1,
+      operations: { read: ['clerk'], create: ['clerk'], update: ['clerk'] },
+      fields: { carrier: { read: ['clerk'], write: ['clerk'] }, order: { read: ['clerk'], write: ['clerk'] } },
+      rowFilters: [],
+      lookups: { order: [] },
+    }
+    const { proposal } = await policyOver(delivery, saved)
+    const rows = screen.getByRole('main', { name: 'Policy' })
+    const order = within(changeFields(rows)).getByRole<HTMLInputElement>('checkbox', { name: labelOf(proposal.form, 'order') })
+    expect(order.disabled).toBe(true)
+    expect(computeAccessibleDescription(order)).toBe(
+      `${labelOf(proposal.form, 'order')} ${String(unsettableField(saved, proposal.bindings, 'order'))}. ${CHANGE_NOTE}`,
+    )
+    expect(within(changeFields(rows)).getByRole<HTMLInputElement>('checkbox', { name: labelOf(proposal.form, 'carrier') }).disabled).toBe(false)
+    expect([...(await audit()), ...unnamed()]).toEqual([])
+  })
+
+  // A grant written by hand that the server refuses keeps its boxes,
+  // ticked, so they can be unticked: a role that may no longer update,
+  // described by why, and the record's key, described by the check's
+  // reason; unticked, each is gone from what publishes, the key's box then
+  // not offered at all (watched failing with a refused field's box drawn
+  // disabled whatever it held: "expected [ true, true ] to deeply equal [
+  // true, false ]").
+  test('keeps a refused role and field of a hand-written grant ticked, described by why, until unticked', async () => {
+    const user = userEvent.setup()
+    const { proposal, latest } = await policyOver(VERSIONED, { ...WRITING, bulk: { update: { roles: ['clerk', 'lead'], fields: ['id', 'notes'] } } })
+    const policy = screen.getByRole('main', { name: 'Policy' })
+    const lead = within(changeRoles(policy)).getByRole<HTMLInputElement>('checkbox', { name: 'lead' })
+    expect(lead.checked).toBe(true)
+    expect(computeAccessibleDescription(lead)).toMatch(/^lead may not update with this form, so the server refuses this grant until it is unticked/)
+    const key = within(changeFields(policy)).getByRole<HTMLInputElement>('checkbox', { name: labelOf(proposal.form, 'id') })
+    expect([key.checked, key.disabled]).toEqual([true, false])
+    expect(computeAccessibleDescription(key)).toBe(
+      `${labelOf(proposal.form, 'id')} ${String(unsettableField(WRITING, proposal.bindings, 'id'))}. ${CHANGE_NOTE}`,
+    )
+    expect([...(await audit()), ...unnamed()]).toEqual([])
+    await user.click(lead)
+    await user.click(key)
+    expect(latest().bulk).toEqual({ update: { roles: ['clerk'], fields: ['notes'] } })
+    expect(within(changeRoles(policy)).queryByRole('checkbox', { name: 'lead' })).toBeNull()
+    expect(within(changeFields(policy)).getByRole<HTMLInputElement>('checkbox', { name: labelOf(proposal.form, 'id') }).disabled).toBe(true)
+    await fits(policy)
+  })
+})
+
 describe('a change of chosen records, written by hand', () => {
-  // The studio offers no control for `bulk.update` (0175), so an
-  // administrator writes it by hand, and nothing on the step may lose it:
+  // A `bulk.update` an administrator wrote by hand (0175), before the
+  // studio offered its own control (0176), and nothing on the step may lose it:
   // ticking a role's delete box adds the delete beside it, unticking takes
   // the delete alone away, and what publishes still grants the change,
   // which the server accepts. Watched failing with `withBulkDeleteRoles`
@@ -438,7 +616,7 @@ describe('a draft’s policy, as its publisher reads it', () => {
   })
 
   // A change of chosen records (0175) is a grant over a page of records
-  // too, written by hand since the studio offers no control for it: the
+  // too, granted beside a deletion's on the Policy step (0176): the
   // publisher reads who may make it and in which fields, each by its label
   // and key as the Fields list names it, beside who may delete them --
   // nobody, where the policy names no delete. Watched failing with the

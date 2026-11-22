@@ -8,6 +8,7 @@ import { labelOf, useDocument } from './document.js'
 import { useFocusAfterRender } from './focus.js'
 import { ActionGrants } from './policy-actions.js'
 import { BulkGrants } from './policy-bulk.js'
+import { BulkChangeGrant } from './policy-bulk-change.js'
 import { LookupFilters, RowFilters } from './policy-filters.js'
 import {
   boundColumns,
@@ -187,6 +188,7 @@ export function PolicyStep({
       </fieldset>
       <DeleteReach bindings={bindings} snapshot={snapshot} policy={policy} onPolicy={onPolicy} check={CHECK} />
       <BulkGrants bindings={bindings} policy={policy} onPolicy={onPolicy} check={CHECK} />
+      <BulkChangeGrant bindings={bindings} policy={policy} document={document} labels={labels} onPolicy={onPolicy} />
       <ActionGrants bindings={bindings} snapshot={snapshot} policy={policy} onPolicy={onPolicy} check={CHECK} />
 
       <fieldset>
