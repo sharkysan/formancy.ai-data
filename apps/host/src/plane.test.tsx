@@ -206,7 +206,10 @@ async function changeJourney(user: User, removable: string): Promise<void> {
   await user.click(within(paper).getByRole('button', { name: 'Continue' }))
   const confirming = await screen.findByRole('region', { name: 'Change 2 chosen Removable records?' }, { timeout: 15_000 })
   await user.click(within(confirming).getByRole('button', { name: 'Change them' }))
-  await within(screen.getByRole('region', { name: 'Change 2 chosen Removable records' })).findByText('Changed 2 of 2 records.', {}, { timeout: 15_000 })
+  // While the change is out the region keeps the confirmation's name, so the
+  // outcome is waited for by its own name rather than looked up at once.
+  const answered = await screen.findByRole('region', { name: 'Change 2 chosen Removable records' }, { timeout: 15_000 })
+  await within(answered).findByText('Changed 2 of 2 records.', {}, { timeout: 15_000 })
 }
 
 /** The page's doors: its own origin on each engine, and the live demo's path, behind its Worker, signed in as tenant 1's clerk. */
