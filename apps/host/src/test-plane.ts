@@ -81,6 +81,14 @@ async function verifierFor(demoKey: string | undefined): Promise<IdentityVerifie
   return async (token) => (literal.has(token) ? verifyIdentity(token) : demo(token))
 }
 
+/**
+ * The fields the clerk may change chosen records in, by form, where
+ * `startPlane({ changes })` grants it (0176): a removable record's note,
+ * which may be NULL; and an order's customer, a lookup, its status, held to
+ * `ORDER_MOVES`, and its notes.
+ */
+export const CHANGES = { removable: ['note'], moves: ['customer', 'status', 'notes'] } as const
+
 /** The fixture's values, from the run's setup: see `Edges`. */
 export const EDGES = inject('edges')
 
@@ -230,7 +238,8 @@ export interface Plane {
  * again as `starting` of `ENGINES`, with `STARTING` chosen over its base.
  * With `actions` (0162), each engine's action order (test-actions.ts).
  * With `deletes` and `bulk` (0174), the clerk may delete the chosen records
- * of the forms `bulk` names together.
+ * of the forms `bulk` names together; with `changes` (0176), change them,
+ * in the fields `CHANGES` names.
  */
 export async function startPlane(
   options: {
@@ -259,15 +268,25 @@ export async function startPlane(
      * cell-by-index reads must allow for.
      */
     bulk?: ReadonlyArray<'removable' | 'order'>
+    /**
+     * The forms whose chosen records the clerk may change together (0175,
+     * 0176), in the fields `CHANGES` names: `removable`, with `deletes`,
+     * and `moves`, with `moves`, the order form whose status moves from
+     * draft to placed to shipped. Each draws the boxes' column first.
+     */
+    changes?: ReadonlyArray<keyof typeof CHANGES>
   } = {},
 ): Promise<Plane> {
   const { pg, ms } = inject('databases')
   // 32 random bytes as base64url: the shape of the key a Durable Object starts its container with.
   const demoKey = options.demo === true ? randomBytes(32).toString('base64url') : undefined
   const deletes = options.deletes === true
-  /** Who may delete a form's chosen records together, where `bulk` names it. */
-  const together = (form: 'removable' | 'order'): Pick<FormPolicy, 'bulk'> =>
-    options.bulk?.includes(form) === true ? { bulk: { delete: { roles: ['clerk'] } } } : {}
+  /** Who may delete a form's chosen records together, where `bulk` names it, and change them, where `changes` does. */
+  const together = (form: 'removable' | 'order' | 'moves'): Pick<FormPolicy, 'bulk'> => {
+    const deleting = form !== 'moves' && options.bulk?.includes(form) === true ? { delete: { roles: ['clerk'] } } : {}
+    const changing = form !== 'order' && options.changes?.includes(form) === true ? { update: { roles: ['clerk'], fields: [...CHANGES[form]] } } : {}
+    return Object.keys(deleting).length + Object.keys(changing).length === 0 ? {} : { bulk: { ...deleting, ...changing } }
+  }
   const connections: ConnectionConfig[] = [
     { id: 'pg', kind: 'postgres', ...pg, password: 'env:PG_PASSWORD', schemas: ['sales'], tls: { enabled: false } },
     { id: 'ms', kind: 'sqlserver', ...ms, password: 'env:MS_PASSWORD', schemas: ['sales'], tls: { enabled: false, trustServerCertificate: true } },
@@ -354,7 +373,7 @@ export async function startPlane(
           : formId === withheld
             ? { ...readOnly, fields: { ...base.fields, amount: { read: [], write: [] } } }
             : formId === moves
-              ? { ...base, transitions: ORDER_MOVES }
+              ? { ...base, transitions: ORDER_MOVES, ...together('moves') }
               : formId === unread
                 ? { ...base, fields: { ...base.fields, status: { read: [], write: [] } } }
                 : deletes

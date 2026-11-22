@@ -23,13 +23,14 @@ import type { Renderer } from './session.js'
  * | Load the saved record, where its rows are saved with it (0155) | its rows' changes                        |
  * | the record read again after an action over it ran (0162)       | the record's own forms: those its        |
  * |                                                                | confirmation listed without asking again |
+ * | the record read again after a change of chosen records (0176)  | the same                                 |
  *
  * A deletion out, or unknown (0053), is listed with its owner's panes and
  * goes where they go, but for a renderer hidden: it is drawn by none; so is
  * an action's run out, or unknown, over the open record (0162). One
  * asked from a grid's row that is not the record open in the detail is its
  * grid's (`gridOwner`), as a run over the records chosen of its page is
- * (0166) and a deletion of them (0174): the records grid's goes only with the grid --
+ * (0166) and a deletion or a change of them (0174, 0176): the records grid's goes only with the grid --
  * another form, Back or Forward, Sign out -- and a child grid's with its
  * section, as that child's panes do but for its own rows and its New.
  *
@@ -43,10 +44,12 @@ import type { Renderer } from './session.js'
  * What a pane holds that a discard would lose: answers changed since it was
  * opened or saved, a save out, or a save whose outcome is unknown (0031) --
  * and, of a record or a child row, a deletion out or one that may have been
- * done and is not checked (0053); and of the open record, an action's run
- * out or one that may have run and is not checked (0162).
+ * done and is not checked (0053); of the open record, an action's run
+ * out or one that may have run and is not checked (0162); and of the
+ * records grid, a change of chosen records out or one that may have been
+ * made and is not checked (0176).
  */
-export type Work = 'changed' | 'saving' | 'unknown' | 'deleting' | 'delete-unknown' | 'running' | 'run-unknown'
+export type Work = 'changed' | 'saving' | 'unknown' | 'deleting' | 'delete-unknown' | 'running' | 'run-unknown' | 'changing' | 'change-unknown'
 
 /** Each kind of work, as the notice says it after a pane's name. */
 export const WORK: Readonly<Record<Work, string>> = {
@@ -57,6 +60,8 @@ export const WORK: Readonly<Record<Work, string>> = {
   'delete-unknown': 'a deletion that may have been done, not yet checked.',
   running: 'an action the server has not answered yet.',
   'run-unknown': 'an action that may have run, not yet checked.',
+  changing: 'a change the server has not answered yet.',
+  'change-unknown': 'a change that may have been made, not yet checked.',
 }
 
 /** How a renderer is written for a person. */
@@ -97,6 +102,8 @@ export type LeaveRequest =
    * `agreed`: the renderers of the record's forms its confirmation listed, whose work the person agreed to drop when they ran it.
    */
   | { kind: 'ran'; record: string; label: string; agreed?: readonly Renderer[] }
+  /** The open record read again into its own panes once a change of the chosen records changed it (0176), `agreed` as a run's. */
+  | { kind: 'changed-chosen'; record: string; agreed?: readonly Renderer[] }
   | { kind: 'renderer'; hides: readonly Renderer[]; shows: string }
   /** Drill down: going down from level `below` into a row, or a new one when `record` is null, whose form is `title`; or into the record a lookup there names, by Open (0141). */
   | { kind: 'drill'; below: number; record: string | null; title: string }
@@ -220,6 +227,7 @@ export function discards(request: LeaveRequest): Discarded | null {
     case 'reload-rows':
       return { owners: request.rows, renderers: 'all' }
     case 'ran':
+    case 'changed-chosen':
       // The forms a renderer draws, never the record's deletion, which a read leaves where it is; nor what its confirmation listed, already agreed to.
       return { owners: ['master'], renderers: ['react', 'angular'], agreed: request.agreed ?? [] }
     case 'renderer':
@@ -279,6 +287,8 @@ export function lead(request: LeaveRequest): Said {
       return ['Loading ', { code: request.record }, ` as saved, with its rows,${closes}`]
     case 'ran':
       return ['Reading ', { code: request.record }, ` again, since ${request.label} ran on it,${closes}`]
+    case 'changed-chosen':
+      return ['Reading ', { code: request.record }, ` again, since it was changed with the chosen records,${closes}`]
     case 'new':
       return [`Starting a new record${closes}`]
     case 'child-new':

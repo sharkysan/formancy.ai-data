@@ -65,7 +65,7 @@ import { fieldHeading } from '@formancy/data-client'
 let plane: Plane
 
 beforeAll(async () => {
-  plane = await startPlane({ children: true, deletes: true, saves: true, actions: true, bulk: ['removable'] })
+  plane = await startPlane({ children: true, deletes: true, saves: true, actions: true, bulk: ['removable'], changes: ['removable'] })
 })
 
 afterAll(async () => {
@@ -565,6 +565,95 @@ describe.each(ENGINES)('the page on $engine', ({ connection, formId, lines, remo
     await user.click(within(unknown).getByRole('button', { name: 'Check them' }))
     await within(unknown).findByRole('button', { name: 'Close' }, { timeout: 15_000 })
     expect(await floor('chosen records, checked')).toEqual(CLEAN('chosen records, checked'))
+  })
+
+  // A change of chosen records' states, each held to the floor (0176): its
+  // fields, none ticked, and one ticked on paper, the paper's control named
+  // and dressed by the theme; the confirmation, focused, described by each
+  // field and its value, its next Tab on Keep them -- never the button
+  // that sends; the change out, both answers aria-disabled and its line
+  // saying so; what the server answered, one record changed and one
+  // changed beside the page named in the server's words, its box after it
+  // described by why; and a lost answer before and after Check them. Its
+  // heading's level is bulk-update.test.tsx's to hold (to be watched
+  // failing in CI with a field's box unnamed: a checkbox with no label).
+  test("passes the floor in a change of chosen records' states", async () => {
+    let lose = false
+    let hold = false
+    const losing = losingWrites(plane.fetch, { when: 'before', writes: /\/records\/update-chosen$/ })
+    const holding = holdingRequests(plane.fetch, ({ path }) => hold && path.endsWith('/records/update-chosen'))
+    const fetch: typeof globalThis.fetch = (input, init) => (lose ? losing.fetch(input, init) : holding.fetch(input, init))
+    const note = stamp(`floor of changed ${connection}`)
+    const made: string[] = []
+    for (let n = 0; n < 3; n += 1) {
+      const created = await plane.clerk.create(removable, { note })
+      if (!created.ok || created.value.record === null) throw new Error('a removable record was not created')
+      made.push(created.value.record)
+    }
+    const [changed, moved, lost] = made as [string, string, string]
+    const user = mount(fetch)
+    await signIn(user, TOKENS.clerk)
+    await chooseForm(user, removable)
+    await user.type(screen.getByRole('textbox', { name: 'Search' }), note)
+    await user.click(within(gridSection('Records')).getByRole('button', { name: 'Search' }))
+    await waitFor(() => expect(gridStatus('Records')?.textContent).toBe('Rows 1–3.'), { timeout: 15_000 })
+    const records = within(gridSection('Records'))
+    const boxOf = (record: string): HTMLInputElement => records.getByRole<HTMLInputElement>('checkbox', { name: `Choose Removable ${record}` })
+    await user.click(await waitFor(() => boxOf(changed), { timeout: 15_000 }))
+    await user.click(boxOf(moved))
+    const read = await plane.clerk.read(removable, moved)
+    if (!read.ok || read.value.version === null) throw new Error('the removable record did not read')
+    if (!(await plane.clerk.update(removable, { record: moved, version: read.value.version, answers: { note: `${note} moved` } })).ok)
+      throw new Error('it was not changed beside the page')
+
+    await user.click(records.getByRole('button', { name: 'Change the chosen…' }))
+    const asking = await region('Change 2 chosen Removable records')
+    await waitFor(() => expect(focusedName()).toBe('Change 2 chosen Removable records'))
+    expect(await floor('a change of chosen records, its fields')).toEqual(CLEAN('a change of chosen records, its fields'))
+    await user.click(within(asking).getByRole('checkbox', { name: 'Note' }))
+    const sheet = await within(asking).findByRole('form', { name: 'Values to set, React' }, { timeout: 15_000 })
+    await user.type(within(sheet).getByLabelText('Note', { exact: true }), `${note} changed`)
+    expect(await floor('a change of chosen records, on paper')).toEqual(CLEAN('a change of chosen records, on paper'))
+    await user.click(within(sheet).getByRole('button', { name: 'Continue' }))
+    const confirming = await region('Change 2 chosen Removable records?')
+    await waitFor(() => expect(focusedName()).toBe('Change 2 chosen Removable records?'))
+    expect(within(confirming).getAllByRole('listitem')[0]?.textContent).toBe(`Note: ${note} changed`)
+    await user.tab()
+    expect(focusedName()).toBe('Keep them')
+    await user.tab()
+    expect(focusedName()).toBe('Change them')
+    expect(await floor('a change of chosen records, confirming')).toEqual(CLEAN('a change of chosen records, confirming'))
+    hold = true
+    await user.keyboard('{Enter}')
+    await waitFor(() => expect(holding.held).toHaveLength(1), { timeout: 15_000 })
+    expect(within(confirming).getByRole('button', { name: 'Keep them' }).getAttribute('aria-disabled')).toBe('true')
+    expect(await floor('a change of chosen records, changing')).toEqual(CLEAN('a change of chosen records, changing'))
+    hold = false
+    await holding.pass()
+    const answered = await region('Change 2 chosen Removable records')
+    await waitFor(() => expect(paragraphs(answered)[0]).toBe('Changed 1 of 2 records.'), { timeout: 15_000 })
+    expect(await floor('a change of chosen records, answered')).toEqual(CLEAN('a change of chosen records, answered'))
+    await user.click(within(answered).getByRole('button', { name: 'Close' }))
+    await waitFor(() => expect(computeAccessibleDescription(boxOf(moved))).toMatch(/^Not changed\. /), { timeout: 15_000 })
+    expect(await floor('a change of chosen records, one kept')).toEqual(CLEAN('a change of chosen records, one kept'))
+
+    await user.click(boxOf(moved))
+    await user.click(boxOf(lost))
+    lose = true
+    await user.click(records.getByRole('button', { name: 'Change the chosen…' }))
+    const again = await region('Change 1 chosen Removable record')
+    await user.click(within(again).getByRole('checkbox', { name: 'Note' }))
+    const lostSheet = await within(again).findByRole('form', { name: 'Values to set, React' }, { timeout: 15_000 })
+    await user.type(within(lostSheet).getByLabelText('Note', { exact: true }), `${note} lost`)
+    await user.click(within(lostSheet).getByRole('button', { name: 'Continue' }))
+    await user.click(within(await region('Change 1 chosen Removable record?')).getByRole('button', { name: 'Change them' }))
+    const unknown = await region('Change 1 chosen Removable record')
+    await within(unknown).findByRole('button', { name: 'Check them' }, { timeout: 15_000 })
+    expect(await floor('a change of chosen records, may have been changed')).toEqual(CLEAN('a change of chosen records, may have been changed'))
+    lose = false
+    await user.click(within(unknown).getByRole('button', { name: 'Check them' }))
+    await within(unknown).findByRole('button', { name: 'Close' }, { timeout: 15_000 })
+    expect(await floor('a change of chosen records, checked')).toEqual(CLEAN('a change of chosen records, checked'))
   })
 
   // Download CSV's states, each held to the floor (0080): a file in the

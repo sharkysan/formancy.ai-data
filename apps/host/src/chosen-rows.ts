@@ -28,10 +28,10 @@ import type { SessionState } from './session.js'
  *   (`hearForms`), as a delete hears one (delete-flow.ts's `useHeard`).
  * - **In the page's order**, whatever order the boxes were ticked in: the
  *   order a run sends, and a refusal names, the records in.
- * - **After a deletion of them** (0174), the records it deleted, or found
- *   gone, leave the choice (`settle`), and each still chosen is marked with
- *   why it was not deleted -- its box's description -- until the choice
- *   changes.
+ * - **After a deletion or a change of them** (0174, 0176), the records it
+ *   did, or found done, leave the choice (`settle`), and each still chosen
+ *   is marked with why it was not -- its box's description -- until the
+ *   choice changes.
  */
 
 /** The list a page was drawn from, by identity: the grid's datasource for one search, filter and sort. */
@@ -44,7 +44,7 @@ export interface ChoiceNow {
   said: string
   /** How many times it was said: each saying a new one, so a sentence said again is heard again (selection-bar.tsx). */
   count: number
-  /** Why each record still chosen after a deletion of the choice was not deleted, by its token: its box's description, until the choice changes (0174). */
+  /** Why each record still chosen after a deletion or a change of the choice was not done, by its token: its box's description, until the choice changes (0174, 0176). */
   marks: ReadonlyMap<string, string>
 }
 
@@ -65,16 +65,18 @@ export interface ChosenRows {
   /** Clear the choice: `said`, what the line says then, where it is not how many are chosen. */
   clear: (said?: string) => void
   /**
-   * A deletion of the choice answered (0174): the records in `gone` leave
-   * it, each record still chosen that `marks` names is marked with why, and
-   * the line says `said`. Nothing is chosen that was not: a box unticked
-   * while the deletion was out stays unticked.
+   * A deletion or a change of the choice answered (0174, 0176): the records
+   * in `gone` leave it, each record still chosen that `marks` names is
+   * marked with why, and the line says `said`. Nothing is chosen that was
+   * not: a box unticked while the request was out stays unticked.
    */
   settle: (gone: ReadonlySet<string>, marks: ReadonlyMap<string, string>, said: string) => void
   /** The records chosen, in the page's order, each at its version now. */
   records: () => RunRecord[]
   /** A record's version now, where it is on the page: as the page read it, or as the detail heard it since. */
   version: (token: string) => string | null
+  /** A record's answers as the page read it, where it is on the page: the state a change of the choice moves each record from (0176). */
+  answers: (token: string) => Readonly<Record<string, unknown>> | null
 }
 
 /** What the line says while nothing is chosen. */
@@ -92,12 +94,12 @@ const addressable = (row: GridRow): row is GridRow & { record: string; version: 
 export function createChosenRows(noun: string): ChosenRows {
   const listeners = new Set<() => void>()
   /** The page the choice is of, and its rows as drawn last, each version as last heard. */
-  let shown: { list: ListIdentity; start: number; rows: Array<{ record: string; version: string }> } | null = null
+  let shown: { list: ListIdentity; start: number; rows: Array<{ record: string; version: string; answers: GridRow['answers'] }> } | null = null
   let chosen = new Set<string>()
   let state: ChoiceNow = { chosen, said: NONE_CHOSEN, count: 0, marks: new Map() }
   const name = (token: string): string => `${noun} ${token}`
 
-  /** The choice changed: every change but a deletion's answer drops the marks, which say why the records it left were not deleted. */
+  /** The choice changed: every change but a request's answer drops the marks, which say why the records it left were not done. */
   function set(next: Set<string>, said = chosenText(next.size), marks: ReadonlyMap<string, string> = new Map()): void {
     chosen = next
     state = { chosen, said, count: state.count + 1, marks }
@@ -112,7 +114,7 @@ export function createChosenRows(noun: string): ChosenRows {
     now: () => state,
     name,
     page(list, start, rows) {
-      const drawn = rows.filter(addressable).map(({ record, version }) => ({ record, version }))
+      const drawn = rows.filter(addressable).map(({ record, version, answers }) => ({ record, version, answers }))
       const same = shown !== null && shown.list === list && shown.start === start
       shown = { list, start, rows: drawn }
       if (chosen.size === 0) return
@@ -149,13 +151,15 @@ export function createChosenRows(noun: string): ChosenRows {
     },
     records: () => (shown?.rows ?? []).filter((row) => chosen.has(row.record)).map(({ record, version }) => ({ record, version })),
     version: (token) => shown?.rows.find((row) => row.record === token)?.version ?? null,
+    answers: (token) => shown?.rows.find((row) => row.record === token)?.answers ?? null,
   }
 }
 
 /**
  * Whether the records chosen now are the ones a question was asked over,
  * by their tokens: a question over a choice -- a run's dialog or
- * confirmation (0166), a deletion's confirmation (0174) -- stands only
+ * confirmation (0166), a deletion's confirmation (0174), a change's
+ * fields or its confirmation (0176) -- stands only
  * while they are. A page drawn again in another order chooses the same
  * records, which are sent in the page's order.
  */

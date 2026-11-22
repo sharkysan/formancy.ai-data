@@ -38,9 +38,9 @@ import { ViewPicker } from './view-picker.js'
  * the search submitted, never what the box holds, the filter applied, and
  * the sort, with every column whatever the grid hides. None of it is
  * written into the address, as no filter is (0104). Where the form serves
- * this person an action over a selection, or a deletion of the records
- * chosen, the grid has a column of boxes and what may be done with the
- * records chosen is a bar above its well (0166, 0174).
+ * this person an action over a selection, or a deletion or a change of the
+ * records chosen, the grid has a column of boxes and what may be done with
+ * the records chosen is a bar above its well (0166, 0174, 0176).
  */
 /** The Records panel's grid, kept apart from every child section's (0106). */
 const RECORDS: GridSection = { kind: 'records' }

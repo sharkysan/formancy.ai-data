@@ -3,23 +3,27 @@ import type { ReactElement } from 'react'
 import { useActionFlow } from './action-flow.js'
 import type { ActionFlow, ActionFlowOptions } from './action-flow.js'
 import { ActionRegion } from './action-region.js'
-import { useChosenDelete } from './chosen-delete-flow.js'
-import type { ChosenDelete, ChosenDeleteOptions } from './chosen-delete-flow.js'
-import { ChosenDeleteRegion } from './chosen-delete-region.js'
+import { CHANGE_CHOSEN } from './chosen-change.js'
 import { DELETE_CHOSEN } from './chosen-deletion.js'
+import { useChosen } from './chosen-flow.js'
+import type { ChosenFlow } from './chosen-flow.js'
+import type { ChosenOptions } from './chosen-flow-state.js'
+import { ChosenRegion } from './chosen-region.js'
 import { hearForms, NONE_CHOSEN, useChosenRows } from './chosen-rows.js'
 import type { ChoiceNow, ChosenRows } from './chosen-rows.js'
 
 /*
  * What a person does with the records chosen, above the records grid
- * (0166, 0174): a button for each action over a selection the form serves
- * this person, and Delete the chosen… where it serves them a deletion of
- * chosen records (`bulk.delete`, 0173); a status line that says how many
- * records are chosen -- and, when a page of another list or another page
- * cleared a choice, that it did and why, or which records a deletion left
- * chosen; Choose every record on this page, and Clear the choice; under
- * them, the regions a run and a deletion are drawn in, as the open
- * record's are under its header (action-region.tsx, 0162; delete-confirm.tsx, 0053).
+ * (0166, 0174, 0176): a button for each action over a selection the form
+ * serves this person, Change the chosen… where it serves them a change of
+ * chosen records in some field (`bulk.update`, 0175), and Delete the
+ * chosen… where it serves them their deletion (`bulk.delete`, 0173); a
+ * status line that says how many records are chosen -- and, when a page
+ * of another list or another page cleared a choice, that it did and why,
+ * or which records a deletion or a change left chosen; Choose every record
+ * on this page, and Clear the choice; under them, the regions a run and a
+ * request over the choice are drawn in, as the open record's are under
+ * its header (action-region.tsx, 0162; delete-confirm.tsx, 0053).
  *
  * A button pressed with nothing chosen is no dead end and sends nothing:
  * it is `aria-disabled`, never `disabled`, which would drop the keyboard,
@@ -38,39 +42,41 @@ export const CHOOSE_FIRST = 'Choose records first, with the boxes in the grid’
 /** What a press of Clear the choice says while nothing is chosen. */
 export const NOTHING_TO_CLEAR = 'There is nothing to clear.'
 
-/** The records grid's choice, the flow of the actions over it and its deletion, where the form offers this person either. */
+/** The records grid's choice, the flow of the actions over it and of its deletion or change, where the form offers this person one. */
 export interface Selection {
-  /** Whether the form serves this person an action over a selection, or a deletion of chosen records: the bar and the column are drawn only then. */
+  /** Whether the form serves this person an action over a selection, or a deletion or a change of chosen records: the bar and the column are drawn only then. */
   offered: boolean
   flow: ActionFlow
-  deletion: ChosenDelete
+  request: ChosenFlow
   rows: ChosenRows
   now: ChoiceNow
 }
 
-/** What the form's actions and the deletion of its chosen records are given: a run's options, and what a deletion closes and lists of the Drill down levels. */
+/** What the form's actions and a request over its chosen records are given: a run's options, and what a deletion closes and lists of the Drill down levels. */
 export type ActionsOptions = Omit<ActionFlowOptions, 'chosen' | 'drill'> &
-  Pick<ChosenDeleteOptions, 'onGone'> & { drill: ActionFlowOptions['drill'] & ChosenDeleteOptions['drill'] }
+  Pick<ChosenOptions, 'onGone'> & { drill: ActionFlowOptions['drill'] & ChosenOptions['drill'] }
 
 /**
  * A form's actions: the open record's flow, which its header offers
  * (0162), and the choice of the records grid's page with a flow over it
- * beside that one and its deletion, which the bar offers (0166, 0174) --
- * each of them may be out at once (action-flow.ts, chosen-delete-flow.ts).
+ * beside that one and its deletion or change, which the bar offers (0166,
+ * 0174, 0176) -- each of them may be out at once (action-flow.ts,
+ * chosen-flow.ts).
  */
 export function useActions(options: ActionsOptions): { running: ActionFlow; selection: Selection } {
   const running = useActionFlow(options)
   const { rows, now } = useChosenRows(options.entry.title)
   const flow = useActionFlow({ ...options, chosen: rows })
-  const deletion = useChosenDelete({ ...options, chosen: rows })
+  const request = useChosen({ ...options, chosen: rows })
   // What the record's forms hear, the choice hears too: the version a chosen record is sent at (chosen-rows.ts).
   useEffect(() => hearForms(rows, options.sessions), [rows, options.sessions])
-  return { running, selection: { offered: flow.actions.length > 0 || deletion.offered, flow, deletion, rows, now } }
+  const offered = flow.actions.length > 0 || request.deletes || request.changes.length > 0
+  return { running, selection: { offered, flow, request, rows, now } }
 }
 
-/** The bar above the records grid, and the regions a run over the records chosen and their deletion are drawn in. */
+/** The bar above the records grid, and the regions a run over the records chosen and their deletion or change are drawn in. */
 export function SelectionBar({ selection, idBase }: { selection: Selection; idBase: string }): ReactElement {
-  const { flow, deletion, rows, now } = selection
+  const { flow, request, rows, now } = selection
   const none = now.chosen.size === 0
   const hint = `${idBase}-hint`
   /** What a press of a button over the choice does while nothing is chosen: says what to do first, sending nothing. */
@@ -91,8 +97,13 @@ export function SelectionBar({ selection, idBase }: { selection: Selection; idBa
             {flow.label(action)}
           </button>
         ))}
-        {deletion.offered ? (
-          <button type="button" className="button" ref={deletion.buttonRef} {...waiting} onClick={() => (none ? first() : deletion.ask())}>
+        {request.changes.length > 0 ? (
+          <button type="button" className="button" ref={request.changeRef} {...waiting} onClick={() => (none ? first() : request.askChange())}>
+            {CHANGE_CHOSEN}
+          </button>
+        ) : null}
+        {request.deletes ? (
+          <button type="button" className="button" ref={request.deleteRef} {...waiting} onClick={() => (none ? first() : request.askDelete())}>
             {DELETE_CHOSEN}
           </button>
         ) : null}
@@ -117,7 +128,7 @@ export function SelectionBar({ selection, idBase }: { selection: Selection; idBa
         ) : null}
       </div>
       <ActionRegion flow={flow} idBase={`${idBase}-run`} />
-      <ChosenDeleteRegion flow={deletion} idBase={`${idBase}-delete`} />
+      <ChosenRegion flow={request} idBase={`${idBase}-chosen`} />
     </>
   )
 }

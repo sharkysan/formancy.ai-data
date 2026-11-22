@@ -106,7 +106,8 @@ const CLOSE = {
  * bound again as `close-all`, over the records a person chooses of the
  * page (0166), so the grid has its boxes and the bar above it; a clerk of
  * tenant 1 reads the order and runs both, through its customer (0043), and
- * may delete the orders chosen together (0173, 0174).
+ * may delete the orders chosen together (0173, 0174) and change their note
+ * together (0175, 0176).
  */
 async function publishActionOrder(call) {
   const proposal = await call(TOKENS.admin, '/v1/form-proposals', {
@@ -150,7 +151,7 @@ async function publishActionOrder(call) {
         lookups: { customer: [{ column: 'tenant_id', attribute: 'tenant' }] },
         through: ['customer'],
         actions: { close: { roles: ['clerk'] }, 'close-all': { roles: ['clerk'] } },
-        bulk: { delete: { roles: ['clerk'] } },
+        bulk: { delete: { roles: ['clerk'] }, update: { roles: ['clerk'], fields: ['note'] } },
       },
       snapshot: proposal.snapshot,
     },

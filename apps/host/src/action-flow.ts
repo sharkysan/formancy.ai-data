@@ -370,7 +370,7 @@ function useRunEntry(flow: FlowState): PaneEntry {
  * something, which keeps it: they are answering that. A run out from Run
  * it keeps the confirmation's number, so the keyboard stays on Run it; a
  * run again, or the action asked again while it is out, is a new one; and
- * so for a deletion of chosen records (chosen-delete-flow.ts, 0174). Not
+ * so for a request over chosen records (chosen-flow.ts, 0174, 0176). Not
  * scrolled sideways: a region scrolled into view horizontally moves the
  * whole page by the scrollbar's gutter (unsaved-notice.tsx).
  */

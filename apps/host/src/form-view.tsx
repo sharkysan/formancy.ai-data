@@ -186,7 +186,7 @@ export function FormView({
     formOf,
   })
   // The record's actions (0162), and those over a selection (0166): a run reads the record again into its panes, and its row and the sections it names;
-  // a deletion of the records chosen (0174) closes the open one where it deleted it, as a delete does.
+  // a deletion of the records chosen (0174) closes the open one where it deleted it, as a delete does, and a change of them (0176) reads it again.
   const actions = useActions({
     client,
     entry,
