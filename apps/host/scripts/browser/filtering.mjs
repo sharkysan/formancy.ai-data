@@ -210,6 +210,7 @@ export function filterJourney(plane, { check }) {
           .first()
           .locator(`[role="gridcell"][aria-colindex="${String(amount)}"]`)
         await cell.focus()
+        const value = ((await cell.textContent()) ?? '').trim()
         const sent = nextList(page)
         await page.keyboard.press('=')
         const request = await sent
@@ -218,6 +219,20 @@ export function filterJourney(plane, { check }) {
           'a cell’s example: = keeps the rows with its value',
           terms.some((term) => term.field === 'amount' && term.op === 'equals') ? null : `the filter is ${JSON.stringify(terms)}`,
         )
+        // Measured once the rows the list answered are drawn, every one with
+        // the cell's value. The keyboard is on a cell before = and after it,
+        // so the check below waits for nothing; measured while the list was
+        // on its way, its rows were drawn between axe's audit and the gate's
+        // reading of the cells axe left, which were then gone (the release
+        // rehearsal's run 45072894046, Chromium), as the lookup's step above
+        // once was.
+        await request.response()
+        await until(async () => {
+          const amounts = await dataRows(grid, page)
+            .locator(`[role="gridcell"][aria-colindex="${String(amount)}"]`)
+            .allTextContents()
+          return amounts.length > 0 && amounts.every((text) => text.trim() === value)
+        }, `the grid never drew only the rows whose Amount is ${value}`)
         // The keyboard back on a data cell once the grid lists again, to point at the next value: a gridcell outside the header's row of boxes, read from the DOM, which says where a cell is.
         const back = await until(
           () => page.evaluate(() => document.activeElement?.getAttribute('role') === 'gridcell' && document.activeElement.closest('.ag-header') === null),
