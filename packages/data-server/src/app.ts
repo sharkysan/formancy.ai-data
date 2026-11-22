@@ -124,7 +124,7 @@ export interface DataServerOptions {
    * a page may go on sending them, checked before each record and never
    * during one: every record after it is answered not sent (0173). A whole
    * number from 1 to 2147483647, or the server is not built. Default
-   * `DEFAULT_BULK_DEADLINE_MS`, 20 s, chosen and not measured; the runnable
+   * `DEFAULT_BULK_DEADLINE_MS`, 14 s, chosen and not measured; the runnable
    * server reads `FORMANCY_DATA_BULK_DEADLINE_MS` for it.
    */
   runtime?: {

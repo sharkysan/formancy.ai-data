@@ -28,13 +28,16 @@ describe('FORMANCY_DATA_BULK_DEADLINE_MS', () => {
   })
 
   // The default is chosen so that a request whose last record starts just
-  // before it -- on SQL Server two statements, each bounded by mssql's
-  // request timeout -- answers before nginx's default proxy_read_timeout of
-  // 60 s, which the composed stack leaves as it is (bulk-deadline.ts). A
-  // default raised past that would have the proxy cut answers the server
-  // still writes. Watched failing with a default of 40 s.
+  // before it answers before nginx's default proxy_read_timeout of 60 s,
+  // which the composed stack leaves as it is (bulk-deadline.ts). On SQL
+  // Server that record is up to three statements, each bounded by mssql's
+  // request timeout: the root's description, the delete, and, where it
+  // deleted nothing, the read that says why. A default raised past that
+  // would have the proxy cut answers the server still writes. Watched
+  // failing with the first default of 20 s, chosen while the count was
+  // two statements: 20 s and three timeouts are 65 s.
   test('leaves a last record on SQL Server room to answer before the proxy gives up', () => {
-    expect(DEFAULT_BULK_DEADLINE_MS + 2 * SQLSERVER_REQUEST_TIMEOUT_MS).toBeLessThan(60_000)
+    expect(DEFAULT_BULK_DEADLINE_MS + 3 * SQLSERVER_REQUEST_TIMEOUT_MS).toBeLessThan(60_000)
   })
 
   // An embedder's option is held to the variable's rule, so a server is

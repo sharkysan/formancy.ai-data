@@ -19,21 +19,25 @@ import { lookupDeadlineProblem } from './lookup-deadline.js'
 export type BulkDeadlineSetting = { ok: true; ms: number } | { ok: false; problem: string }
 
 /**
- * The deadline where the deployment names none: 20 s. Chosen, not
+ * The deadline where the deployment names none: 14 s. Chosen, not
  * measured (0173, 2026-11-22): a request answers within the deadline and
- * one record more, and a record on SQL Server is two statements -- the
- * root's description and the delete -- each bounded by mssql's request
- * timeout of 15 s (`SQLSERVER_REQUEST_TIMEOUT_MS`); 20 s and those 30 s
- * end before nginx's default `proxy_read_timeout` of 60 s, which the
- * composed stack's deploy/web/nginx.conf leaves as it is, so the proxy in
- * front does not cut an answer the server is still writing. On PostgreSQL
- * nothing bounds a statement's wait for a lock, as for a delete alone.
- * What a page of deletes takes is measured by
- * `bulk-sized.integration.test.ts` on the default images, in CI, which
- * holds a page done within this default; its report is where the figure
- * comes from, and this number is set again from it.
+ * one record more, and a record on SQL Server is up to three statements --
+ * the root's description, the delete, and, where it deleted nothing, the
+ * read that says why -- each bounded by mssql's request timeout of 15 s
+ * (`SQLSERVER_REQUEST_TIMEOUT_MS`); 14 s and those 45 s end before
+ * nginx's default `proxy_read_timeout` of 60 s, which the composed stack's
+ * deploy/web/nginx.conf leaves as it is, so the proxy in front does not
+ * cut an answer the server is still writing. A page cut short by the
+ * deadline costs a second request for the records not sent; an answer cut
+ * by the proxy, a read of every record. On PostgreSQL nothing bounds a
+ * statement's wait for a lock, as for a delete alone. What a page of
+ * deletes takes is measured by `bulk-sized.integration.test.ts` on the
+ * default images, which holds a page done within this default and prints
+ * its timings to the data-server test job's log in CI, one line per engine
+ * starting `bulk-sized`; they are where the figure is to come from, and
+ * this number is set again from them.
  */
-export const DEFAULT_BULK_DEADLINE_MS = 20_000
+export const DEFAULT_BULK_DEADLINE_MS = 14_000
 
 /**
  * `FORMANCY_DATA_BULK_DEADLINE_MS` as written: unset is the default

@@ -51,7 +51,7 @@ import { trustedProxiesSetting } from './trusted-proxies.js'
  *                                                  (0161)
  *   FORMANCY_DATA_BULK_DEADLINE_MS                 how long a request that deletes chosen records may go on
  *                                                  sending them, checked before each record, 1 to 2147483647 ms;
- *                                                  default DEFAULT_BULK_DEADLINE_MS, 20 s, chosen (0173)
+ *                                                  default DEFAULT_BULK_DEADLINE_MS, 14 s, chosen (0173)
  *   PORT                                           default 4390
  */
 function required(name: string): string {

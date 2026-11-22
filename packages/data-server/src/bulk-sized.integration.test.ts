@@ -31,11 +31,14 @@ import { DRIVER_FACTORIES } from './drivers.js'
  * answer -- the request's authorisation, then each record's description
  * and delete, one after another. Held without a clock where a fact has
  * none -- every record of every run is deleted -- and timed, and reported,
- * where it has: test-results/bulk-sized.json, with the answer's bytes,
- * what write-once.ts keeps of a page.
+ * where it has, with the answer's bytes, what write-once.ts keeps of a
+ * page: in test-results/bulk-sized-postgres.json and
+ * bulk-sized-sqlserver.json, one per engine, and in the log, one line per
+ * engine starting `bulk-sized`, which is what a CI run keeps of it -- no
+ * workflow keeps test-results/ but the release report's own files.
  *
  * The timings are what DEFAULT_BULK_DEADLINE_MS is to be set from
- * (bulk-deadline.ts: chosen until this suite has run in CI). The one clock
+ * (bulk-deadline.ts: chosen until these lines are read). The one clock
  * this suite holds is that a page of LIST_PAGE_SIZE records, sent to a
  * server with the default deadline, is deleted whole within it: a runner
  * on which it is not has outgrown the default, and the deadline is
@@ -209,9 +212,12 @@ describe.each([
   })
 
   afterAll(() => {
-    // The measurement, beside the run's results: what bulk-deadline.ts is to record.
+    // The measurement, beside the run's results and in the log, which is
+    // what a CI run keeps of it: what bulk-deadline.ts is to record.
+    const engine = db === 'pg' ? 'postgres' : 'sqlserver'
     mkdirSync('test-results', { recursive: true })
-    writeFileSync(join('test-results', `bulk-sized-${db === 'pg' ? 'postgres' : 'sqlserver'}.json`), JSON.stringify(report, null, 2))
+    writeFileSync(join('test-results', `bulk-sized-${engine}.json`), JSON.stringify(report, null, 2))
+    console.log(`bulk-sized ${engine}, ${new Date().toISOString()}: ${JSON.stringify(report)}`)
   })
 
   /** A request's records: `n` new rows, each at the version a row starts at. */
