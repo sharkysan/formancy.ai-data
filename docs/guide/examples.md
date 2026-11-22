@@ -46,6 +46,12 @@ and no form sent anywhere, with
 does not use; the hashed chunks are cached for a year, and the third-party
 notices are sent as UTF-8 text
 ([0069](../decisions/0069-the-examples-page-is-served-at-formancy-ai-data-examples.md)).
+The page asks search engines to index it there and nowhere else: its
+source says `noindex`, as every page's here does, and the deploy drops it
+from the copy it stages and names https://formancy.ai/data/examples/ as
+the page's canonical address, keeping the page's own description. A
+crawler that runs no script reads the title and that description alone
+([0177](../decisions/0177-the-examples-page-and-the-live-demo-ask-to-be-indexed-each-at-its-own-address-and-only-the-deploy-that-puts-it-there-says-so.md)).
 Cloudflare's bot detection puts an inline script into the page as it
 serves it, which the policy refuses like any other: the browser's console
 reports that refusal on every load, and nothing on the page needs the

@@ -71,6 +71,13 @@ with the demo's data, and the data server built from the checkout beside
 it, with the runtime plane alone; its disk is the image's on every start.
 The page's Content-Security-Policy is the examples page's with inline
 styles allowed, which AG Grid's theme needs, and nothing else.
+The page asks search engines to index it at https://formancy.ai/data/demo/,
+which it names as its canonical address, with a description of the demo
+in place of the host page's: the deploy writes both into the copy it
+stages and drops the host page's `noindex` from it. The host page's own
+build, which the composed stack serves, still asks to be left out, and a
+crawler starts no server
+([0177](../decisions/0177-the-examples-page-and-the-live-demo-ask-to-be-indexed-each-at-its-own-address-and-only-the-deploy-that-puts-it-there-says-so.md)).
 
 Cloudflare's Workers Builds deploys it from `main` on every push, with
 `pnpm build` and `node scripts/live-demo.mjs`, as it deploys the examples

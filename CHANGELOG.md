@@ -16,6 +16,13 @@ which are kept unchanged under a heading of their own below it (0171).
 
 ### Changed
 
+- **The examples page and the live demo ask search engines to index them**
+  ([0177](docs/decisions/0177-the-examples-page-and-the-live-demo-ask-to-be-indexed-each-at-its-own-address-and-only-the-deploy-that-puts-it-there-says-so.md)):
+  they are the module's only public pages, and nothing of it could be
+  found. Each deploy drops the page's `noindex` and names its address as
+  canonical; the studio and an operator's host page still ask to be left
+  out.
+
 ### Fixed
 
 ## 0.5.0 — 2026-11-22

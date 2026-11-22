@@ -20,8 +20,11 @@
 // The page is the host page built in its demo mode, with a relative base,
 // so one build is right under /data/demo/ and at the root of `vite
 // preview`; it is staged under that path in apps/live-demo/.cloudflare,
-// the directory the config names, with the `_headers` file at its root, and
-// the staging is removed afterwards. The image is built from its Dockerfile
+// the directory the config names, with the `_headers` file at its root and
+// the page asking to be indexed at the demo's address with the demo's own
+// description, where the host page's source, which the composed stack
+// serves too, asks to be left out (0177), and the staging is removed
+// afterwards. The image is built from its Dockerfile
 // by Wrangler, from the repository root, so Docker must answer, in the dry
 // run too: Wrangler 4.146.0 builds a Dockerfile's image for a dry run and
 // pushes nothing ("deploying (even in dry-run mode)" in its
@@ -39,11 +42,11 @@
 // names the commit it is. GitHub's workflows hold no Cloudflare token and
 // never run it.
 
-import { cpSync, existsSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, realpathSync, rmSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { IDLE_MINUTES, MAX_INSTANCES, PREFIX, SESSION_PATH } from '../apps/live-demo/dist/worker/pure.mjs'
-import { buildProblems, run, WRANGLER } from './demo.mjs'
+import { buildProblems, run, stageBuild, WRANGLER } from './demo.mjs'
 import { LIVE_ALLOWED, LIVE_POLICY, liveHeadersFile } from './live-demo-headers.mjs'
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -114,6 +117,18 @@ export const liveDemoBase = () => `${PREFIX}/`
 
 /** The address a reader opens. */
 export const liveDemoUrl = () => `https://${HOST}${liveDemoBase()}`
+
+/**
+ * What a search shows of the live demo under its title (0177), in place of
+ * the host page's description, which says what an operator's host page is.
+ */
+export const LIVE_DESCRIPTION =
+  'A live demo of Formancy Data: sign in as one of its people and search, open and change orders in forms generated from PostgreSQL, on a data server and sample data of your own.'
+
+/** The host page's demo build in `dist`, staged in `stage` as the live demo's Worker serves it: at its address, with its headers and the demo's description. */
+export function stageLiveDemo(dist, stage) {
+  stageBuild(dist, stage, { address: liveDemoUrl(), headers: liveHeadersFile(liveDemoBase()), description: LIVE_DESCRIPTION })
+}
 
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b)
 const shown = (value) => JSON.stringify(value) ?? 'nothing'
@@ -254,8 +269,7 @@ async function main(args) {
   const stage = join(app, STAGE)
   rmSync(stage, { recursive: true, force: true })
   try {
-    cpSync(dist, join(stage, liveDemoBase()), { recursive: true })
-    writeFileSync(join(stage, '_headers'), liveHeadersFile(liveDemoBase()))
+    stageLiveDemo(dist, stage)
     run('npx', deployArguments(commit, dryRun), { stdio: 'inherit' })
   } finally {
     rmSync(stage, { recursive: true, force: true })

@@ -2206,7 +2206,7 @@
       ]
     },
     "0069": {
-      "reviewed": "sha256:9fb38cedb4ee8d2ba8476542c5493cd8e100d8621219edde02da0222c564c9d2",
+      "reviewed": "sha256:03ca79ef4f630b974cbea4958cea7b51352cf91f51c40d536cf5fcdb46f6f9f2",
       "limitations": [
         {
           "area": "operations",
@@ -2263,7 +2263,7 @@
       ]
     },
     "0070": {
-      "reviewed": "sha256:e5fc753382537f66ebbc67e0c0aa5b9a68d59e2d3d7dbab4efa8abcbc02c47ce",
+      "reviewed": "sha256:cb5290a80b9fa2c3445b96ee5dc5aa600adb4070caf3ef98b165a31f34a7e731",
       "limitations": [
         {
           "area": "operations",
@@ -5428,6 +5428,39 @@
         {
           "area": "host",
           "says": "The live demo’s forms grant no change of chosen records, so its page offers none."
+        }
+      ]
+    },
+    "0177": {
+      "reviewed": "sha256:a5dce2683b6fb6edd2fade80284d33cb51dd65e5bd1ed96e15b7933d1b76b7c6",
+      "limitations": [
+        {
+          "area": "operations",
+          "says": "The examples page and the live demo ask search engines to index them, and what a search engine reads of either without running its script is its title, its description and an empty root: everything else is drawn by the script, and what any search engine indexed or shows of them was not read."
+        },
+        {
+          "area": "operations",
+          "says": "A search shows the live demo under the host page's title, \"Formancy Data host: published forms, their records and their rows\", above the demo's own description."
+        },
+        {
+          "area": "operations",
+          "says": "A person who finds the live demo by a search starts a server as anybody else does, so what it costs the rightsholder, and the sign-ins refused while every place is taken, grow with being found; a crawler starts none."
+        },
+        {
+          "area": "operations",
+          "says": "The page each deploy sends at formancy.ai differs from the build the browser gates measured in its head -- no robots meta, its description, a canonical link -- which a test of the staging holds, and nothing reads what Cloudflare serves there."
+        },
+        {
+          "area": "operations",
+          "says": "The studio and the composed stack's host page ask search engines to leave them out by a meta in the page alone: nothing sends an X-Robots-Tag, so neither their other files nor a crawler that ignores the meta is asked."
+        },
+        {
+          "area": "operations",
+          "says": "No sitemap lists the examples page or the live demo until formancy.ai's site does, which is a change in that repository."
+        },
+        {
+          "area": "operations",
+          "says": "A page source whose robots meta says anything but noindex, or that has no description or two, stops the examples page's and the live demo's deploys until their staging reads it."
         }
       ]
     }

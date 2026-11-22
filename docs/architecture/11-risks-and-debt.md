@@ -865,6 +865,13 @@ in it
 examples demo is the page as `main` holds it, deployed without waiting for
 that commit's CI, and what it serves was read by hand once
 ([0069](../decisions/0069-the-examples-page-is-served-at-formancy-ai-data-examples.md)).
+It and the live demo ask to be indexed, and what a search engine reads of
+a page drawn by script without running it is its title and description;
+what any search engine indexed or shows of either was not read, no
+sitemap lists them until formancy.ai's site does, and the live demo keeps
+the host page's title. An operator's studio and host page ask to be left
+out by a meta in each page and no header
+([0177](../decisions/0177-the-examples-page-and-the-live-demo-ask-to-be-indexed-each-at-its-own-address-and-only-the-deploy-that-puts-it-there-says-so.md)).
 
 **The live demo.** Accepted rather than fixed, for a demo that is not a
 deployment of the product: it costs the rightsholder money while anybody

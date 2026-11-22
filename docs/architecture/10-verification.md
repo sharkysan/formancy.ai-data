@@ -593,6 +593,11 @@ and each of these fails on the change that breaks what it holds:
   the guide's pages say of it, and `scripts/live-demo-gate/*.test.mjs` for
   its gate's pure parts
   ([0070](../decisions/0070-the-live-demo-runs-the-real-server-and-postgresql-in-a-cloudflare-container-of-each-visitors-own.md));
+  `scripts/indexed-page.test.mjs` for what each page tells a search
+  engine: every app's source and the composed stack's builds ask to be
+  left out, and each deploy stages its page asking to be indexed at its
+  own address, nothing else of it changed
+  ([0177](../decisions/0177-the-examples-page-and-the-live-demo-ask-to-be-indexed-each-at-its-own-address-and-only-the-deploy-that-puts-it-there-says-so.md));
   `scripts/server-start.test.mjs` for what the built server says and
   refuses at start about the Entra connections in its allowlist
   ([0074](../decisions/0074-a-sql-server-connection-may-log-in-as-an-entra-principal-and-no-test-logs-in-as-one.md));

@@ -5,9 +5,10 @@
 // One reader for the checks that ask where a page loads from -- the demo's
 // policy (scripts/demo-headers.mjs), the faces a build carries
 // (scripts/fonts.mjs), the getting-started gate's page check and the static
-// guard that no page names another host (0072) -- so that two of them never
-// read one page two ways. Node built-ins only: the getting-started gate
-// imports it from a checkout with nothing installed.
+// guard that no page names another host (0072) -- and for the head the
+// public pages' deploys write (scripts/indexed-page.mjs, 0177), so that two
+// of them never read one page two ways. Node built-ins only: the
+// getting-started gate imports it from a checkout with nothing installed.
 
 /**
  * An attribute as HTML writes it: a name, and a value double-quoted,
@@ -16,14 +17,23 @@
 const ATTRIBUTE = /([^\s"'<>/=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/g
 
 /**
- * Each `tag` element of `html` (a pattern), as its attributes: lowercased
- * names, `true` for one with no value. A `>` inside a quoted value does not
- * end the tag.
+ * Each `tag` element of `html` (a pattern), where its start tag begins, its
+ * text, and its attributes: lowercased names, `true` for one with no value.
+ * A `>` inside a quoted value does not end the tag.
  */
+export function tags(html, tag) {
+  return [...html.matchAll(new RegExp(`<${tag}\\b((?:[^>"']|"[^"]*"|'[^']*')*)>`, 'gi'))].map((match) => ({
+    index: match.index,
+    text: match[0],
+    attributes: Object.fromEntries(
+      [...match[1].matchAll(ATTRIBUTE)].map(([, name, double, single, bare]) => [name.toLowerCase(), double ?? single ?? bare ?? true]),
+    ),
+  }))
+}
+
+/** Each `tag` element of `html` (a pattern), as its attributes alone. */
 export function elements(html, tag) {
-  return [...html.matchAll(new RegExp(`<${tag}\\b((?:[^>"']|"[^"]*"|'[^']*')*)>`, 'gi'))].map((match) =>
-    Object.fromEntries([...match[1].matchAll(ATTRIBUTE)].map(([, name, double, single, bare]) => [name.toLowerCase(), double ?? single ?? bare ?? true])),
-  )
+  return tags(html, tag).map((element) => element.attributes)
 }
 
 /** Every `src` and `href` of every element of `html`, as `{ name, value }`, in order. */
