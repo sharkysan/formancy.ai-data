@@ -32,6 +32,7 @@ export const RUNTIME_ROUTES: readonly { method: 'GET' | 'POST'; path: string }[]
   { method: 'POST', path: '/v1/forms/:id/lookups/:source/resolve' },
   { method: 'POST', path: '/v1/forms/:id/records/create' },
   { method: 'POST', path: '/v1/forms/:id/records/delete' },
+  { method: 'POST', path: '/v1/forms/:id/records/delete-chosen' },
   { method: 'POST', path: '/v1/forms/:id/records/export' },
   { method: 'POST', path: '/v1/forms/:id/records/list' },
   { method: 'POST', path: '/v1/forms/:id/records/read' },

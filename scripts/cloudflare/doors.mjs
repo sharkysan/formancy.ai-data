@@ -50,13 +50,17 @@ export const EXAMPLE = {
  */
 const SAMPLES = { forms: 'order', connections: 'erp', lookups: 'customer', versions: '1', drafts: '1', actions: 'close' }
 
-const LINE = /^((?:│ {3}| {4})*)(?:├── |└── )(\/\S*) \(([A-Z]+(?:, [A-Z]+)*)\)$/
+const LINE = /^((?:│ {3}| {4})*)(?:├── |└── )(\S+) \(([A-Z]+(?:, [A-Z]+)*)\)$/
 
 /**
  * Fastify's `printRoutes({ commonPrefix: false })`, read back: `[{ method,
- * path }]`, a child's path joined to its parent's. HEAD is folded into the
- * GET Fastify adds it for; a HEAD alone, and any line that is not a route,
- * stops the reading with a sentence rather than being skipped.
+ * path }]`, a child's path joined to its parent's. A child that does not
+ * start with a slash goes on with its parent's last segment -- Fastify's
+ * tree prints `/records/delete-chosen` as `-chosen` under
+ * `/records/delete` (0173) -- and needs a parent to go on from. HEAD is
+ * folded into the GET Fastify adds it for; a HEAD alone, and any line that
+ * is not a route, stops the reading with a sentence rather than being
+ * skipped.
  */
 export function parsePrintedRoutes(text) {
   const routes = []
@@ -69,6 +73,7 @@ export function parsePrintedRoutes(text) {
     const depth = indent.length / 4
     if (depth > parents.length) throw new Error(`the router printed ${JSON.stringify(line)} under no route`)
     parents.length = depth
+    if (!segment.startsWith('/') && depth === 0) throw new Error(`the router printed ${JSON.stringify(line)}, which goes on from no route`)
     const path = `${parents.at(-1) ?? ''}${segment}`
     parents.push(path)
     const methods = list.split(', ')
