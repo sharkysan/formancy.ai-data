@@ -1,6 +1,5 @@
 import {
   authorizeOperation,
-  bulkOffered,
   copiedFields,
   deleteEffects,
   driftRefusal,
@@ -45,7 +44,7 @@ import type { AuditSink, RuntimeAuditEvent, RuntimeOperation } from '../audit.js
 import { auditedForm, auditRequests, recordReference, selectionReferences } from '../audit.js'
 import { loadPublished } from '../published.js'
 import { formActions, registerActionRoute } from './runtime-actions.js'
-import { registerBulkRoute } from './runtime-bulk.js'
+import { chosenOffered, registerBulkRoute } from './runtime-bulk.js'
 import { registerDeleteRoute } from './runtime-deletes.js'
 import { NOT_FOUND, planRefusal, recordFailure, unknownOutcome } from './runtime-errors.js'
 import { registerExportRoute } from './runtime-exports.js'
@@ -77,7 +76,7 @@ export interface RuntimeOptions {
   saveDeadlineMs: number
   /** How long a run of an action may take before the database stops it (0161). */
   actionDeadlineMs: number
-  /** How long a request that deletes chosen records may go on sending them (0173). */
+  /** How long a request that deletes (0173) or changes (0175) chosen records may go on sending them. */
   bulkDeadlineMs: number
 }
 
@@ -91,8 +90,9 @@ declare module 'fastify' {
      * record -- moves its policy's state field (0112). `action`: the name
      * of the action run, once the form binds it (0161). `records`: every
      * record a run over a selection addressed, once the form binds it
-     * (0165), whose count is then `rows` -- or every record a delete of
-     * chosen records named (0173), and `outcomes` what became of each.
+     * (0165), whose count is then `rows` -- or every record a delete
+     * (0173) or a change (0175) of chosen records named, and `outcomes`
+     * what became of each.
      */
     auditTrail?: {
       formVersion: number | null
@@ -124,6 +124,7 @@ export const ROUTE_OPERATIONS: Readonly<Record<string, RuntimeOperation>> = {
   'POST /v1/forms/:id/records/update': 'update',
   'POST /v1/forms/:id/records/delete': 'delete',
   'POST /v1/forms/:id/records/delete-chosen': 'delete-chosen',
+  'POST /v1/forms/:id/records/update-chosen': 'update-chosen',
   'POST /v1/forms/:id/records/supersede': 'supersede',
   'POST /v1/forms/:id/records/save': 'save',
   'POST /v1/forms/:id/actions/:action/run': 'action',
@@ -246,7 +247,7 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
    */
   async function sendOnce(
     request: FastifyRequest<{ Params: { id: string } }>,
-    operation: UnknownOutcome['operation'] | 'delete-chosen' | `action:${string}`,
+    operation: UnknownOutcome['operation'] | 'delete-chosen' | 'update-chosen' | `action:${string}`,
     id: string | undefined,
     perform: () => Promise<WriteAnswer>,
   ): Promise<WriteAnswer & { repeated?: boolean }> {
@@ -494,8 +495,8 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
       together,
       // The actions this person may run, as the root as described now leaves them runnable (0161).
       actions: formActions(bundle, actor, verdict),
-      // What this person may do to a page's chosen records together, where the database still allows a delete (0173).
-      bulk: { delete: operations.includes('delete') && bulkOffered(bundle.policy, actor, bundle.bindings).delete },
+      // What this person may do to a page's chosen records together, where the database still allows the write (0173, 0175).
+      bulk: chosenOffered(bundle, actor, operations),
     } satisfies PublishedForm
   })
 
@@ -536,7 +537,7 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
 
   // A record's answers written once per sending of a write id (0031): its echoes removed and its selections checked first.
   const served = (request: FastifyRequest) => servedForms(menu, request)
-  const { lookupDeadlineMs, saveDeadlineMs, actionDeadlineMs } = options
+  const { lookupDeadlineMs, saveDeadlineMs, actionDeadlineMs, bulkDeadlineMs } = options
   registerWriteRoutes(app, { published, connection, context, sendOnce, lost, refusal, describedRoot, answered, lookupDeadlineMs, served })
 
   // A record and its together children's rows, in one transaction (0155): every part's steps the write routes', in one request.
@@ -558,8 +559,8 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
   // One record, by its token and the version read (0050): the update's steps, a delete's answers.
   registerDeleteRoute(app, { published, connection, context, sendOnce, lost, refusal, answered })
 
-  // The chosen records of a page, each a delete of its own in the order sent, once per sending (0173).
-  registerBulkRoute(app, { published, connection, context, sendOnce, lost, refusal, answered, noted, bulkDeadlineMs: options.bulkDeadlineMs })
+  // The chosen records of a page, each a delete (0173) or an update (0175) of its own in the order sent, once per sending.
+  registerBulkRoute(app, { published, connection, context, sendOnce, lost, refusal, describedRoot, answered, noted, lookupDeadlineMs, bulkDeadlineMs })
 
   // A change from a date (0113): the update's read and steps, a create's answer.
   registerSupersedeRoute(app, {

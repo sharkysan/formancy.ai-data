@@ -197,11 +197,24 @@ async function created(
   return { status: 201, body: done, record: done.record ?? undefined }
 }
 
+/** What one update asks of the runtime plane: who is asking, how a lost answer and a planner's refusal are said, the root's description, and the lookups' deadline. */
+export type UpdateSteps = Pick<WriteRouteSteps, 'context' | 'lost' | 'refusal' | 'describedRoot' | 'lookupDeadlineMs'>
+
+/** A membership check as one of a request's, by what it asks: its field, its tokens and the filter they are checked under. */
+export function vouchedAs(check: MembershipCheck): string {
+  return canonicalize([check.field, check.tokens, check.filters])
+}
+
 /**
  * One update, from the read that tells an echo from a change to the write,
  * answered rather than sent: the update route runs it once per sending, so
  * a write id that arrives again is answered with this answer and asks the
- * database nothing, its read included (0031).
+ * database nothing, its read included (0031). Each chosen record of a
+ * request that changes several (0175, `runtime-bulk.ts`) is this, called
+ * once for it, so one record of such a request is a single update and the
+ * two cannot answer it apart. `moved` is whether the update, as planned,
+ * moves the policy's state field (0112), which the update route's trail
+ * names; `null` for one refused before it was planned.
  *
  * The policy is asked first, before any statement (0041). The record as it
  * stands is read next, and the read carries the table's description, which
@@ -214,21 +227,26 @@ async function created(
  * the read failed, whatever the failure, that failure is the answer: sent
  * anyway, a read that failed and a write that did not would store the cut
  * value.
+ *
+ * Every selection is checked before the update is sent -- but one in
+ * `vouched` (`vouchedAs`), which the request it belongs to has checked
+ * already, under the same filter, and which a request over chosen records
+ * checks once for all of them.
  */
-async function updated(
-  steps: WriteRouteSteps,
+export async function updateOne(
+  steps: UpdateSteps,
   request: FastifyRequest<{ Params: { id: string } }>,
   bundle: PublishedBundle,
   open: OpenConnection,
-  record: string,
-  version: string,
-  answers: Record<string, unknown>,
-): Promise<WriteAnswer> {
+  change: { record: string; version: string; answers: Record<string, unknown> },
+  vouched: ReadonlySet<string> = new Set(),
+): Promise<{ answer: WriteAnswer; moved: boolean | null }> {
+  const { record, version, answers } = change
   const actor = steps.context(request)
   const authorized = authorizeOperation(bundle.policy, actor, 'update')
-  if (!authorized.ok) return planRefusal(authorized.code, authorized.message)
+  if (!authorized.ok) return { answer: planRefusal(authorized.code, authorized.message), moved: null }
   const read = await readForWrite(steps, bundle, open, actor, record)
-  if (!read.ok) return read.answer
+  if (!read.ok) return { answer: read.answer, moved: null }
   const { current, unread, described } = read
   // The record as read now is newer than the one the person saved over: the
   // database will answer stale, and an echo the change moved is not theirs.
@@ -245,17 +263,18 @@ async function updated(
     described,
   )
   if (!plan.ok) {
-    if (plan.code === 'invalid-values') return { status: 422, body: { code: plan.code, message: plan.message, fieldErrors: plan.fieldErrors } }
-    if (plan.code === 'record-not-read' && unread !== undefined) return recordFailure(bundle.bindings, unread)
-    return steps.refusal(request, 'update', plan)
+    if (plan.code === 'invalid-values')
+      return { answer: { status: 422, body: { code: plan.code, message: plan.message, fieldErrors: plan.fieldErrors } }, moved: null }
+    if (plan.code === 'record-not-read' && unread !== undefined) return { answer: recordFailure(bundle.bindings, unread), moved: null }
+    return { answer: steps.refusal(request, 'update', plan), moved: null }
   }
-  if (request.auditTrail !== undefined) request.auditTrail.moved = plan.moved
-  const refused = await memberships(open, plan.memberships, request.log, steps.lookupDeadlineMs)
-  if (refused !== undefined) return refused
+  const unchecked = plan.memberships.filter((check) => !vouched.has(vouchedAs(check)))
+  const refused = await memberships(open, unchecked, request.log, steps.lookupDeadlineMs)
+  if (refused !== undefined) return { answer: refused, moved: plan.moved }
   const outcome = await open.records.update(plan.request)
-  if (!outcome.ok && outcome.code === 'unknown-outcome') return steps.lost(request, 'update', record, version, outcome.message)
-  if (!outcome.ok) return recordFailure(bundle.bindings, outcome)
-  return { status: 200, body: toFormAnswers(bundle.bindings, plan.fields, outcome) }
+  if (!outcome.ok && outcome.code === 'unknown-outcome') return { answer: steps.lost(request, 'update', record, version, outcome.message), moved: plan.moved }
+  if (!outcome.ok) return { answer: recordFailure(bundle.bindings, outcome), moved: plan.moved }
+  return { answer: { status: 200, body: toFormAnswers(bundle.bindings, plan.fields, outcome) }, moved: plan.moved }
 }
 
 /**
@@ -328,6 +347,12 @@ export function registerWriteRoutes(app: FastifyInstance, steps: WriteRouteSteps
     const open = await steps.connection(bundle, reply)
     if (open === undefined) return reply
     const { record, version, answers } = body
-    return steps.answered(reply, await steps.sendOnce(request, 'update', id, () => updated(steps, request, bundle, open, record, version, answers)))
+    const updated = async (): Promise<WriteAnswer> => {
+      const { answer, moved } = await updateOne(steps, request, bundle, open, { record, version, answers })
+      // Whether the update, as planned, moves the state field (0112); a write refused before it was planned names none.
+      if (request.auditTrail !== undefined && moved !== null) request.auditTrail.moved = moved
+      return answer
+    }
+    return steps.answered(reply, await steps.sendOnce(request, 'update', id, updated))
   })
 }

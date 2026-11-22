@@ -24,7 +24,9 @@ import type { FastifyRequest } from 'fastify'
  * with its rows (0155), whose answer is the record and every row it wrote,
  * kept under the same byte cap as any other -- a delete of a page's
  * chosen records (0173), `delete-chosen`, whose answer is each record's
- * outcome as a delete of it alone answers it -- and a run of an action
+ * outcome as a delete of it alone answers it, a change of them (0175),
+ * `update-chosen`, each record's as an update of it alone answers it --
+ * and a run of an action
  * (0161), each action an operation of its own, `action:<name>`, whose
  * answer is the tokens it addressed; and the same id with another body is
  * refused, because
@@ -69,8 +71,17 @@ export interface WriteAnswer {
  * message of 2,046 UTF-16 code units, `REFUSAL_LONGEST`, prefix included,
  * so 2,027 of reason -- are about 105 KB in ASCII and up to about 307 KB
  * in a script of three UTF-8 bytes to a code unit, so between about 320
- * and 109 of them fill it. bulk-sized.integration.test.ts reports a page
- * of deletes' bytes through the real server. Oldest dropped first,
+ * and 109 of them fill it. A change of a page of chosen records (0175)
+ * keeps each record's update answer, the record as stored among them:
+ * counted on 2026-11-22 as the JSON the built route answers over fake
+ * ports for the shared fixture's order form, seven-digit keys, its edge
+ * amount and a short note, 50 orders changed are 14,263 bytes and 50 stale
+ * ones 7,413, so the cap holds about 2,350 and 4,500 such pages, and a
+ * page of changed orders fills it before the count does; a record's
+ * answer grows with what it holds, and notes of 10 KB each would make a
+ * page about half a megabyte and some 60 of them the cap.
+ * bulk-sized.integration.test.ts reports a page of deletes' and of
+ * changes' bytes through the real server. Oldest dropped first,
  * so a person sending large records under fresh ids cannot make this
  * server hold more: a resend that arrives after its answer was dropped is
  * applied again.
@@ -111,7 +122,7 @@ interface Kept {
 interface Scope {
   actor: string
   form: string
-  operation: 'create' | 'update' | 'delete' | 'delete-chosen' | 'supersede' | 'save' | `action:${string}`
+  operation: 'create' | 'update' | 'delete' | 'delete-chosen' | 'update-chosen' | 'supersede' | 'save' | `action:${string}`
   id: string
   body: unknown
 }

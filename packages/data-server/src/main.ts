@@ -49,9 +49,10 @@ import { trustedProxiesSetting } from './trusted-proxies.js'
  *   FORMANCY_DATA_ACTION_DEADLINE_MS               how long a run of an action may take before the database stops
  *                                                  it, 1 to 2147483647 ms; default DEFAULT_ACTION_DEADLINE_MS, 15 s
  *                                                  (0161)
- *   FORMANCY_DATA_BULK_DEADLINE_MS                 how long a request that deletes chosen records may go on
- *                                                  sending them, checked before each record, 1 to 2147483647 ms;
- *                                                  default DEFAULT_BULK_DEADLINE_MS, 14 s, chosen (0173)
+ *   FORMANCY_DATA_BULK_DEADLINE_MS                 how long a request that deletes or changes chosen records may
+ *                                                  go on sending them, checked before each record, 1 to
+ *                                                  2147483647 ms; default DEFAULT_BULK_DEADLINE_MS, 14 s, chosen
+ *                                                  (0173, 0175)
  *   PORT                                           default 4390
  */
 function required(name: string): string {

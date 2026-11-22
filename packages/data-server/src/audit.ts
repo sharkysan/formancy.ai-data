@@ -27,6 +27,7 @@ export type RuntimeOperation =
   | 'update'
   | 'delete'
   | 'delete-chosen'
+  | 'update-chosen'
   | 'supersede'
   | 'save'
   | 'action'
@@ -86,8 +87,8 @@ export interface RuntimeAuditEvent extends AuditEventBase {
    * changes the save carried -- creates, updates and deletes of its
    * children's rows, whatever became of them -- 0 for a body that is not
    * one. `action` over a selection (0165): how many records it addressed.
-   * `delete-chosen` (0173): how many records it named, whatever became of
-   * them. `null` for every other operation. A number, never which records:
+   * `delete-chosen` (0173) and `update-chosen` (0175): how many records it
+   * named, whatever became of them. `null` for every other operation. A number, never which records:
    * an operator can see that somebody took ten thousand rows, or changed
    * twenty lines of an order, and the trail is still no copy of them. A
    * save's event names no child form, row, token or ref.
@@ -120,16 +121,17 @@ export interface RuntimeAuditEvent extends AuditEventBase {
    * leave fifty hashed records; one run over the same fifty answers "who
    * closed invoice 7" as well. Its `record` is then `null`. Absent from
    * every other event, and from a run whose form binds no action of its
-   * name. `delete-chosen` too (0173): every record the request named, in
-   * the order sent, once its body is `{ records }` -- absent from one that
+   * name. `delete-chosen` (0173) and `update-chosen` (0175) too: every
+   * record the request named, in the order sent, once its body is `{ records }` -- absent from one that
    * is not -- with its `record` `null`.
    */
   records?: string[] | null
   /**
-   * `delete-chosen` only (0173): what became of each record `records`
-   * names, in the same order -- `done`, the code a delete of it alone
-   * would have been refused with (`stale`, `not-found`, `referenced`,
-   * `declined` and the rest), `unknown-outcome`, or `not-sent` for one
+   * `delete-chosen` (0173) and `update-chosen` (0175) only: what became of
+   * each record `records` names, in the same order -- `done`, the code a
+   * write of it alone would have been refused with (`stale`, `not-found`,
+   * `referenced`, `transition-denied`, `declined` and the rest),
+   * `unknown-outcome`, or `not-sent` for one
    * no statement was sent for. A code and never a message: a declined
    * record is `declined`, never the deployment's words. `null` where the
    * request was answered as a whole -- refused before any record was sent,
