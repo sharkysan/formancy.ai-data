@@ -1,13 +1,14 @@
 import type { FormSchema, LogicRule } from '@formancy/spec'
 import { describe, expect, test } from 'vitest'
-import { namedIn, readTogether, readTogetherProblems } from './read-together.js'
+import { readTogether, readTogetherProblems } from './read-together.js'
 import type { FormPolicy } from './types.js'
 
 /*
  * What a form's rules read together (0175): the fields no change of chosen
  * records may set, since the page cannot run such a rule over each
  * record's other answers and the server runs none. Read from the rules'
- * targets and expressions, by a scan of the expression's tokens.
+ * targets and expressions, each expression as formancy's own parser reads
+ * it.
  */
 
 const FIELDS = ['status', 'amount', 'notes', 'items', 'due']
@@ -27,22 +28,6 @@ const policy = (fields: string[]): FormPolicy => ({
   rowFilters: [],
   lookups: {},
   bulk: { update: { roles: ['clerk'], fields } },
-})
-
-describe('namedIn', () => {
-  // A field is named by its key as a variable, and by nothing else: a
-  // member after a dot is no field of the form, and a string literal's
-  // text is none, in any of CEL's quotes, escapes or prefixes. Watched
-  // failing with string literals scanned as code: `'amount'` in a
-  // comparison read the amount.
-  test('names every variable, and no member and no text in a literal', () => {
-    expect(namedIn('status == "shipped" && amount > 0')).toEqual(new Set(['status', 'amount']))
-    expect(namedIn("items.size() > 0 && address . city == 'amount'")).toEqual(new Set(['items', 'address']))
-    expect(namedIn(String.raw`notes == 'it\'s amount' || notes == "say \"due\""`)).toEqual(new Set(['notes']))
-    expect(namedIn(`notes == '''amount ' due''' || r'\\' == notes || b"due" == notes`)).toEqual(new Set(['notes']))
-    expect(namedIn('rate > 1.5 && br == 2')).toEqual(new Set(['rate', 'br']))
-    expect(namedIn('true')).toEqual(new Set(['true']))
-  })
 })
 
 describe('readTogether', () => {
@@ -82,6 +67,39 @@ describe('readTogether', () => {
         ['amount', 'due'],
       ]),
     )
+  })
+
+  // What an expression reads is formancy's own answer, `referencedPaths`
+  // over `parse`, the reading its engine builds a form's dependencies
+  // from, each path's first key a field: a raw string's escaped quote ends
+  // no literal, a comprehension's local named like a field reads no field,
+  // and a comment's text is none. Watched failing on this repository's
+  // former scan of the tokens, which ended `r'\''` at its second quote and
+  // so read `shipped` as a name and `status` as text: the rule on notes
+  // read nothing beside it, and both fields were granted.
+  test("reads an expression as formancy's parser does", () => {
+    const raw = form([{ target: 'notes', kind: 'visible', cel: String.raw`r'\'' != '' && status == 'shipped'` }])
+    expect(readTogether(raw)).toEqual(
+      new Map([
+        ['notes', 'notes'],
+        ['status', 'notes'],
+      ]),
+    )
+    const local = form([{ target: 'due', kind: 'required', cel: 'items.exists(amount, amount > 0) // notes' }])
+    expect(readTogether(local)).toEqual(
+      new Map([
+        ['due', 'due'],
+        ['items', 'due'],
+      ]),
+    )
+  })
+
+  // An expression the parser refuses is one whose reads nobody can say, so
+  // it reads every field, and none of them is granted on a guess: fail
+  // closed. Watched failing on the former scan, which read `status ==` as
+  // naming status alone and granted amount beside it.
+  test('reads every field for an expression that does not parse', () => {
+    expect(readTogether(form([{ target: 'notes', kind: 'visible', cel: 'status ==' }]))).toEqual(new Map(FIELDS.map((key) => [key, 'notes'])))
   })
 
   // A check's validator is answered with the whole submission, and a

@@ -687,6 +687,9 @@ importers:
 
   packages/data-core:
     dependencies:
+      '@formancy/expressions':
+        specifier: 0.13.0
+        version: 0.13.0
       '@formancy/spec':
         specifier: 0.13.0
         version: 0.13.0

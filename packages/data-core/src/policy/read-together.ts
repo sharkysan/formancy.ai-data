@@ -1,3 +1,4 @@
+import { parse, referencedPaths } from '@formancy/expressions'
 import type { FormSchema } from '@formancy/spec'
 import type { FormPolicy } from './types.js'
 
@@ -21,14 +22,16 @@ import type { FormPolicy } from './types.js'
  * - its target, the field it decides about, by the first key of its data
  *   path -- `address` of `address.city`, `items` of `items[].qty` -- unless
  *   it is a page's (`skip`);
- * - every field key its expression names as a variable: CEL names a field
- *   by its key, a member after a dot names none, and text inside a string
- *   literal is no name. Read by `namedIn`, a scan of the expression's
- *   tokens, never its evaluation, which errs towards a field read: a
- *   function named like a field counts as the field;
- * - every field, for a `check`, whose validator the deployment answers
- *   with the whole submission (formancy.ai 0086), and for a `skip`, which
- *   hides a page of fields by what it reads.
+ * - every field its expression reads, as formancy's own parser answers it
+ *   (`@formancy/expressions`' `referencedPaths` over `parse`), the reading
+ *   its engine builds a form's dependencies from, by each path's first key:
+ *   never a second reading of CEL here that the engine's could disagree
+ *   with (0002);
+ * - every field, for an expression that parser refuses, whose reads nobody
+ *   can say, so nothing is granted on a guess; for a `check`, whose
+ *   validator the deployment answers with the whole submission
+ *   (formancy.ai 0086); and for a `skip` that reads a field, which hides a
+ *   page of fields by what it reads.
  *
  * A form the generator made carries only `disabled` rules over `true`, and
  * a presentation adds none (0030), so this refuses something only in a
@@ -36,64 +39,16 @@ import type { FormPolicy } from './types.js'
  * given.
  */
 
-/** Every field key a CEL expression names as a variable: each identifier outside a string literal and not after a dot. */
-export function namedIn(cel: string): Set<string> {
-  const named = new Set<string>()
-  let at = 0
-  let afterDot = false
-  while (at < cel.length) {
-    const char = cel[at] as string
-    const quoted = stringAt(cel, at)
-    if (quoted !== null) {
-      at = quoted
-      afterDot = false
-      continue
-    }
-    if (/[A-Za-z_]/.test(char)) {
-      let end = at + 1
-      while (end < cel.length && /[A-Za-z0-9_]/.test(cel[end] as string)) end += 1
-      if (!afterDot) named.add(cel.slice(at, end))
-      at = end
-      afterDot = false
-      continue
-    }
-    if (char === '.') afterDot = true
-    else if (!/\s/.test(char)) afterDot = false
-    at += 1
-  }
-  return named
-}
-
-/**
- * Where a string literal that starts at `at` ends, or `null` where none
- * starts there: CEL's quotes, single or triple, `'` or `"`, after an
- * optional `r` (raw: no escapes) or `b` prefix, in either case and order.
- */
-function stringAt(cel: string, at: number): number | null {
-  const prefix = /^(?:[rR][bB]?|[bB][rR]?)?/.exec(cel.slice(at))?.[0] ?? ''
-  // A prefix is one only before a quote, and only as a token's start: `br` of `abr'` is the end of an identifier.
-  if (prefix !== '' && at > 0 && /[A-Za-z0-9_]/.test(cel[at - 1] as string)) return null
-  const open = at + prefix.length
-  const quote = cel[open]
-  if (quote !== "'" && quote !== '"') return null
-  const raw = /[rR]/.test(prefix)
-  const fence = cel.startsWith(quote.repeat(3), open) ? quote.repeat(3) : quote
-  let index = open + fence.length
-  while (index < cel.length) {
-    if (!raw && cel[index] === '\\') {
-      index += 2
-      continue
-    }
-    if (cel.startsWith(fence, index)) return index + fence.length
-    index += 1
-  }
-  // Unterminated: the rest is the literal, so nothing in it is a name -- the validator refuses such an expression first.
-  return cel.length
-}
-
 /** The field a data path is about: its first key. */
 function fieldOf(path: string): string {
   return path.split(/[.[]/)[0] ?? path
+}
+
+/** The fields of the form an expression reads, by key, or `null` where formancy's parser refuses it. */
+function fieldsRead(cel: string, keys: ReadonlySet<string>): string[] | null {
+  const parsed = parse(cel)
+  if (!parsed.ok) return null
+  return [...new Set(referencedPaths(parsed.ast).map(fieldOf))].filter((name) => keys.has(name))
 }
 
 /**
@@ -105,10 +60,10 @@ export function readTogether(form: FormSchema): Map<string, string> {
   const keys = new Set(form.model.fields.map((field) => field.key))
   const together = new Map<string, string>()
   for (const rule of form.logic?.rules ?? []) {
-    const named = [...namedIn(rule.cel ?? '')].filter((name) => keys.has(name))
+    const named = rule.cel === undefined ? [] : fieldsRead(rule.cel, keys)
     const read = new Set<string>(rule.kind === 'skip' ? [] : [fieldOf(rule.target)])
-    const everything = rule.kind === 'check' || (rule.kind === 'skip' && named.length > 0)
-    for (const field of everything ? keys : named) read.add(field)
+    const reads = named === null || rule.kind === 'check' || (rule.kind === 'skip' && named.length > 0) ? keys : named
+    for (const field of reads) read.add(field)
     if (read.size < 2) continue
     for (const field of read) if (!together.has(field)) together.set(field, rule.target)
   }

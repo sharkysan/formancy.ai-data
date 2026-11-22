@@ -26,7 +26,7 @@ says.
 | `@formancy/builder-core` | 0.13.0 | `0.13.0` |
 | `@formancy/conformance` | 0.13.0 | `0.13.0` |
 | `@formancy/core` | 0.13.0 | `0.13.0` |
-| `@formancy/expressions` (transitive) | 0.13.0 |  |
+| `@formancy/expressions` | 0.13.0 | `0.13.0` |
 | `@formancy/react` | 0.13.0 | `0.13.0` |
 | `@formancy/spec` | 0.13.0 | `0.13.0` |
 | `@formancy/themes` | 0.13.0 | `0.13.0` |

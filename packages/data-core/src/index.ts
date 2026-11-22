@@ -184,7 +184,7 @@ export {
 } from './policy/evaluate.js'
 export { startingDefaults } from './policy/starting.js'
 export { validatePolicy } from './policy/validate.js'
-export { namedIn, readTogether, readTogetherProblems } from './policy/read-together.js'
+export { readTogether, readTogetherProblems } from './policy/read-together.js'
 export { isThroughKeyType, throughProblems, unscopedLookups } from './policy/through.js'
 export { actsOnDelete, deleteEffects, deleteProblems, deleteReach, deleteReview, grantsDelete, reachOf, reachTables, unaccepted } from './policy/cascades.js'
 export type { DeleteReachFacts, DeleteReview, ReachedKey } from './policy/cascades.js'
