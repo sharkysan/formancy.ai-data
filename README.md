@@ -159,9 +159,9 @@ repository, which does not publish it ([*Studio*](./docs/guide/studio.md)).
 
 ## Status
 
-**0.4.0, released on 2026-11-20, is the latest release.** This page
+**0.5.0, released on 2026-11-22, is the latest release.** This page
 describes `main`, which the examples page and the live demo are deployed
-from; [the status page](./docs/guide/status.md) says what 0.4.0 added and
+from; [the status page](./docs/guide/status.md) says what 0.5.0 added and
 what is not yet measured, and [`CHANGELOG.md`](./CHANGELOG.md)'s
 *Unreleased* what `main` has added since.
 

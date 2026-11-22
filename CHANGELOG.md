@@ -14,6 +14,166 @@ which are kept unchanged under a heading of their own below it (0171).
 
 ### Added
 
+### Changed
+
+### Fixed
+
+## 0.5.0 — 2026-11-22
+
+**The fifth release of Formancy Data.**
+- A person changes or deletes the records they chose on a page in one
+  request, each record on its own, and is told what became of each.
+- An administrator grants who may, and in which fields, in the studio's
+  Policy step; nobody may until then.
+- A PostgreSQL enum is a select of its labels, and a domain whose check
+  lists its values a select of them.
+
+Built on formancy's `@formancy/*` packages at 0.13.0, as 0.4.0 was. A
+number in parentheses is the
+[decision record](https://github.com/sharkysan/formancy.ai-data/blob/v0.5.0/docs/decisions/README.md)
+behind a line; each names the test that fails when it stops being true.
+
+### Get it
+
+- **Server image:** `ghcr.io/sharkysan/formancy-data-server:v0.5.0`,
+  signed, with its SBOM attached. There is no `latest` tag.
+- **npm packages, with provenance:** `@formancy/data-core`,
+  `@formancy/data-postgres`, `@formancy/data-sqlserver`,
+  `@formancy/data-server`, `@formancy/data-client` and
+  `@formancy/data-identity`, all at 0.5.0.
+- **Try it on your machine:** the
+  [getting-started guide](https://github.com/sharkysan/formancy.ai-data/blob/v0.5.0/docs/getting-started.md)
+  starts both databases, the server, the studio and a host page with one
+  command. CI runs it as written.
+
+### Upgrade from 0.4.0
+
+- **Upgrade the server before every host's `@formancy/data-client`.**
+  0.5.0's client answers `unexpected` to a 0.4.0 server's form, which
+  carries no `bulk`, and a 0.4.0 server refuses a policy that names `bulk`
+  ([0173](https://github.com/sharkysan/formancy.ai-data/blob/v0.5.0/docs/decisions/0173-chosen-records-are-deleted-each-on-its-own-with-one-answer-per-record.md), [0175](https://github.com/sharkysan/formancy.ai-data/blob/v0.5.0/docs/decisions/0175-chosen-records-are-changed-each-on-its-own-to-the-values-given-in-fields-a-policy-names.md)).
+- **Rolled back to 0.4.0, a deployment refuses a policy that names
+  `bulk`**, and a 0.4.0 server handed a snapshot taken since cannot
+  generate a form over a table with an enum column, so a downgrade needs a
+  discovery by the older server ([0173](https://github.com/sharkysan/formancy.ai-data/blob/v0.5.0/docs/decisions/0173-chosen-records-are-deleted-each-on-its-own-with-one-answer-per-record.md), [0170](https://github.com/sharkysan/formancy.ai-data/blob/v0.5.0/docs/decisions/0170-an-enum-is-a-select-of-its-labels-and-a-domain-whose-check-lists-its-values-a-select-of-them.md)).
+- **A form published at 0.4.0 keeps what it was generated with.** Its enum
+  and domain columns stay left out until it is generated again in the
+  studio's Drift step and published. One over a table with a column of a
+  domain NOT NULL with no default stops offering create, which the
+  database already refused, until then. A database with an enum or a
+  domain column fingerprints otherwise at its first discovery, so each
+  drift review of such a form compares in full until it is published again
+  ([0170](https://github.com/sharkysan/formancy.ai-data/blob/v0.5.0/docs/decisions/0170-an-enum-is-a-select-of-its-labels-and-a-domain-whose-check-lists-its-values-a-select-of-them.md)).
+- **New setting, safe left unset:** `FORMANCY_DATA_BULK_DEADLINE_MS`,
+  14,000 ms unset, bounds a delete or a change of chosen records. From
+  15,000 up, a last record's answer on SQL Server can be cut by a proxy's
+  60 seconds ([0173](https://github.com/sharkysan/formancy.ai-data/blob/v0.5.0/docs/decisions/0173-chosen-records-are-deleted-each-on-its-own-with-one-answer-per-record.md), [0175](https://github.com/sharkysan/formancy.ai-data/blob/v0.5.0/docs/decisions/0175-chosen-records-are-changed-each-on-its-own-to-the-values-given-in-fields-a-policy-names.md)).
+- **A deployment behind a Cloudflare Tunnel runs `tunnel-config` again**,
+  as section 8 of the
+  [Cloudflare guide](https://github.com/sharkysan/formancy.ai-data/blob/v0.5.0/docs/deploy/cloudflare.md)
+  says, and starts cloudflared again: until then its runtime door forwards
+  no delete or change of chosen records, which fails closed. Nothing else
+  needs it ([0037](https://github.com/sharkysan/formancy.ai-data/blob/v0.5.0/docs/decisions/0037-cloudflare-is-the-edge-not-the-runtime.md)).
+- **Audit events gain the operations `delete-chosen` and
+  `update-chosen`**, one event naming every record, with an `outcomes` key
+  no other event has ([0173](https://github.com/sharkysan/formancy.ai-data/blob/v0.5.0/docs/decisions/0173-chosen-records-are-deleted-each-on-its-own-with-one-answer-per-record.md), [0175](https://github.com/sharkysan/formancy.ai-data/blob/v0.5.0/docs/decisions/0175-chosen-records-are-changed-each-on-its-own-to-the-values-given-in-fields-a-policy-names.md)).
+- **For embedders and integrators:** `FormPolicy` gains `bulk`,
+  `GET /v1/forms/:id` carries it for its person, and
+  `@formancy/data-core` installs `@formancy/expressions` at 0.13.0,
+  exactly. The record port and the adapters are unchanged
+  ([0173](https://github.com/sharkysan/formancy.ai-data/blob/v0.5.0/docs/decisions/0173-chosen-records-are-deleted-each-on-its-own-with-one-answer-per-record.md), [0175](https://github.com/sharkysan/formancy.ai-data/blob/v0.5.0/docs/decisions/0175-chosen-records-are-changed-each-on-its-own-to-the-values-given-in-fields-a-policy-names.md)).
+
+### What's new
+
+**On the host page**, the example workspace over the runtime plane:
+- **Delete the chosen…** above the Records grid asks in the form's own
+  words, deletes each chosen record on its own and names each one not
+  deleted, which stays chosen with its reason ([0174](https://github.com/sharkysan/formancy.ai-data/blob/v0.5.0/docs/decisions/0174-the-host-page-deletes-the-chosen-records-of-a-page-and-the-studio-grants-who-may.md)).
+- **Change the chosen…** draws the fields ticked on paper, confirms each
+  value, and answers by the same rule; the open record, if changed, is
+  read again into its forms ([0176](https://github.com/sharkysan/formancy.ai-data/blob/v0.5.0/docs/decisions/0176-the-host-page-changes-the-chosen-records-of-a-page-and-the-studio-grants-who-may-and-in-which-fields.md)).
+- **A lost answer** offers Check them, which reads each record and sends
+  nothing again ([0174](https://github.com/sharkysan/formancy.ai-data/blob/v0.5.0/docs/decisions/0174-the-host-page-deletes-the-chosen-records-of-a-page-and-the-studio-grants-who-may.md), [0176](https://github.com/sharkysan/formancy.ai-data/blob/v0.5.0/docs/decisions/0176-the-host-page-changes-the-chosen-records-of-a-page-and-the-studio-grants-who-may-and-in-which-fields.md)).
+
+**In the studio**:
+- **The Policy step** grants who may delete chosen records, from the roles
+  given delete, and who may change them and in which fields, each field
+  the server would refuse shown and saying why ([0174](https://github.com/sharkysan/formancy.ai-data/blob/v0.5.0/docs/decisions/0174-the-host-page-deletes-the-chosen-records-of-a-page-and-the-studio-grants-who-may.md), [0176](https://github.com/sharkysan/formancy.ai-data/blob/v0.5.0/docs/decisions/0176-the-host-page-changes-the-chosen-records-of-a-page-and-the-studio-grants-who-may-and-in-which-fields.md)).
+
+**In the server and the adapters**:
+- **The runtime plane** deletes and changes chosen records in one request,
+  each as its delete or update alone would be, checked once for the
+  request, stopping at the first answer lost, under the policy's new
+  `bulk` grant; `@formancy/data-client`'s `deleteChosen`, `updateChosen`
+  and `reconcileChosen` send and check them ([0173](https://github.com/sharkysan/formancy.ai-data/blob/v0.5.0/docs/decisions/0173-chosen-records-are-deleted-each-on-its-own-with-one-answer-per-record.md), [0175](https://github.com/sharkysan/formancy.ai-data/blob/v0.5.0/docs/decisions/0175-chosen-records-are-changed-each-on-its-own-to-the-values-given-in-fields-a-policy-names.md)).
+- **Generation** reads a PostgreSQL enum as a select of its labels in its
+  type's order, and a domain whose check lists its values as a select of
+  them. A label renamed under a published form stops its writes until the
+  form is generated again, and one added is for review ([0170](https://github.com/sharkysan/formancy.ai-data/blob/v0.5.0/docs/decisions/0170-an-enum-is-a-select-of-its-labels-and-a-domain-whose-check-lists-its-values-a-select-of-them.md)).
+
+**In the documentation**: the README is a short page for somebody
+deciding, and *How it works* opens with a sketch of the architecture
+([0172](https://github.com/sharkysan/formancy.ai-data/blob/v0.5.0/docs/decisions/0172-the-readme-is-a-short-pitch-page-and-how-it-works-opens-with-a-sketch-drawn-by-hand.md)); the guide pictures Drill down, a person's own view, Columns
+and a starting value ([0169](https://github.com/sharkysan/formancy.ai-data/blob/v0.5.0/docs/decisions/0169-the-guides-pages-picture-drill-down-a-persons-own-view-columns-and-a-starting-value-and-the-camera-waits-two-frames-between-shots.md)).
+
+### Known gaps
+
+- **The performance figures are still 0.1.0's.**
+  [The performance page](https://github.com/sharkysan/formancy.ai-data/blob/v0.5.0/docs/performance.md)
+  was measured on 2026-10-15, at commit `2e0c4071e113`, and
+  `node scripts/performance-stale.mjs` names this release's code and
+  dependencies as different. The default lookup deadline, 892 ms, is still
+  derived from those figures, and none measure a page of records, a file
+  of them, the menu of forms, a delete, a save, an action or a change of
+  chosen records ([0084](https://github.com/sharkysan/formancy.ai-data/blob/v0.5.0/docs/decisions/0084-a-release-does-not-wait-for-the-performance-figures-to-be-measured-again.md)).
+- **A delete or a change of chosen records covers one page of them**, each
+  record on its own: a refused one leaves the others done, and nothing is
+  undone. A change sets every record to the same values, and no field a
+  rule of the form reads together with another can be granted to it
+  ([0173](https://github.com/sharkysan/formancy.ai-data/blob/v0.5.0/docs/decisions/0173-chosen-records-are-deleted-each-on-its-own-with-one-answer-per-record.md), [0175](https://github.com/sharkysan/formancy.ai-data/blob/v0.5.0/docs/decisions/0175-chosen-records-are-changed-each-on-its-own-to-the-values-given-in-fields-a-policy-names.md)).
+- **`FORMANCY_DATA_BULK_DEADLINE_MS` is chosen, not measured**, and
+  checked between records only: on PostgreSQL nothing bounds a record's
+  wait for a lock, and on SQL Server a record whose read failed is four
+  statements, which no deadline keeps inside a proxy's 60 seconds
+  ([0173](https://github.com/sharkysan/formancy.ai-data/blob/v0.5.0/docs/decisions/0173-chosen-records-are-deleted-each-on-its-own-with-one-answer-per-record.md), [0175](https://github.com/sharkysan/formancy.ai-data/blob/v0.5.0/docs/decisions/0175-chosen-records-are-changed-each-on-its-own-to-the-values-given-in-fields-a-policy-names.md)).
+- **A grid's cells are not editable**: a record is edited in its form
+  beside the grid ([0047](https://github.com/sharkysan/formancy.ai-data/blob/v0.5.0/docs/decisions/0047-a-hosts-workspace-lists-opens-and-edits-records-in-linked-grids.md)).
+- **Opening a form, a create and a save read every published form**, and
+  nothing is cached: about 2 ms a published form, measured once
+  ([0140](https://github.com/sharkysan/formancy.ai-data/blob/v0.5.0/docs/decisions/0140-a-form-names-the-forms-each-lookups-record-opens-in.md), [0155](https://github.com/sharkysan/formancy.ai-data/blob/v0.5.0/docs/decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md)).
+- **What an action's routine does is the deployment's**: it may write what
+  no grant lets the person write. On PostgreSQL a form scoped through a
+  parent needs UPDATE on the parent's table for any run, and a run whose
+  answer was lost is reported as possibly run ([0159](https://github.com/sharkysan/formancy.ai-data/blob/v0.5.0/docs/decisions/0159-a-form-binds-a-database-routine-as-an-action-over-the-open-record.md), [0160](https://github.com/sharkysan/formancy.ai-data/blob/v0.5.0/docs/decisions/0160-an-action-runs-in-one-transaction-that-locks-the-record-moves-its-version-and-calls-the-routine-guarded-and-never-retried.md)).
+- **Two people saving lines of one order at once** makes the second stale,
+  and on SQL Server saves of different records wait on each other, and can
+  deadlock, where the child's foreign key has no index ([0155](https://github.com/sharkysan/formancy.ai-data/blob/v0.5.0/docs/decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md)).
+- **A browse role reads every row the connection's account can read**,
+  with no form or policy between ([0099](https://github.com/sharkysan/formancy.ai-data/blob/v0.5.0/docs/decisions/0099-a-browse-role-reads-any-table-or-views-rows-as-the-connections-account-does.md)).
+- **On a record just created, a field written on create only stays
+  writable** until the record is opened again ([0122](https://github.com/sharkysan/formancy.ai-data/blob/v0.5.0/docs/decisions/0122-a-host-page-draws-a-saved-record-for-the-update-and-a-new-one-for-the-create.md)).
+- **Drill down's levels are in the page's memory**, so a reload starts at
+  the records ([0090](https://github.com/sharkysan/formancy.ai-data/blob/v0.5.0/docs/decisions/0090-a-hosts-workspace-can-drill-down-one-level-at-a-time-with-a-trail-back.md)).
+- **As before:** a typeahead's "there are more" is heard, not seen, under
+  formancy's themes ([0085](https://github.com/sharkysan/formancy.ai-data/blob/v0.5.0/docs/decisions/0085-a-lookup-says-when-its-list-goes-on-never-how-long-it-is.md)); no test logs in as an Entra principal or
+  runs on Azure SQL; no host page on another origin has run in a browser,
+  nor anything through a real Cloudflare Tunnel; and no lawyer has
+  reviewed the licence.
+
+The release report attached below says what this release was tested on,
+and its *Known limitations* lists every limitation the decision records
+name, one sentence each. Every change since 0.4.0, with its reason, is in
+[CHANGELOG.md](https://github.com/sharkysan/formancy.ai-data/blob/v0.5.0/CHANGELOG.md#development-between-040-and-050)
+under *Development between 0.4.0 and 0.5.0*, which these notes summarise
+([0171](https://github.com/sharkysan/formancy.ai-data/blob/v0.5.0/docs/decisions/0171-every-releases-notes-are-a-summary-and-an-unreleased-entry-is-a-sentence-or-two.md)).
+
+## Development between 0.4.0 and 0.5.0
+
+Every entry written under *Unreleased* between 0.4.0 and 0.5.0, as it was
+written. All of it is in 0.5.0.
+
+### Added
+
 - The guide's pages picture Drill down, a person's own view, Columns and a
   starting value, so a reader sees each where its prose describes it; a
   tree, a state's moves and the studio's Browse stay unpictured, for the
