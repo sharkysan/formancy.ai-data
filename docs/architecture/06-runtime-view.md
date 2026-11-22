@@ -1348,3 +1348,54 @@ CI's runner (1,088 ms for 50 records on PostgreSQL, 2026-11-22); two
 statements a record, three for one not deleted; and on the host page a
 record not found that closes the open record, and why a record is still
 chosen said by its box's title alone (§11).
+
+## 6.18 Changing the chosen records of a page
+
+The chosen records of a page, one to `LIST_PAGE_SIZE`, each changed on its
+own to the same answers, one after another in the order sent, each exactly
+as 6.6 updates one ([0175](../decisions/0175-chosen-records-are-changed-each-on-its-own-to-the-values-given-in-fields-a-policy-names.md)).
+
+1. `GET /v1/forms/:id` says `bulk.update`, the fields this person may
+   change chosen records in, where `operations` holds `update` and the
+   policy's `bulk.update` names a role of theirs (`bulkOffered`), the
+   grant's fields `writable.update` holds, in the form's order; `null`
+   otherwise. data-client's `updateChosen` sends
+   `POST /v1/forms/:id/records/update-chosen` with `{ records, answers }`
+   and a write id.
+2. `routes/runtime-bulk.ts` reads the shape (`readChangeBody`), then the
+   write id, the form and its connection; then, once per sending of the
+   write id, `authorizeBulk`, 403 before any statement, and
+   `chosenTwice`, 400.
+3. Once for the request, since neither depends on a record: the answers
+   (`bulkAnswers`) -- `nothing-to-update` 400, a field outside the grant
+   `over-posting` 403, every value through `planUpdate`'s own
+   `decodeAnswers`, 422 with every error -- and each selection's
+   membership check, 422 or 503. The deadline counts from the start of
+   this step's sending, so the checks are inside it.
+4. For each record: the deadline first; then `updateOne`, the body of
+   6.6's update route -- the policy, the read that carries the root's
+   description, the echoes removed, `planUpdate` with the record's own
+   move from its own state, any check the request did not vouch for, one
+   guarded statement. Its status and body are the record's outcome, and
+   the loop, its stop, its first record and its throw are 6.17's, one
+   function (`eachChosen`) for both.
+5. The answer is 200 `{ records }` in the order sent; the trail's one
+   event, `update-chosen`, as 6.17's, with no `moved`. data-client reads
+   each record by `writeOutcome` as an update of it alone; a request whose
+   answer was lost is an `UnknownChosen` of `update-chosen`, and
+   `reconcileChosen` reads each as an update.
+
+Held by `packages/data-core/src/records/bulk-change.test.ts`,
+`policy/validate.test.ts` and `policy/read-together.test.ts`; by
+`packages/data-server/src/routes/runtime-bulk-update.test.ts` over fake
+ports and `bulk-deadline.test.ts`; on both engines by
+`e2e-bulk.integration.test.ts` through `BULK_PARITY`, the lost answer in
+`e2e-lost-answer.integration.test.ts`, and the time a page takes in
+`bulk-sized.integration.test.ts`; and by `packages/data-client/src/chosen.test.ts`
+and `deletes.integration.test.ts`. The container suites were written
+without a database, and CI is their first run. What it costs: a set left
+half changed, named record by record; one value for every record; no
+field a rule reads together with another; two statements a record, three
+for one not changed, four on SQL Server for one whose read failed, past
+what any deadline keeps inside the proxy's 60 s; and no control on the
+host page or in the studio (§11).

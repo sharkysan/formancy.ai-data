@@ -473,6 +473,32 @@ then planned by `planDelete`, as one sent alone, and answered as a
 `ChosenOutcome` of the `ChosenAnswer`. Optional: a policy without it means
 what it meant, and a server older than it refuses a policy that uses it.
 
+They can be changed in one request too, each to the same answers in the
+fields `bulk.update` lists, each record an update of its own
+([0175](../../docs/decisions/0175-chosen-records-are-changed-each-on-its-own-to-the-values-given-in-fields-a-policy-names.md)):
+
+```ts
+const orderPolicy = { …, bulk: { update: { roles: ['supervisor'], fields: ['status', 'notes'] } } }
+bulkOffered(orderPolicy, supervisorContext, bindings) // { delete: false, update: ['status', 'notes'] }
+bulkAnswers(snapshot, bindings, orderPolicy, supervisorContext, { amount: '1' })
+// { ok: false, code: 'over-posting', message: 'amount is not changed in chosen records together with this form' }
+```
+
+`validatePolicy` (`policy/bulk-fit.ts`) refuses a role `operations.update`
+does not grant, a field a listed role may not write, and the key, a field
+written on create only, one the database or the server writes, a pinned
+one, a version chain's and the together field, each by name; the state
+field may be listed, each record's move checked from its own state by its
+own `planUpdate`. `readTogetherProblems` (`policy/read-together.ts`) is
+what the bundle's check asks of the form: a listed field a rule reads
+together with another, by the rule's target and the field keys its
+expression names. `readChangeBody` reads a request, the `ChosenChangeBody`;
+`bulkAnswers` reads its answers once -- held to the grant and to
+`checkSubmittedFields`, decoded by `planUpdate`'s own `decodeAnswers` --
+and returns each selection's membership check, which the caller runs once;
+each record is then `planUpdate`'s over its own read, answered as a
+`ChosenOutcome<FormRecord>` of the `ChangedAnswer`.
+
 ## Record requests
 
 The one place a browser's request becomes an adapter's: the policy, the

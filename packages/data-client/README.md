@@ -48,10 +48,11 @@ only for an abort the caller asked for, with the AbortError it raised.
 | `supersede(formId, { record, version, answers })` | `POST /v1/forms/:id/records/supersede` → the next version (0113) |
 | `delete(formId, { record, version })` | `POST /v1/forms/:id/records/delete` → `{ record, deleted: true }` |
 | `deleteChosen(formId, { records })` | `POST /v1/forms/:id/records/delete-chosen` → each record's outcome in the order sent, as `delete` would resolve to it, or `not-sent` (0173) |
+| `updateChosen(formId, { records, answers })` | `POST /v1/forms/:id/records/update-chosen` → each record's outcome in the order sent, as `update` would resolve to it, or `not-sent` (0175) |
 | `save(formId, { record, rows })` | `POST /v1/forms/:id/records/save` → `{ record, rows }`, the record and each change as stored (0155) |
 | `runAction(formId, name, { records, answers })` | `POST /v1/forms/:id/actions/:action/run` → `{ records }`, each record's token (0161) |
 | `reconcile(formId, unknown)` | `POST /v1/forms/:id/records/read`, or nothing when there is no token |
-| `reconcileChosen(formId, unknown)` | `POST /v1/forms/:id/records/read` for each record an `UnknownChosen` names, one at a time (0173) |
+| `reconcileChosen(formId, unknown)` | `POST /v1/forms/:id/records/read` for each record an `UnknownChosen` names, one at a time, each read as a lost delete or a lost update of it alone (0173, 0175) |
 | `query(formId, source, { operation, search, offset?, limit? }, signal?)` | `POST /v1/forms/:id/lookups/:source/query` |
 | `resolve(formId, source, { operation, tokens }, signal?)` | `POST /v1/forms/:id/lookups/:source/resolve` |
 | `saveView(formId, { name, filter, sort })` | `POST /v1/forms/:id/views/save` → `{ own }`, the person's views (0126) |

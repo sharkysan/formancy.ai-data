@@ -181,6 +181,13 @@ record is still chosen is its box's title, which a person who neither
 points nor uses a screen reader does not see once the outcome is closed;
 and the live demo grants none, so its page never offers it
 ([0174](../decisions/0174-the-host-page-deletes-the-chosen-records-of-a-page-and-the-studio-grants-who-may.md)).
+A change of chosen records can leave a set half changed the same way, sets
+one value for every record, and refuses to grant a field any rule of the
+form reads together with another -- which fields a rule reads is this
+repository's scan of its expression's tokens, erring towards a field
+read, not formancy's own parser, which exports none; and on SQL Server a
+record whose read failed is four statements, which no deadline keeps
+inside the proxy's 60 s ([0175](../decisions/0175-chosen-records-are-changed-each-on-its-own-to-the-values-given-in-fields-a-policy-names.md)).
 
 ### Two engines that mean different things
 

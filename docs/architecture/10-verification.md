@@ -324,6 +324,25 @@ holds a page done within the default deadline; its first run on
 2026-11-22 deleted 50 records in at most 1,088 ms on PostgreSQL and
 296 ms on SQL Server.
 
+A change of chosen records ([0175](../decisions/0175-chosen-records-are-changed-each-on-its-own-to-the-values-given-in-fields-a-policy-names.md)) is held the same way: `BULK_PARITY`'s
+change cases over the shared fixture's orders in
+`e2e-bulk.integration.test.ts` -- changed, stale, a move refused from the
+record's own state, a trigger's words, a stored spelling read back, not
+found, and a customer outside the lookup's filter refusing the request --
+the lost answer in `e2e-lost-answer.integration.test.ts`, its marker the
+note every record takes, counted afresh before the request that sends it
+again, and a page timed in `bulk-sized.integration.test.ts`, all written
+on 2026-11-22 without a database, so CI is their first run. What needs
+none ran and was watched failing with its rule taken out: the grant, the
+fields a rule reads together and the answers read once
+(`packages/data-core/src/policy/validate.test.ts`,
+`policy/read-together.test.ts`, `records/bulk-change.test.ts`), the
+route, its deadline and the trail over fake ports
+(`packages/data-server/src/routes/runtime-bulk-update.test.ts`,
+`bulk-deadline.test.ts`), and the client's reading
+(`packages/data-client/src/chosen.test.ts`, `transport.test.ts`, run
+alone without the package's database setup).
+
 The studio's offer of the scope and the host page's choice of rows
 ([0166](../decisions/0166-a-person-chooses-a-pages-records-by-a-column-of-boxes-and-runs-an-action-over-them-from-a-bar-above-the-grid.md)) were
 written on 2026-11-18 without a database. What needs none ran and was
