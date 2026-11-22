@@ -2,6 +2,7 @@ import { authorizeBulk, bulkAnswers, bulkOffered, chosenTwice, readBulkBody, rea
 import type {
   ChosenAnswer,
   ChosenBody,
+  ChosenChangeBody,
   ChosenOutcome,
   PlanRefusal,
   PolicyContext,
@@ -232,7 +233,7 @@ async function changedEach(
   request: Request,
   bundle: PublishedBundle,
   open: OpenConnection,
-  body: { records: ChosenBody['records']; answers: Record<string, unknown> },
+  body: ChosenChangeBody,
 ): Promise<WriteAnswer> {
   const until = Date.now() + steps.bulkDeadlineMs
   const refused = refusedAsAWhole(steps, request, bundle, 'update', body.records)
@@ -242,8 +243,9 @@ async function changedEach(
     if (decided.code === 'invalid-values') return { status: 422, body: { code: decided.code, message: decided.message, fieldErrors: decided.fieldErrors } }
     return steps.refusal(request, 'update', decided)
   }
-  const unchecked = await memberships(open, decided.memberships, request.log, steps.lookupDeadlineMs)
-  if (unchecked !== undefined) return unchecked
+  // A selection no record could take refuses the request, as an update alone of any of them would be refused.
+  const unoffered = await memberships(open, decided.memberships, request.log, steps.lookupDeadlineMs)
+  if (unoffered !== undefined) return unoffered
   const vouched = new Set(decided.memberships.map(vouchedAs))
   return eachChosen(steps, request, 'update-chosen', body.records, until, async (record, version) => {
     const { answer } = await updateOne(steps, request, bundle, open, { record, version, answers: body.answers }, vouched)
