@@ -24,8 +24,10 @@ import { DECLINED_BY, RegionHeading, Words } from './words.js'
  *   moment (0146) -- what the server did -- then each record not deleted,
  *   by the words a row's Delete names it with, in the server's words, and
  *   the records the request stopped before; the region the keyboard is
- *   taken to is described by all of it, so it is said as it lands. A record
- *   whose fate is not known offers Check them, and Close only once every
+ *   taken to is described by all of it, so it is said as it lands. Framed
+ *   in teal where some were deleted, in the warm colour of a refusal where
+ *   none was. A record whose fate is not known offers Check them, framed
+ *   as a save that may have been stored is, and Close only once every
  *   fate is: the guard counts it until then.
  * - **refused**: the server's sentence verbatim, a reason the deployment
  *   worded said as its own (0156), and that none was deleted.
@@ -144,10 +146,12 @@ function ChosenOutcome({ flow, idBase }: { flow: ChosenDelete; idBase: string })
   const named = lines(now)
   const stopped = notSent(now)
   const unknown = now.each.some(({ fate }) => fate.kind === 'unknown' || fate.kind === 'lost')
+  // Teal where the server deleted some of them, as what it did; the warm colour of a refusal where it deleted none.
+  const deletedAny = now.each.some(({ fate }) => fate.kind === 'deleted' || fate.kind === 'gone')
   // Every sentence it says, in order: how many it deleted, each record it did not, and those it never sent.
   const described = [`${idBase}-summary`, ...(named.length === 0 ? [] : [`${idBase}-each`]), ...(stopped === null ? [] : [`${idBase}-stopped`])].join(' ')
   return (
-    <div {...region} className="notice" data-kind={unknown ? 'unknown' : 'done'} aria-describedby={described}>
+    <div {...region} className="notice" data-kind={unknown ? 'unknown' : deletedAny ? 'done' : 'refused'} aria-describedby={described}>
       <RegionHeading level={4} id={headingId}>
         {heading(now.target, false)}
       </RegionHeading>
