@@ -91,6 +91,9 @@ import { disableFields } from './widgets.js'
 
 export type Renderer = 'react' | 'angular'
 
+/** What holds a form's Save while it is out: the record's deletion (0053), an action over it (0162) or a selection that holds it (0166), or chosen records' deletion that holds it (0174). */
+export type HoldBy = 'delete' | 'action' | 'selection' | 'bulk'
+
 export type SaveResult =
   | { kind: 'saved' | 'created' | 'refused' | 'declined' | 'busy' | 'replaced' | 'held' | 'rows'; message: string }
   /** `keep`: a save of the record's rows alone, stale at the record, whose rows' changes can be kept (0155). */
@@ -262,7 +265,7 @@ export function createSession({ client, formId, definition, renderer, namespace,
   let lost: { write: UnknownWrite; generation: number; held: boolean } | undefined
   const lostHere = () => (lost !== undefined && lost.generation === opened?.generation ? lost : undefined)
   /** What a press says while the record's deletion, or an action over it, is out (0053, 0162): by what holds it, set by `hold`, lifted by `release`. */
-  const holds = new Map<'delete' | 'action' | 'selection', string>()
+  const holds = new Map<HoldBy, string>()
   /** A form opened, a save sent or a save answered: each is a change `subscribe`'s listeners hear. */
   const notify = (): void => {
     for (const listener of listeners) listener()
@@ -559,15 +562,15 @@ export function createSession({ client, formId, definition, renderer, namespace,
       return saving !== undefined && saving.generation === opened?.generation
     },
     /**
-     * While the record's deletion is out (0053), or an action over it (0162)
-     * or over a selection that holds it (0166), a press sends nothing and says
-     * `message`; `release` lifts what `by` held, whatever it came to, and
-     * leaves the others'.
+     * While the record's deletion is out (0053), an action over it (0162) or
+     * over a selection that holds it (0166), or a deletion of chosen records
+     * that holds it (0174), a press sends nothing and says `message`;
+     * `release` lifts what `by` held, whatever it came to, and leaves the others'.
      */
-    hold(message: string, by: 'delete' | 'action' | 'selection' = 'delete'): void {
+    hold(message: string, by: HoldBy = 'delete'): void {
       holds.set(by, message)
     },
-    release(by: 'delete' | 'action' | 'selection' = 'delete'): void {
+    release(by: HoldBy = 'delete'): void {
       holds.delete(by)
     },
     /** This form's last save whose outcome is unknown, if any. */

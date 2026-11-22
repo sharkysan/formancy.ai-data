@@ -65,7 +65,7 @@ import { fieldHeading } from '@formancy/data-client'
 let plane: Plane
 
 beforeAll(async () => {
-  plane = await startPlane({ children: true, deletes: true, saves: true, actions: true })
+  plane = await startPlane({ children: true, deletes: true, saves: true, actions: true, bulk: ['removable'] })
 })
 
 afterAll(async () => {
@@ -116,7 +116,7 @@ test('signed out, the page asks for a token alone, and passes the floor', async 
   expect(await floor('signed out')).toEqual(CLEAN('signed out'))
 })
 
-describe.each(ENGINES)('the page on $engine', ({ connection, formId, lines }) => {
+describe.each(ENGINES)('the page on $engine', ({ connection, formId, lines, removable }) => {
   // The definition is the server's: every field it publishes, in both
   // renderers, by the label it carries -- a field one renderer dropped, or
   // a renderer that never started, is a name missing from one list.
@@ -492,6 +492,79 @@ describe.each(ENGINES)('the page on $engine', ({ connection, formId, lines }) =>
     holding.answer()
     hold = false
     await closed(refusing)
+  })
+
+  // A deletion of chosen records' states, each held to the floor (0174):
+  // the bar with records chosen; the confirmation, focused, described by
+  // what deleting them does, its next Tab on Keep them -- never the button
+  // that deletes; the deletion out, both answers aria-disabled and its
+  // line saying so; what the server answered, one record deleted and one
+  // other rows refer to named in the server's words, its box after it
+  // described by why; and a lost answer before and after Check them. Its
+  // heading's level is bulk-delete.test.tsx's to hold, as a delete's are
+  // delete.test.tsx's (to be watched failing in CI with Delete them before
+  // Keep them: "expected 'Delete them' to be 'Keep them'").
+  test("passes the floor in a deletion of chosen records' states", async () => {
+    let lose = false
+    let hold = false
+    const losing = losingWrites(plane.fetch, { when: 'before', writes: /\/records\/delete-chosen$/ })
+    const holding = holdingRequests(plane.fetch, ({ path }) => hold && path.endsWith('/records/delete-chosen'))
+    const fetch: typeof globalThis.fetch = (input, init) => (lose ? losing.fetch(input, init) : holding.fetch(input, init))
+    const note = stamp(`floor of chosen ${connection}`)
+    const made: string[] = []
+    for (let n = 0; n < 3; n += 1) {
+      const created = await plane.clerk.create(removable, { note })
+      if (!created.ok || created.value.record === null) throw new Error('a removable record was not created')
+      made.push(created.value.record)
+    }
+    const [deleted, referred, lost] = made as [string, string, string]
+    await plane.db.referToRemovable(connection, referred)
+    const user = mount(fetch)
+    await signIn(user, TOKENS.clerk)
+    await chooseForm(user, removable)
+    await user.type(screen.getByRole('textbox', { name: 'Search' }), note)
+    await user.click(within(gridSection('Records')).getByRole('button', { name: 'Search' }))
+    await waitFor(() => expect(gridStatus('Records')?.textContent).toBe('Rows 1–3.'), { timeout: 15_000 })
+    const records = within(gridSection('Records'))
+    const boxOf = (record: string): HTMLInputElement => records.getByRole<HTMLInputElement>('checkbox', { name: `Choose Removable ${record}` })
+    await user.click(await waitFor(() => boxOf(deleted), { timeout: 15_000 }))
+    await user.click(boxOf(referred))
+    expect(await floor('chosen records')).toEqual(CLEAN('chosen records'))
+
+    await user.click(records.getByRole('button', { name: 'Delete the chosen…' }))
+    const confirming = await region('Delete 2 chosen Removable records?')
+    await waitFor(() => expect(focusedName()).toBe('Delete 2 chosen Removable records?'))
+    await user.tab()
+    expect(focusedName()).toBe('Keep them')
+    await user.tab()
+    expect(focusedName()).toBe('Delete them')
+    expect(await floor('chosen records, confirming')).toEqual(CLEAN('chosen records, confirming'))
+    hold = true
+    await user.keyboard('{Enter}')
+    await waitFor(() => expect(holding.held).toHaveLength(1), { timeout: 15_000 })
+    expect(within(confirming).getByRole('button', { name: 'Keep them' }).getAttribute('aria-disabled')).toBe('true')
+    expect(await floor('chosen records, deleting')).toEqual(CLEAN('chosen records, deleting'))
+    hold = false
+    await holding.pass()
+    const answered = await region('Delete 2 chosen Removable records')
+    await waitFor(() => expect(paragraphs(answered)[0]).toBe('Deleted 1 of 2 records.'), { timeout: 15_000 })
+    expect(await floor('chosen records, answered')).toEqual(CLEAN('chosen records, answered'))
+    await user.click(within(answered).getByRole('button', { name: 'Close' }))
+    await waitFor(() => expect(computeAccessibleDescription(boxOf(referred))).toMatch(/^Not deleted\. /), { timeout: 15_000 })
+    expect(await floor('chosen records, one kept')).toEqual(CLEAN('chosen records, one kept'))
+
+    await user.click(boxOf(referred))
+    await user.click(boxOf(lost))
+    lose = true
+    await user.click(records.getByRole('button', { name: 'Delete the chosen…' }))
+    await user.click(within(await region('Delete 1 chosen Removable record?')).getByRole('button', { name: 'Delete them' }))
+    const unknown = await region('Delete 1 chosen Removable record')
+    await within(unknown).findByRole('button', { name: 'Check them' }, { timeout: 15_000 })
+    expect(await floor('chosen records, may have been deleted')).toEqual(CLEAN('chosen records, may have been deleted'))
+    lose = false
+    await user.click(within(unknown).getByRole('button', { name: 'Check them' }))
+    await within(unknown).findByRole('button', { name: 'Close' }, { timeout: 15_000 })
+    expect(await floor('chosen records, checked')).toEqual(CLEAN('chosen records, checked'))
   })
 
   // Download CSV's states, each held to the floor (0080): a file in the

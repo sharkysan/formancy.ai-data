@@ -19,7 +19,8 @@
 // schema every fixture loads, an order with close_order bound as its
 // action `close`, worded by its presentation, as src/test-actions.ts
 // publishes it (0162), and again as `close-all`, over the records a person
-// chooses of the page (0166): a clerk reads the order and runs both.
+// chooses of the page (0166): a clerk reads the order and runs both, and
+// deletes the orders chosen together (0174), which nothing refers to.
 
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -104,7 +105,8 @@ const CLOSE = {
  * presentation, which the server checks as it checks the suites'; and
  * bound again as `close-all`, over the records a person chooses of the
  * page (0166), so the grid has its boxes and the bar above it; a clerk of
- * tenant 1 reads the order and runs both, through its customer (0043).
+ * tenant 1 reads the order and runs both, through its customer (0043), and
+ * may delete the orders chosen together (0173, 0174).
  */
 async function publishActionOrder(call) {
   const proposal = await call(TOKENS.admin, '/v1/form-proposals', {
@@ -137,7 +139,7 @@ async function publishActionOrder(call) {
       bindings: proposal.bindings,
       policy: {
         version: 1,
-        operations: { read: ['clerk'], create: [], update: ['clerk'] },
+        operations: { read: ['clerk'], create: [], update: ['clerk'], delete: ['clerk'] },
         fields: Object.fromEntries(
           proposal.bindings.fields.map((binding) => [
             binding.field,
@@ -148,6 +150,7 @@ async function publishActionOrder(call) {
         lookups: { customer: [{ column: 'tenant_id', attribute: 'tenant' }] },
         through: ['customer'],
         actions: { close: { roles: ['clerk'] }, 'close-all': { roles: ['clerk'] } },
+        bulk: { delete: { roles: ['clerk'] } },
       },
       snapshot: proposal.snapshot,
     },
@@ -352,8 +355,10 @@ export async function startPlane() {
       const [{ id }] = await sql`insert into actions."order" (customer_id, amount, note) values (${customer}, 12.50, ${note}) returning id`
       return `k1:${String(id)}`
     },
-    /** An action order's status and note, as the owner reads them. */
+    /** An action order's status and note, as the owner reads them; undefined once it is deleted. */
     actionOrderOf: async (record) => (await sql`select status, note from actions."order" where id = ${record.slice('k1:'.length)}`)[0],
+    /** An action order changed beside the page, as the owner writes it: its version moves on. */
+    touchActionOrder: (record) => sql`update actions."order" set version = version + 1 where id = ${record.slice('k1:'.length)}`,
     /** How many orders have exactly these notes: what the database holds, asked beside the page. */
     ordersWithNotes: async (notes) => (await sql`select count(*)::int as n from sales."order" where notes = ${notes}`)[0].n,
     deleteCustomer: (no) => sql`delete from sales.customer where tenant_id = 1 and customer_no = ${no}`,

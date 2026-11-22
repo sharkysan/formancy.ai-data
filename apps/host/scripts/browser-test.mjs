@@ -126,6 +126,10 @@
 //     bar through its dialog and its confirmation, Keep it the next Tab and
 //     Enter on Run it from the keyboard, the keyboard then on what the
 //     server did, the order chosen closed in the database and the other not;
+//     and Delete the chosen… (0174) over two more, one changed beside the
+//     page, its confirmation in place with Keep them the next Tab, and Enter
+//     on Delete them from the keyboard, the keyboard then on what the server
+//     answered, one order deleted in the database and the other still chosen;
 //   - a grid's Columns (0106): Enter on Columns opens its panel and keeps
 //     the keyboard there, the next Tab on the first column's Show; Space on
 //     a Show hides its column and asks the server nothing, and a column

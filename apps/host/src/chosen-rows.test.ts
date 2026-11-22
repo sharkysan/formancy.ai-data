@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { clearedText, createChosenRows, hearForms, NONE_CHOSEN } from './chosen-rows.js'
+import { clearedText, createChosenRows, hearForms, holdsAsked, NONE_CHOSEN } from './chosen-rows.js'
 import type { GridRow } from './grid-datasource.js'
 
 /*
@@ -136,5 +136,45 @@ describe('the records chosen of a page', () => {
     off()
     tell('k1:1', '4')
     expect(choice.version('k1:1')).toBe('3')
+  })
+
+  // A deletion of the choice answered (0174): what it deleted, or found
+  // gone, leaves the choice, and each record still chosen is marked with
+  // why -- but nothing is chosen again that a person unticked while it was
+  // out, and a mark is never left on a record no longer chosen. The page
+  // drawn again keeps the marks, the choice being unchanged; a box ticked
+  // drops them, since they say why the records a deletion left are chosen
+  // (watched failing with the marks kept past a box ticked: "expected 1 to
+  // be +0"; and with the marks' records taken as the choice: "expected [
+  // 'k1:2', 'k1:3' ] to deeply equal [ 'k1:2' ]").
+  test('settles after a deletion: the records gone leave it, the rest marked until it changes', () => {
+    const choice = createChosenRows('Order')
+    choice.page(LIST, 0, PAGE)
+    choice.all()
+    choice.toggle(PAGE[2] as GridRow)
+    const marks = new Map([
+      ['k1:2', 'Not deleted. It changed.'],
+      ['k1:3', 'Not sent, so not deleted.'],
+    ])
+    choice.settle(new Set(['k1:1']), marks, '1 chosen. Still chosen after the deletion: Order k1:2.')
+    expect([...choice.now().chosen]).toEqual(['k1:2'])
+    expect(Object.fromEntries(choice.now().marks)).toEqual({ 'k1:2': 'Not deleted. It changed.' })
+    expect(choice.now().said).toBe('1 chosen. Still chosen after the deletion: Order k1:2.')
+    choice.page(LIST, 0, [row('k1:2'), row('k1:3')])
+    expect(choice.now().marks.get('k1:2')).toBe('Not deleted. It changed.')
+    choice.toggle(row('k1:3'))
+    expect(choice.now().marks.size).toBe(0)
+  })
+
+  // A question over the choice stands only while the same records are
+  // chosen, whatever order a page drawn again puts them in: one more or
+  // one fewer, or another in its place, is not what it asked over
+  // (watched failing with the count compared alone: "expected true to be
+  // false").
+  test('holds what a question asked over only while the same records are chosen, in any order', () => {
+    const at = (record: string) => ({ record, version: '1' })
+    expect(holdsAsked([at('k1:2'), at('k1:1')], [at('k1:1'), at('k1:2')])).toBe(true)
+    expect(holdsAsked([at('k1:1')], [at('k1:1'), at('k1:2')])).toBe(false)
+    expect(holdsAsked([at('k1:1'), at('k1:3')], [at('k1:1'), at('k1:2')])).toBe(false)
   })
 })

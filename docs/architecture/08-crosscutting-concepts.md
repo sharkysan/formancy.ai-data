@@ -546,7 +546,11 @@ over fake ports and, on both engines, `e2e-bulk.integration.test.ts`
 and `e2e-lost-answer.integration.test.ts`, first run in CI. **What it
 costs.** A set can be left half deleted, each record named; the deadline
 bounds nothing inside one record; and a page is two statements a record,
-three for one not deleted.
+three for one not deleted. The host page asks it from the bar above the
+Records grid, in the form's `deleting` words, and draws each record's
+outcome, those not deleted left chosen with why on their boxes; the
+studio's Policy step grants it to roles given delete, nobody by default
+([0174](../decisions/0174-the-host-page-deletes-the-chosen-records-of-a-page-and-the-studio-grants-who-may.md)).
 
 
 ## 8.7 Audit
@@ -698,7 +702,11 @@ user interface is the rule, and this is what each part of it rests on.
   and the host page deletes only after a confirmation in place
   ([0053](../decisions/0053-a-host-deletes-a-record-from-its-detail-or-its-row-after-a-confirmation-in-place.md)),
   and runs an action only after one too, Keep it the next Tab in both
-  ([0162](../decisions/0162-the-host-page-runs-an-action-from-the-open-records-header-after-its-dialog-and-a-confirmation-in-place-and-reads-the-record-again.md)).
+  ([0162](../decisions/0162-the-host-page-runs-an-action-from-the-open-records-header-after-its-dialog-and-a-confirmation-in-place-and-reads-the-record-again.md)),
+  and deletes the records chosen of a page only after one more, Keep them
+  the next Tab, which says what deleting them also does from the form's
+  `deleting` and never a cascade the policy names none of
+  ([0174](../decisions/0174-the-host-page-deletes-the-chosen-records-of-a-page-and-the-studio-grants-who-may.md)).
   A choice of records is a column of real checkboxes, never the grid's
   own selection, which stays the open row: each box in a cell the arrow
   keys reach, out of the Tab order so the grid stays one stop, its Space

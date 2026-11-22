@@ -50,8 +50,9 @@ import type { Plane } from './test-plane.js'
  * package rather than listed here: a route the server adds is one the page
  * may send, and one the page sends that the table does not have fails --
  * the delete route included, which the page sends since 0053, from its
- * confirmation in place, the export, since 0080, from Download CSV, and a
- * run of an action, since 0162, from the action's confirmation.
+ * confirmation in place, the export, since 0080, from Download CSV, a
+ * run of an action, since 0162, from the action's confirmation, and a
+ * deletion of chosen records, since 0174, from Delete the chosen….
  *
  * And through both doors the page has: its own origin, as a host serves
  * it, and the live demo's path, behind the demo's Worker (0070), where the
@@ -62,7 +63,7 @@ import type { Plane } from './test-plane.js'
 let plane: Plane
 
 beforeAll(async () => {
-  plane = await startPlane({ children: true, deletes: true, demo: true, versions: true, saves: true, actions: true })
+  plane = await startPlane({ children: true, deletes: true, demo: true, versions: true, saves: true, actions: true, bulk: ['removable'] })
 })
 
 afterAll(async () => {
@@ -139,6 +140,33 @@ async function priceJourney(user: User, price: string): Promise<void> {
   await screen.findByRole('heading', { level: 3, name: `Price ${next}` }, { timeout: 15_000 })
 }
 
+/**
+ * Two removable records deleted together through the page (0174): chosen
+ * by Choose every record on this page and Delete the chosen…, and answered.
+ */
+async function chosenJourney(user: User, removable: string): Promise<void> {
+  const note = stamp('plane-chosen')
+  const made: string[] = []
+  for (let n = 0; n < 2; n += 1) {
+    const created = await plane.clerk.create(removable, { note })
+    if (!created.ok || created.value.record === null) throw new Error('a removable record was not created')
+    made.push(created.value.record)
+  }
+  await chooseForm(user, removable)
+  await searchRecords(
+    user,
+    note,
+    made.map((record) => record.slice(3)),
+  )
+  const records = gridSection('Records')
+  await user.click(within(records).getByRole('button', { name: 'Choose every record on this page' }))
+  await user.click(within(records).getByRole('button', { name: 'Delete the chosen…' }))
+  const confirming = await screen.findByRole('region', { name: 'Delete 2 chosen Removable records?' }, { timeout: 15_000 })
+  await user.click(within(confirming).getByRole('button', { name: 'Delete them' }))
+  const answered = await screen.findByRole('region', { name: 'Delete 2 chosen Removable records' }, { timeout: 15_000 })
+  await within(answered).findByText('Deleted 2 of 2 records.', {}, { timeout: 15_000 })
+}
+
 /** The page's doors: its own origin on each engine, and the live demo's path, behind its Worker, signed in as tenant 1's clerk. */
 const JOURNEYS = [
   ...ENGINES.map((engine) => ({ ...engine, door: 'its own origin', demo: false })),
@@ -147,7 +175,7 @@ const JOURNEYS = [
   { ...ENGINES[0], door: "the demo's path", demo: true },
 ]
 
-describe.each(JOURNEYS)('what the page sends on $engine, through $door', ({ connection, formId, lines, price, demo, savedOrder }) => {
+describe.each(JOURNEYS)('what the page sends on $engine, through $door', ({ connection, formId, lines, price, demo, savedOrder, removable }) => {
   test('only runtime routes under its base, each carrying the token in the header and nowhere else, never a tenant, and only for forms the menu named', async () => {
     plane.sent.length = 0
     const words = stamp('plane')
@@ -211,8 +239,10 @@ describe.each(JOURNEYS)('what the page sends on $engine, through $door', ({ conn
     await runIt(user, closing)
     await closed(closing)
     // And on its own origin a price, whose tenant is a column of its own:
-    // the demo publishes no form over versions.
+    // the demo publishes no form over versions; and two records deleted
+    // together, which no form of the demo's grants (0174).
     if (door === undefined) await priceJourney(user, price)
+    if (door === undefined) await chosenJourney(user, removable)
 
     const page: Sent[] = door === undefined ? [...plane.sent] : [...door.sent]
     const token = door === undefined ? TOKENS.clerk : String(door.tokens[0])
@@ -248,11 +278,15 @@ describe.each(JOURNEYS)('what the page sends on $engine, through $door', ({ conn
     // carries the token in its header alone, as below. A change from a date is sent from a price on the page's own
     // origin, the tenant a column the page sends in no body since 0117
     // (watched failing with every answer sent: the tenant in the price's
-    // update and in its change from a date). Through the demo's door it is
-    // the one exception: the demo publishes no form over versions. A delete
-    // of chosen records (0173) is unsent on every door until the page has a
-    // control that sends it: the runtime plane and the client offer it first.
-    const UNSENT: ReadonlySet<string> = new Set(door === undefined ? ['delete-chosen'] : ['supersede', 'delete-chosen'])
+    // update and in its change from a date). A deletion of chosen records is
+    // sent from Delete the chosen… on the removable form since 0174 (to be
+    // watched failing in CI with the journey's chosenJourney left out:
+    // delete-chosen unused on its own origin). Through the demo's door
+    // these two are the exceptions: the demo publishes no form over
+    // versions, and none of its forms grants a deletion of chosen records
+    // -- apps/live-demo/src/image/forms.ts writes no `bulk` -- so the page
+    // there never offers Delete the chosen….
+    const UNSENT: ReadonlySet<string> = new Set(door === undefined ? [] : ['supersede', 'delete-chosen'])
     expect(
       ROUTES.filter(({ matches, operation }) => !UNSENT.has(operation) && !sent.some((request) => matches.test(line(request)))).map(
         ({ operation }) => operation,

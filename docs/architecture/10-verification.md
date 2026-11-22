@@ -352,6 +352,35 @@ over it, and a box ticked or unticked closing a question, nothing run; a
 second press sending nothing (`actions.test.tsx`) -- and the browser
 gate's step (`apps/host/scripts/browser/choosing.mjs`) run first in CI.
 
+The host page's deletion of the records chosen and the studio's grant of
+it ([0174](../decisions/0174-the-host-page-deletes-the-chosen-records-of-a-page-and-the-studio-grants-who-may.md)) were written on 2026-11-22 without a database. What needs none
+ran and was watched failing with its rule taken out: what the
+confirmation says from the form's `deleting`, each record's fate in the
+order sent, said, marked and counted, a refusal of the whole request and
+a lost one checked record by record, none deleted said as none, and the
+open record a check found gone left open until Close the record
+(`apps/host/src/chosen-deletion.test.ts`), the one rule the three
+confirmations ask of the forms they drop (`leave.test.ts`), the choice a
+deletion's answer settles and the question that holds only while the
+same records are chosen (`chosen-rows.test.ts`), and a box described by
+why its record is still chosen (`choose-column.test.tsx`), each run with
+a configuration of its own that starts no database; and the Policy
+step's boxes, nobody by default, publishing exactly the roles ticked,
+offering nothing where no delete of one record is and listing a grant
+there to remove, and a draft's policy naming the grant
+(`apps/studio/src/policy-bulk.test.tsx`). The deletion against the real
+server on both engines -- each outcome, done, changed since, not found,
+referred to, a cascade, a lost answer and Check them; the open record
+closed, or left open by a check while its forms hold work, its Save held
+while the deletion is out and Delete them waiting for a save of it; a
+question closed by Escape, Keep them and a change of the choice; a second
+press sending nothing; the guard (`bulk-delete.test.tsx`), axe in each
+state (`page.test.tsx`), the route sent on the page's own origin
+(`plane.test.tsx`) -- and the browser gate's two states run first in CI.
+No test holds the Drill down levels that hold a chosen record other than
+the open one: the fixture has no form that is its own child and may be
+deleted.
+
 `sharedCases()` derives every case id, and a test declares the ones it
 asserts with `covers()`. The release report keeps a matrix of every case on
 each engine and fails a run in which one is missing or failed on either. What

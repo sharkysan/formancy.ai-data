@@ -7,6 +7,7 @@ import { DeleteReach } from './delete-reach.js'
 import { labelOf, useDocument } from './document.js'
 import { useFocusAfterRender } from './focus.js'
 import { ActionGrants } from './policy-actions.js'
+import { BulkGrants } from './policy-bulk.js'
 import { LookupFilters, RowFilters } from './policy-filters.js'
 import {
   boundColumns,
@@ -185,6 +186,7 @@ export function PolicyStep({
         </p>
       </fieldset>
       <DeleteReach bindings={bindings} snapshot={snapshot} policy={policy} onPolicy={onPolicy} check={CHECK} />
+      <BulkGrants bindings={bindings} policy={policy} onPolicy={onPolicy} check={CHECK} />
       <ActionGrants bindings={bindings} snapshot={snapshot} policy={policy} onPolicy={onPolicy} check={CHECK} />
 
       <fieldset>

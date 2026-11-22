@@ -6,7 +6,7 @@ import { again, answer, checked, checking, close, confirm, deletionWork, HELD, I
 import type { DeleteTarget, Deletion } from './deletion.js'
 import { formsAtRisk, useGuardContext, useRegistered } from './guard.js'
 import type { PaneEntry } from './guard.js'
-import { gridOwner } from './leave.js'
+import { eachOnce, gridOwner, unlisted } from './leave.js'
 import type { LeaveRequest, PaneWork } from './leave.js'
 import type { Session } from './session.js'
 
@@ -100,9 +100,6 @@ interface FlowState {
   regionRef: RefObject<HTMLDivElement | null>
 }
 
-/** Two lists of forms at risk name the same forms. */
-const named = (pane: PaneWork): string => `${pane.owner} ${String(pane.renderer)}`
-
 const release = (flow: FlowState): void => {
   for (const session of flow.latest.current.sessions) session.release()
 }
@@ -136,8 +133,7 @@ export function useDeleteFlow(options: DeleteFlowOptions): DeleteFlow {
 
   /** The forms that hold work which a delete of `target` drops, as the guard would list them: the open record's, and the levels that hold it, each once. */
   const atStake = (target: DeleteTarget): PaneWork[] => {
-    const forms = [...(target.open ? formsAtRisk(registry, latest.current.discards) : []), ...(latest.current.held?.(target) ?? [])]
-    return forms.filter((pane, index) => forms.findIndex((other) => named(other) === named(pane)) === index)
+    return eachOnce([...(target.open ? formsAtRisk(registry, latest.current.discards) : []), ...(latest.current.held?.(target) ?? [])])
   }
 
   return {
@@ -261,7 +257,7 @@ function sendDeletion(flow: FlowState, atStake: (target: DeleteTarget) => PaneWo
   if (now.target.open && sessions.some((session) => session.isSaving())) return
   // Typed into since the question was asked: named before anything is dropped, as the guard names it.
   const risky = atStake(now.target)
-  if (risky.some((pane) => !now.discards.some((listed) => named(listed) === named(pane)))) {
+  if (unlisted(risky, now.discards)) {
     flow.set({ ...now, discards: risky, n: now.n + 1 })
     return
   }

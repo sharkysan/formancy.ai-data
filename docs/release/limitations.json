@@ -1307,7 +1307,7 @@
       ]
     },
     "0047": {
-      "reviewed": "sha256:74bef7b37ae18478fff11dff2bf897114e429d03f9142b662f43598720be265c",
+      "reviewed": "sha256:2fbca00ca72051b8a79aa317e3b744749307e337bd9425b8d8506f439840c616",
       "limitations": [
         {
           "area": "host",
@@ -1568,11 +1568,11 @@
       ]
     },
     "0053": {
-      "reviewed": "sha256:c9eca0eb2dc4cc1185808aa3da56f8cd06a644d7a1be542ad2cd1d3888582968",
+      "reviewed": "sha256:5d4ab52cad1965518d9c71109bd48742fdcf7972ffdf931062f51b6e68f47478",
       "limitations": [
         {
           "area": "host",
-          "says": "The host page deletes one record at a time, from its open detail or its grid row, after a confirmation in place; no key deletes, and there is no bulk delete and no undo.",
+          "says": "The host page deletes a record from its open detail or its grid row after a confirmation in place, and the chosen records of a page from the bar above the grid; no key deletes, and there is no undo.",
           "heldBy": "apps/host/src/delete.test.tsx"
         },
         {
@@ -5059,7 +5059,7 @@
       ]
     },
     "0166": {
-      "reviewed": "sha256:a4521ceda264d4dd0d2af0eb038266065ee28083c9a05b8af9cd1430736f1f69",
+      "reviewed": "sha256:56ca839782ea8a4c1e4beab475e56f08a51267c4052fd7531ab00ab2b7849f47",
       "limitations": [
         {
           "area": "host",
@@ -5238,7 +5238,7 @@
       "none": "Its costs fall on the documentation's readers and its maintainer: a reader of the README follows a link for a condition or a number it no longer states, and the README's sketch of the architecture is redrawn by hand when a block changes, its arrows held by review alone. Nothing a user, integrator or operator of the module installs, runs or configures changed."
     },
     "0173": {
-      "reviewed": "sha256:3687f9b22d8870dda7d5cbd24d7624f5034a5075db5d5f9c546639d8b7e472a4",
+      "reviewed": "sha256:fadcd69f3587b61631e1119093f67ce7afefd395ae6bbf08703d97c0096bfea6",
       "limitations": [
         {
           "area": "writes",
@@ -5270,12 +5270,62 @@
           "heldBy": "packages/data-server/src/routes/runtime-bulk.test.ts"
         },
         {
-          "area": "host",
-          "says": "The host page and the studio offer no delete of chosen records: it is sent through @formancy/data-client or a client of the deployment’s own, by a policy whose bulk grant an administrator writes by hand."
-        },
-        {
           "area": "operations",
           "says": "Behind Cloudflare the runtime door forwards a delete of chosen records only once tunnel-config has run again, and refuses it until then."
+        }
+      ]
+    },
+    "0174": {
+      "reviewed": "sha256:a9eb4596271f5d9d656a1bf65934e9449a87cb01a7fc0b7f9ffc868186eeccaa",
+      "limitations": [
+        {
+          "area": "host",
+          "says": "Where a form offers its person a deletion of chosen records, the Records grid has one more column, of boxes, first, as for an action over a selection.",
+          "heldBy": "apps/host/src/bulk-delete.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "Delete the chosen… deletes each chosen record on its own, so a refused one leaves the others deleted, each named on the page, and nothing is undone.",
+          "heldBy": "apps/host/src/chosen-deletion.test.ts"
+        },
+        {
+          "area": "host",
+          "says": "The confirmation of a deletion of chosen records says what deleting them may do, from the form’s policy, never which of them will be refused.",
+          "heldBy": "apps/host/src/chosen-deletion.test.ts"
+        },
+        {
+          "area": "host",
+          "says": "A chosen record the server cannot find leaves the page and closes the open record, its unsaved changes discarded, though it may be one the person may no longer see rather than one deleted.",
+          "heldBy": "apps/host/src/bulk-delete.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "Why a record is still chosen after a deletion is its box’s title, its description to a screen reader; once the outcome is closed, the bar names the records still chosen and not each reason.",
+          "heldBy": "apps/host/src/choose-column.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "A chosen record whose deletion’s answer was lost, and which a check finds still stored, is deleted only by asking again from the bar.",
+          "heldBy": "apps/host/src/chosen-deletion.test.ts"
+        },
+        {
+          "area": "host",
+          "says": "The open record that a check after a lost answer finds gone stays open, on a record that is not there, while its forms hold work, until the person presses Close the record.",
+          "heldBy": "apps/host/src/bulk-delete.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "While a deletion of chosen records that holds the open record is out, the detail’s Save sends nothing, even where another record has been opened since.",
+          "heldBy": "apps/host/src/bulk-delete.test.tsx"
+        },
+        {
+          "area": "studio",
+          "says": "The studio offers a deletion of chosen records only to roles already given delete with the form.",
+          "heldBy": "apps/studio/src/policy-bulk.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "The live demo’s forms grant no deletion of chosen records, so its page offers none."
         }
       ]
     }

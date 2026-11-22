@@ -521,9 +521,14 @@ get*](../../README.md#what-you-get) is the short version, and
   chosen, has passed. A set can be left half deleted, each record named.
   It is the runtime plane's `POST /v1/forms/:id/records/delete-chosen` and
   `@formancy/data-client`'s `deleteChosen`, which reads a lost request
-  record by record (`reconcileChosen`); the host page and the studio
-  offer no control for it, and a policy names the grant by hand
+  record by record (`reconcileChosen`)
   ([0173](../decisions/0173-chosen-records-are-deleted-each-on-its-own-with-one-answer-per-record.md)).
+  The host page asks it from Delete the chosen… above the Records grid,
+  in the form's `deleting` words, and says what became of each record,
+  those not deleted left chosen with why on their boxes and a lost answer
+  checked record by record; the studio's Policy step grants it to the
+  roles given delete, nobody by default
+  ([0174](../decisions/0174-the-host-page-deletes-the-chosen-records-of-a-page-and-the-studio-grants-who-may.md)).
 - **A person is shown the forms they may read**, and nothing about any
   other, each with the forms whose rows a page may list below one of its
   records, derived from the published forms' foreign keys and types without

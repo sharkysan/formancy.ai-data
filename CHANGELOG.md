@@ -31,6 +31,12 @@ which are kept unchanged under a heading of their own below it (0171).
   policy's new `bulk.delete`, answer each record as its delete alone would,
   so a refused one leaves the rest deleted. An older server refuses such a
   policy, and this client an older server's form: upgrade the server first.
+- **The host page deletes the chosen records of a page, and the studio
+  grants who may**
+  ([0174](docs/decisions/0174-the-host-page-deletes-the-chosen-records-of-a-page-and-the-studio-grants-who-may.md)):
+  Delete the chosen… above the grid asks in the form's own words, then
+  names each record not deleted, which stays chosen. The studio's Policy
+  step offers it to roles given delete, and to nobody by default.
 
 ### Changed
 
