@@ -49,18 +49,21 @@ const NONE: Ticked = { roles: [], fields: [] }
  * offered, saying why in the words of the server's own checks: the key, a
  * field written on create only, one the database writes or the server
  * stamps, one a row filter pins, a version chain's, the field a together
- * child's rows are saved with (`unsettableField`, 0175), and one a rule of
- * the form reads together with another (`readTogether`); so is one nobody
- * given update may write. A field or a role the grant names that is
- * refused keeps its box, ticked, described by why, until it is unticked.
- * Offered only where an update of one record alone is, which a together
- * child's rows have (0155); where nobody may update yet, it says so.
+ * child's rows are saved with (`unsettableField`, 0175), one a rule of the
+ * form reads together with another (`readTogether`), and one a role ticked
+ * may not write -- every role a grant names must write each of its fields
+ * -- or, while none is, one nobody given update writes. A field or a role
+ * the grant names that is refused keeps its box, ticked, described by why,
+ * until it is unticked -- a field the form no longer binds among them,
+ * after the form's own. Offered only where an update of one record alone
+ * is, which a together child's rows have (0155); where nobody may update
+ * yet, it says so.
  *
  * What it publishes is exactly `bulk.update { roles, fields }`, and none
  * while no role or no field is ticked: a box ticked alone is held here,
- * said as granting nothing yet, until the other is. A grant on a form that
- * offers no update is the policy check's to name, with no Remove of its
- * own, as 0175 left it.
+ * said as granting nothing yet in a live region of its own, until the
+ * other is. A grant on a form that offers no update is the policy check's
+ * to name, with no Remove of its own, as 0175 left it.
  */
 export function BulkChangeGrant({ bindings, policy, document, labels, onPolicy }: GrantProps): ReactElement {
   const granted = policy.bulk?.update
@@ -86,7 +89,10 @@ export function BulkChangeGrant({ bindings, policy, document, labels, onPolicy }
           {(policy.operations.update ?? []).length === 0 && shown.roles.length === 0 ? null : (
             <ChangeFields bindings={bindings} policy={policy} document={document} labels={labels} shown={shown} onTicked={write} />
           )}
-          {(shown.roles.length === 0) === (shown.fields.length === 0) ? null : <p className="hint">{NOTHING_YET}</p>}
+          {/* Always drawn, so the line is heard as a box ticked alone makes it, and as the other's tick takes it away. */}
+          <p className="hint" role="status">
+            {(shown.roles.length === 0) === (shown.fields.length === 0) ? '' : NOTHING_YET}
+          </p>
         </>
       )}
     </fieldset>
@@ -131,24 +137,39 @@ function ChangeRoles({ policy, shown, onTicked }: { policy: FormPolicy; shown: T
 /**
  * Why no change of chosen records may set `field`, in the server's words
  * after its label, or null where one may: the bindings' and the policy's
- * own refusal (`unsettableField`), a rule's (`readTogether`), or nobody
- * given update writing it.
+ * own refusal (`unsettableField`), a rule's (`readTogether`), or a role
+ * that may not write it -- each role ticked that may update, as the check
+ * asks of every role the grant names (`bulk-fit.ts`); while none is, any
+ * given update, nobody of whom writes it.
  */
-function refusal(props: Pick<GrantProps, 'bindings' | 'policy'>, together: ReadonlyMap<string, string>, field: string, label: string): string | null {
-  const { bindings, policy } = props
+function refusal(
+  props: Pick<GrantProps, 'bindings' | 'policy'> & { shown: Ticked },
+  together: ReadonlyMap<string, string>,
+  field: string,
+  label: string,
+): string | null {
+  const { bindings, policy, shown } = props
   const unsettable = unsettableField(policy, bindings, field)
   if (unsettable !== null) return `${label} ${unsettable}.`
   const target = together.get(field)
   if (target !== undefined) return `${label} ${readTogetherReason(target)}.`
   const writers = policy.fields[field]?.write ?? []
-  return policy.operations.update.some((role) => writers.includes(role)) ? null : `Nobody given update may write ${label}.`
+  const ticked = shown.roles.filter((role) => policy.operations.update.includes(role))
+  if (ticked.length === 0) return policy.operations.update.some((role) => writers.includes(role)) ? null : `Nobody given update may write ${label}.`
+  const not = ticked.filter((role) => !writers.includes(role))
+  return not.length === 0 ? null : `${label} is not one ${not.join(' or ')} may write.`
 }
 
-/** A box for each field of the form, in its order: offered, or unticked and not offered, saying why -- and kept, ticked, where the grant names it. */
+/**
+ * A box for each field of the form, in its order, then any the grant names
+ * that the form does not bind, by its key: offered, or unticked and not
+ * offered, saying why -- and kept, ticked, where the grant names it.
+ */
 function ChangeFields(props: Omit<GrantProps, 'onPolicy'> & { shown: Ticked; onTicked: (next: Ticked) => void }): ReactElement {
   const { bindings, document, labels, shown, onTicked } = props
   const together = readTogether(document)
-  const fields = bindings.fields.map((binding) => binding.field)
+  const bound = bindings.fields.map((binding) => binding.field)
+  const fields = [...bound, ...shown.fields.filter((field) => !bound.includes(field))]
   return (
     <fieldset className="nested">
       <legend>Fields they may set</legend>

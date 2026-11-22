@@ -357,12 +357,15 @@ describe('who may change chosen records together, and in which fields', () => {
   // checks refuse a change of chosen records -- the key, a pinned or
   // database-written column among them -- shown unticked and not offered,
   // described by the check's own reason (`unsettableField`), and one nobody
-  // given update writes said so. A role alone grants nothing and says so;
-  // with Notes it publishes exactly `bulk.update { roles, fields }`, beside
-  // a deletion's grant, which the real server accepts; Notes unticked again,
-  // no `bulk.update` is left. Axe and a name on every control in each state
+  // given update writes said so. A role alone grants nothing and says so,
+  // in a live region, so it is heard as it is ticked; with Notes it
+  // publishes exactly `bulk.update { roles, fields }`, beside a deletion's
+  // grant, which the real server accepts; Notes unticked again, no
+  // `bulk.update` is left. Axe and a name on every control in each state
   // (watched failing with the field's tick left unwritten: "expected
-  // undefined to deeply equal { roles: [ 'clerk' ], …(1) }").
+  // undefined to deeply equal { roles: [ 'clerk' ], …(1) }"; and with the
+  // line a plain paragraph: 'Unable to find an accessible element with the
+  // role "status"').
   test('is nobody by default, refuses each field the checks refuse in their words, and publishes exactly what is ticked', async () => {
     const user = userEvent.setup()
     const { proposal, latest } = await policyOver(VERSIONED, WRITING)
@@ -387,12 +390,15 @@ describe('who may change chosen records together, and in which fields', () => {
     expect(within(changeFields(policy)).getByRole<HTMLInputElement>('checkbox', { name: labelOf(form, 'id') }).disabled).toBe(true)
     expect([...(await audit()), ...unnamed()]).toEqual([])
 
+    // Said as it changes, in the grant's own live region: a box's "checked" alone would not say that nothing is granted yet.
+    const nothingYet = (): string | null => within(changes(policy)).getByRole('status').textContent
+    expect(nothingYet()).toBe('')
     await user.click(clerk)
     expect(latest()).not.toHaveProperty('bulk')
-    expect(within(changes(policy)).getByText(NOTHING_YET)).toBeTruthy()
+    expect(nothingYet()).toBe(NOTHING_YET)
     await user.click(within(changeFields(policy)).getByRole('checkbox', { name: labelOf(form, 'notes') }))
     expect(latest().bulk?.update).toEqual({ roles: ['clerk'], fields: ['notes'] })
-    expect(within(changes(policy)).queryByText(NOTHING_YET)).toBeNull()
+    expect(nothingYet()).toBe('')
     await user.click(within(grants(policy)).getByRole('checkbox', { name: 'clerk' }))
     expect(latest().bulk).toEqual({ update: { roles: ['clerk'], fields: ['notes'] }, delete: { roles: ['clerk'] } })
     await fits(policy)
@@ -508,6 +514,80 @@ describe('who may change chosen records together, and in which fields', () => {
     expect(latest().bulk).toEqual({ update: { roles: ['clerk'], fields: ['notes'] } })
     expect(within(changeRoles(policy)).queryByRole('checkbox', { name: 'lead' })).toBeNull()
     expect(within(changeFields(policy)).getByRole<HTMLInputElement>('checkbox', { name: labelOf(proposal.form, 'id') }).disabled).toBe(true)
+    await fits(policy)
+  })
+
+  // Every role a grant names must write each of its fields, as the policy
+  // check holds it (`bulk-fit.ts`), so a field is offered by the roles
+  // ticked -- by any role given update only while none is: clerk and
+  // manager both update, manager writes the amount alone, and with manager
+  // ticked the notes are not offered, saying why in the check's words;
+  // ticked before manager was, they keep their box, ticked, saying why,
+  // and the check refuses the grant until one is unticked (watched failing
+  // with any role given update asked: Notes offered beside manager,
+  // "expected [ false, …(1) ] to deeply equal [ true, …(1) ]").
+  test('offers a field only where every role ticked may write it, as the check does', async () => {
+    const user = userEvent.setup()
+    const twoWriters: FormPolicy = {
+      ...WRITING,
+      operations: { ...WRITING.operations, read: ['clerk', 'manager'], update: ['clerk', 'manager'] },
+      fields: { notes: { read: ['clerk', 'manager'], write: ['clerk'] }, amount: { read: ['clerk', 'manager'], write: ['clerk', 'manager'] } },
+    }
+    const { proposal, latest } = await policyOver(VERSIONED, twoWriters)
+    const policy = screen.getByRole('main', { name: 'Policy' })
+    const notesLabel = labelOf(proposal.form, 'notes')
+    const box = (field: string): HTMLInputElement =>
+      within(changeFields(policy)).getByRole<HTMLInputElement>('checkbox', { name: labelOf(proposal.form, field) })
+    const role = (name: string): HTMLInputElement => within(changeRoles(policy)).getByRole<HTMLInputElement>('checkbox', { name })
+    expect([box('notes').disabled, box('amount').disabled]).toEqual([false, false])
+    await user.click(role('manager'))
+    expect([box('notes').disabled, computeAccessibleDescription(box('notes'))]).toEqual([true, `${notesLabel} is not one manager may write. ${CHANGE_NOTE}`])
+    expect(box('amount').disabled).toBe(false)
+    expect([...(await audit()), ...unnamed()]).toEqual([])
+    await user.click(role('manager'))
+    await user.click(role('clerk'))
+    await user.click(box('notes'))
+    expect(latest().bulk?.update).toEqual({ roles: ['clerk'], fields: ['notes'] })
+    await user.click(role('manager'))
+    expect([box('notes').checked, box('notes').disabled, computeAccessibleDescription(box('notes'))]).toEqual([
+      true,
+      false,
+      `${notesLabel} is not one manager may write. ${CHANGE_NOTE}`,
+    ])
+    const refusal = 'bulk.update.fields: notes is not one manager may write, and bulk.update grants manager its change'
+    await waitFor(() => expect(checkSays(policy).getByText(refusal)).toBeTruthy())
+    await user.click(box('notes'))
+    await user.click(box('amount'))
+    expect(latest().bulk?.update).toEqual({ roles: ['clerk', 'manager'], fields: ['amount'] })
+    await fits(policy)
+  })
+
+  // A field a grant names that the form no longer binds -- written by
+  // hand, imported, or left from a generation that had the column -- keeps
+  // a box, ticked, labelled by its key and described by the check's
+  // reason, so it can be unticked; another box ticked keeps it in the
+  // grant, never dropping it unsaid, and unticked it is gone from the step
+  // and from what publishes (watched failing with the boxes drawn from the
+  // bindings alone: 'Unable to find an accessible element with the role
+  // "checkbox" and name "gone"').
+  test('keeps a field the form no longer binds ticked, described by why, until unticked', async () => {
+    const user = userEvent.setup()
+    const { proposal, latest } = await policyOver(VERSIONED, { ...WRITING, bulk: { update: { roles: ['clerk'], fields: ['notes', 'gone'] } } })
+    const policy = screen.getByRole('main', { name: 'Policy' })
+    const refusal = 'bulk.update.fields: gone is not a field of this form'
+    await waitFor(() => expect(checkSays(policy).getByText(refusal)).toBeTruthy())
+    const gone = within(changeFields(policy)).getByRole<HTMLInputElement>('checkbox', { name: 'gone' })
+    expect([gone.checked, gone.disabled, computeAccessibleDescription(gone)]).toEqual([
+      true,
+      false,
+      `gone ${String(unsettableField(WRITING, proposal.bindings, 'gone'))}. ${CHANGE_NOTE}`,
+    ])
+    expect([...(await audit()), ...unnamed()]).toEqual([])
+    await user.click(within(changeFields(policy)).getByRole('checkbox', { name: labelOf(proposal.form, 'amount') }))
+    expect(latest().bulk?.update?.fields).toContain('gone')
+    await user.click(gone)
+    expect(within(changeFields(policy)).queryByRole('checkbox', { name: 'gone' })).toBeNull()
+    expect(latest().bulk?.update?.fields).not.toContain('gone')
     await fits(policy)
   })
 })
