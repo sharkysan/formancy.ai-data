@@ -1394,10 +1394,12 @@ as 6.6 updates one ([0175](../decisions/0175-chosen-records-are-changed-each-on-
    one request over the choice out at a time: a box for each field
    offered, none ticked (`chosen-change-region.tsx`); each ticked field on
    paper, the published form narrowed to them, its state field the states
-   some chosen record may move to from the one the page read it in, its
-   lookups the form's typeahead under the update's filter
-   (`chosen-change.ts`); Continue runs the engine's submit and reads the
-   label of each record a lookup it sets names (`chosen-change-flow.ts`);
+   some chosen record may move to from the one the page read it in,
+   required, and its box refused, saying why, where none may move
+   (`untickable`), a checkbox starting at no, its lookups the form's
+   typeahead under the update's filter (`chosen-change.ts`); Continue
+   runs the engine's submit and reads the label of each record a lookup
+   it sets names (`chosen-change-flow.ts`);
    then a confirmation saying each field and its value, "cleared" for one
    left empty and sent `null`, that each record is changed on its own and
    moves from its own state, and the open record's forms that reading it
@@ -1406,12 +1408,15 @@ as 6.6 updates one ([0175](../decisions/0175-chosen-records-are-changed-each-on-
    drawn as 6.17's, in a change's words; the page is read again; the
    records changed or not found leave the choice, the rest stay chosen
    with why; and the open record changed -- or a check finds moved on --
-   is read again into its forms through the guard, as after 6.15's run. A
-   lost answer offers Check them, `reconcileChosen` reading each as an
-   update's check reads one. The studio's Policy step grants
-   `bulk.update` from the roles given update and the fields the server's
-   checks let a change set (`apps/studio/src/policy-bulk-change.tsx`,
-   their reasons `unsettableField` and `readTogetherReason`).
+   is read again into its forms through the guard, as after 6.15's run, a
+   read refused said in the region (`readRefused`). A lost answer offers
+   Check them, `reconcileChosen` reading each as an update's check reads
+   one, a record it cannot find counted as known. The studio's Policy step
+   grants `bulk.update` from the roles given update and the fields every
+   role ticked may write and the server's checks let a change set
+   (`apps/studio/src/policy-bulk-change.tsx`, their reasons
+   `unsettableField` and `readTogetherReason`), a field the form no longer
+   binds kept ticked until unticked.
 
 Held by `packages/data-core/src/records/bulk-change.test.ts`,
 `policy/validate.test.ts` and `policy/read-together.test.ts`; by

@@ -5378,7 +5378,7 @@
       ]
     },
     "0176": {
-      "reviewed": "sha256:be0fecb3a9484171995c2577fc2bddd59a0ae7d70568f5c8d6b9fc615a4466e4",
+      "reviewed": "sha256:b8fdcdf7d9b2d82fecf45545b802cefc8fc59ba121470c76398573249492aa0d",
       "limitations": [
         {
           "area": "host",
@@ -5392,13 +5392,13 @@
         },
         {
           "area": "host",
-          "says": "The confirmation of a change of chosen records says each value and that each record moves from its own state, never which of them will be refused, and its state field offers every state some chosen record may reach.",
+          "says": "The confirmation of a change of chosen records says each value and that each record moves from its own state, never which of them will be refused; its state field offers every state some chosen record may reach, and cannot be ticked where none may move from the state the page read it in.",
           "heldBy": "apps/host/src/chosen-change.test.ts"
         },
         {
           "area": "host",
-          "says": "A field ticked and left empty in a change of chosen records is cleared in every one of them, and one that may not be NULL cannot be left empty.",
-          "heldBy": "apps/host/src/bulk-update.test.tsx"
+          "says": "A field ticked and left empty in a change of chosen records is cleared in every one of them; the paper requires one whose column may not be NULL only where the form's create must give it, and elsewhere such a field left empty is refused for the whole request, nothing changed.",
+          "heldBy": "packages/data-core/src/records/bulk-change.test.ts"
         },
         {
           "area": "host",
@@ -5416,8 +5416,13 @@
           "heldBy": "apps/host/src/bulk-update.test.tsx"
         },
         {
+          "area": "host",
+          "says": "Where the open record changed with the chosen records cannot be read again, its forms are left at the version from before the change: the region says so, and offers no Load of the saved record.",
+          "heldBy": "apps/host/src/bulk-update.test.tsx"
+        },
+        {
           "area": "studio",
-          "says": "The studio offers a change of chosen records only to roles given update, in fields a role given update may write and the server’s checks let it set; a role or a field ticked alone grants nothing and is not kept in the policy.",
+          "says": "The studio offers a change of chosen records only to roles given update, in fields every role ticked may write -- any role given update, while none is ticked -- and the server’s checks let it set; a role or a field ticked alone grants nothing and is not kept in the policy.",
           "heldBy": "apps/studio/src/policy-bulk.test.tsx"
         },
         {

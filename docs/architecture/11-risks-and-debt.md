@@ -194,12 +194,16 @@ The host page asks it from Change the chosen… and the studio grants it;
 the confirmation says each value and that each record moves from its own
 state, never which record will be refused, and its state field offers
 every state some chosen record may reach, moves others cannot make among
-them; a field left empty is cleared in every record; a deletion and a
-change of one choice are never out at once; a request refused whole keeps
-nothing of the values typed; the open record changed is read again, its
-forms' unsaved changes dropped where the confirmation listed them; a
-studio box ticked alone is the step's own and not in the policy; and the
-live demo grants none ([0176](../decisions/0176-the-host-page-changes-the-chosen-records-of-a-page-and-the-studio-grants-who-may-and-in-which-fields.md)).
+them; a field left empty is cleared in every record, and one on a column
+that may not be NULL which the paper does not require -- `PublishedForm`
+carries no nullability -- is refused for the whole request; a deletion
+and a change of one choice are never out at once; a request refused
+whole keeps nothing of the values typed; the open record changed is read
+again, its forms' unsaved changes dropped where the confirmation listed
+them, and where that read is refused its forms are left at the version
+from before, with no Load of the saved record in the region; a studio box
+ticked alone is the step's own and not in the policy; and the live demo
+grants none ([0176](../decisions/0176-the-host-page-changes-the-chosen-records-of-a-page-and-the-studio-grants-who-may-and-in-which-fields.md)).
 
 ### Two engines that mean different things
 

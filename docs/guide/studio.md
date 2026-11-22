@@ -237,13 +237,16 @@ no change of chosen records may set is shown unticked and not offered,
 saying why in the server's own words: the record's key, a field written on
 create only or by the database, one the server stamps or a row filter
 pins, a version chain's, the field rows are saved with their record by,
-one a rule of the form reads together with another, and one nobody given
-update writes. Nothing is granted until a role and a field are both
-ticked, which the step says while only one is; then the policy holds
-exactly `bulk.update { roles, fields }`. A role or a field a grant names
-that the server refuses keeps its box, ticked and saying why, until it is
-unticked. A form that offers no update, and one nobody may update with
-yet, offer no box, each saying why; rows saved with their record keep an
+one a rule of the form reads together with another, and one a role you
+ticked may not write -- every role the grant names must write each of its
+fields -- or, before any role is ticked, one nobody given update writes.
+Nothing is granted until a role and a field are both ticked, which the
+step says, as you tick, while only one is; then the policy holds exactly
+`bulk.update { roles, fields }`. A role or a field a grant names that the
+server refuses keeps its box, ticked and saying why, until it is
+unticked -- a field the form no longer has among them, after the form's
+own, by its key. A form that offers no update, and one nobody may update
+with yet, offer no box, each saying why; rows saved with their record keep an
 update of a row alone, so they offer this, never the field that names the
 record they are saved with
 ([0176](../decisions/0176-the-host-page-changes-the-chosen-records-of-a-page-and-the-studio-grants-who-may-and-in-which-fields.md)).
