@@ -1320,9 +1320,14 @@ own, one after another in the order sent, each exactly as 6.7 deletes one
    found gone leave the choice, and the open record among them is closed
    as 6.7's delete closes it; the rest stay chosen, the bar naming them
    and each box's title saying why. A lost answer offers Check them, one
-   `reconcileChosen` read of each record not known, and nothing is sent
-   again. The studio's Policy step grants `bulk.delete` from the roles
-   given delete (`apps/studio/src/policy-bulk.tsx`).
+   `reconcileChosen` read of each record not known, read as a delete's
+   check reads one, and nothing is sent again; the open record it finds
+   gone is left open where its forms hold work, typed once the lost answer
+   gave its Save back, until Close the record, as after a delete's check
+   ([0053](../decisions/0053-a-host-deletes-a-record-from-its-detail-or-its-row-after-a-confirmation-in-place.md)). The
+   studio's Policy step grants `bulk.delete` from the roles given delete
+   (`apps/studio/src/policy-bulk.tsx`), and a draft's policy names the
+   grant to its publisher.
 
 Held by `packages/data-core/src/records/bulk.test.ts` and
 `policy/validate.test.ts`; by `packages/data-server/src/routes/runtime-bulk.test.ts`
@@ -1331,7 +1336,7 @@ over fake ports and `bulk-deadline.test.ts`; on both engines by
 `e2e-lost-answer.integration.test.ts`, and the time a page takes in
 `bulk-sized.integration.test.ts`; and by `packages/data-client/src/chosen.test.ts`
 and `deletes.integration.test.ts`; the host page by `apps/host/src/chosen-deletion.test.ts`,
-`chosen-rows.test.ts` and `choose-column.test.tsx` without a server, and
+`chosen-rows.test.ts`, `leave.test.ts` and `choose-column.test.tsx` without a server, and
 on both engines by `bulk-delete.test.tsx`, `page.test.tsx` and
 `plane.test.tsx`, with the browser gate's `apps/host/scripts/browser/choosing.mjs`;
 and the studio's grant by `apps/studio/src/policy-bulk.test.tsx`. The

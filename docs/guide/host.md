@@ -377,7 +377,9 @@ open one closed as a delete closes it, and those not deleted stay chosen,
 the bar naming them and each box's title saying why. An answer that was
 lost offers Check them, which reads each record and says whether it is
 still stored or gone -- by this deletion or somebody else's, which the
-page cannot tell -- and nothing is sent again
+page cannot tell -- and nothing is sent again; the open record it finds
+gone stays open while its forms hold work, typed once the lost answer
+gave its Save back, until you press Close the record
 ([0174](../decisions/0174-the-host-page-deletes-the-chosen-records-of-a-page-and-the-studio-grants-who-may.md)).
 
 New record, and a child's new row, start each field at its column's

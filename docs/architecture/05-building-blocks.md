@@ -501,8 +501,9 @@ does that nothing binds, `src/presentation-actions.tsx` and
 ([0163](../decisions/0163-the-studio-binds-a-routine-as-an-action-offering-each-parameter-only-what-the-generator-binds-and-says-what-it-does-before-it-is-granted.md));
 `src/policy-bulk.tsx` grants who may delete chosen records together, a box
 for each role given delete, through `src/policy-model.ts`'s
-`withBulkDeleteRoles`, and says why nothing is offered where data-core's
-`offers` and `offeredFor` find no delete of one record
+`withBulkDeleteRoles`, says why nothing is offered where data-core's
+`offers` and `offeredFor` find no delete of one record, and lists a grant
+there to remove, which `src/draft-policy.tsx` names to a draft's reviewer
 ([0174](../decisions/0174-the-host-page-deletes-the-chosen-records-of-a-page-and-the-studio-grants-who-may.md));
 `src/versions.tsx` and `src/import.tsx` download and import a version's file
 (0062). Its tests run the real `createDataServer` behind a fake `fetch`

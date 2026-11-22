@@ -174,7 +174,9 @@ request, though a trigger can meet either for some rows alone
 The host page asks it from Delete the chosen… and the studio grants it,
 and the confirmation can say only what deleting them may do, never which
 record will be refused; a record not found leaves the page and closes
-the open record, though it may be one the person may no longer see; why a
+the open record, though it may be one the person may no longer see, while
+the open record a check finds gone stays open, on a record that is not
+there, until Close the record where its forms hold work; why a
 record is still chosen is its box's title, which a person who neither
 points nor uses a screen reader does not see once the outcome is closed;
 and the live demo grants none, so its page never offers it

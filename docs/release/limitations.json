@@ -5276,7 +5276,7 @@
       ]
     },
     "0174": {
-      "reviewed": "sha256:f967a631a561c1933335bfe18e66072682783795207a31073e2a5a6c2f4310d4",
+      "reviewed": "sha256:4210ed0d3f5528d461e2fce5ad3091074fa1e41d165b4b7c89323b6b9b9dd030",
       "limitations": [
         {
           "area": "host",
@@ -5296,7 +5296,7 @@
         {
           "area": "host",
           "says": "A chosen record the server cannot find leaves the page and closes the open record, its unsaved changes discarded, though it may be one the person may no longer see rather than one deleted.",
-          "heldBy": "apps/host/src/chosen-deletion.test.ts"
+          "heldBy": "apps/host/src/bulk-delete.test.tsx"
         },
         {
           "area": "host",
@@ -5307,6 +5307,11 @@
           "area": "host",
           "says": "A chosen record whose deletion’s answer was lost, and which a check finds still stored, is deleted only by asking again from the bar.",
           "heldBy": "apps/host/src/chosen-deletion.test.ts"
+        },
+        {
+          "area": "host",
+          "says": "The open record that a check after a lost answer finds gone stays open, on a record that is not there, while its forms hold work, until the person presses Close the record.",
+          "heldBy": "apps/host/src/bulk-delete.test.tsx"
         },
         {
           "area": "host",

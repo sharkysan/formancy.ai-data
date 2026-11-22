@@ -22,9 +22,20 @@
   counted, a 404 never called deleted (watched failing with a 404 read as
   a refusal); done for every record closes (watched failing with Close
   kept from it); a request refused whole is the server's sentence (watched
-  failing with the refusal dropped); and a lost request is checked record
+  failing with the refusal dropped); a lost request is checked record
   by record, only what is still unknown read again (watched failing with
-  the check reading every record again).
+  the check reading every record again); a check that finds none gone
+  says only what it read, none deleted where every record is still
+  stored (watched failing with "0 of 2 records are not there any more");
+  the open record a check found gone is left open until Close the record
+  (watched failing with it forgotten by the next check); and the count is
+  said in teal only where this request deleted some, once for its answer
+  (watched failing with it said wherever the request was answered).
+  `apps/host/src/leave.test.ts`, the same way -- a confirmation's list
+  names each form once, and asks again only for a form it did not name,
+  the one rule the three confirmations ask (watched failing with each
+  form kept however often it was named, and with every form at risk
+  asked again).
   `apps/host/src/chosen-rows.test.ts`, the same way -- a deletion's answer
   takes the records gone from the choice and marks the rest, never
   choosing again a record unticked while it was out, and a box ticked
@@ -43,25 +54,40 @@
   with the box's change left unwritten, and with an empty grant kept); a
   ticked role that may no longer delete kept, described by why the server
   refuses it (watched failing with the boxes drawn from the delete roles
-  alone); and nothing offered on a form with no delete, nor on rows saved
+  alone); nothing offered on a form with no delete, nor on rows saved
   with their record, each said why (watched failing with `offers()` asked
-  in place of `offeredFor`).
+  in place of `offeredFor`); a grant left from a generation that offered
+  delete, and one imported that names nobody, listed to remove, Remove
+  taking it out of what publishes, the keyboard on the policy check
+  (watched failing with Remove writing nothing, with the keyboard moved
+  from the notice that goes with the grant, and with the notice drawn
+  only for a grant that names a role); and a draft's policy, as its
+  publisher reads it, naming who may delete chosen records together
+  (watched failing with the line left out).
   First run in CI, never run: `apps/host/src/bulk-delete.test.tsx`, on
   both engines -- five removable records deleted together, one changed,
   one deleted and one referred to beside the page, the confirmation in the
-  form's words with no cascade and Keep them the next Tab, the outcome
-  naming each not deleted in the server's words and described by all it
-  says, the two deleted gone from the choice and the database, the others
-  still chosen, named on the bar and described on their boxes, axe at each
-  state; the order form's cascade said and done, the open order's form
-  listed as discarded and the detail closed once it is deleted; a lost
-  answer after and before the server deleted them, the guard asking
-  before another form, Check them reading each and nothing sent again; a
-  question closed by a box unticked and by Clear the choice, one record's
-  question in a delete's own words, nothing chosen saying what to do first,
-  and no box on a form that grants none; a second press while out sending
-  nothing and the open order's Save held; and Delete them waiting for a
-  save of the open order out, then sending the version it moved to.
+  form's words with no cascade, headed a level under the grid, and Keep
+  them the next Tab, the outcome naming each not deleted in the server's
+  words and described by all it says, the two deleted gone from the
+  choice and the database, the others still chosen, named on the bar and
+  described on their boxes, axe at each state; the order form's cascade
+  said and done, the open order's form listed as discarded, the other
+  typed into while it asked named before anything is sent, and the
+  detail closed once it is deleted; the open order deleted beside the
+  page answered not found and closed, its typing listed; a lost answer
+  after and before the server deleted them, the guard asking before
+  another form, Check them reading each and nothing sent again, none
+  deleted said as none; the open order a check found gone, typed into
+  after the lost answer, left open until Close the record; a question
+  closed by Escape, by Keep them, by a box unticked and by Clear the
+  choice, the keyboard back on the bar's button, one record's question in
+  a delete's own words, nothing chosen saying what to do first, and no
+  box on the order lines, which grant a delete and no deletion of chosen
+  records; a second press while out sending nothing, the open order's
+  Save held, and another order's opened meanwhile; and Delete them
+  waiting for a save of the open order out, then sending the version it
+  moved to.
   `apps/host/src/plane.test.tsx` -- the journey sends `delete-chosen` on
   the page's own origin, the exception 0173 left there gone, and the
   demo's door alone keeps it unsent. `apps/host/src/page.test.tsx` -- axe and a
@@ -69,8 +95,16 @@
   answered, a box marked, may have been deleted and checked.
   `apps/host/scripts/browser/choosing.mjs` in Chromium, Firefox and WebKit
   at every width -- the confirmation, the keyboard on it and Keep them the
-  next Tab, and Delete them from the keyboard, the keyboard on what the
-  server answered, one order deleted and the other still chosen.
+  next Tab, and Delete them from the keyboard once the gate's measure has
+  given it back to Keep them, the keyboard on what the server answered,
+  one order deleted and the other still chosen.
+  Held by no test: the Drill down levels that hold a chosen record other
+  than the open one, listed in the confirmation and dropped once it is
+  gone. The fixture has no form that is its own child and may be
+  deleted, and a level holding another chosen order is reached only
+  through Open under a line's lookup (0141); the levels are asked through
+  the same `HeldLevels` a row's Delete asks (0094), which its own suites
+  hold.
 
 ## Context
 
@@ -126,10 +160,17 @@ form's `deleting`, closing the open record when it is the one deleted.
    (`chosen-rows.ts`'s `settle`).
 5. **A lost answer** -- the request's, or one record's, at which the
    server stopped -- offers **Check them**, `reconcileChosen` reading each
-   record not known: at the version sent or changed since, not deleted
-   and kept chosen; gone, deleted by this request or by somebody else's,
-   which the page cannot tell apart and says. Nothing is sent again from
-   an outcome; a deletion of what is left is a new question from the bar.
+   record not known, as a delete's check reads one (`deletion.ts`'s
+   `checkedOf`): at the version sent or changed since, not deleted and
+   kept chosen; gone, deleted by this request or by somebody else's,
+   which the page cannot tell apart and says. A check that finds none
+   gone says only what it read: "None of the chosen records was deleted."
+   where every one is still stored. The open record a check finds gone is
+   closed only where its forms hold no work: the lost answer gave its Save
+   back, and what was typed since was never listed, so it is left open,
+   the region naming it, until **Close the record**, as after a delete's
+   check (0053). Nothing is sent again from an outcome; a deletion of what
+   is left is a new question from the bar.
 6. **The guard counts it** as the records grid's work, as a run over a
    selection is (0166): out, or answered with a record not known and not
    checked, it goes only with the grid -- another form, Back or Forward,
@@ -142,8 +183,11 @@ form's `deleting`, closing the open record when it is the one deleted.
    (0173's refusals, by data-core's `offers` and `offeredFor`), or while
    nobody may delete. A ticked role that may no longer delete keeps its
    box, described by why the server refuses it; a grant on a form that
-   cannot offer one is listed to remove. What it publishes is exactly
-   `bulk: { delete: { roles } }`, and no `bulk` where no box is ticked.
+   cannot offer one is listed to remove, one that names nobody among
+   them. What it publishes is exactly `bulk: { delete: { roles } }`, and
+   no `bulk` where no box is ticked. A draft's policy, as its publisher
+   reads it on the Review step (0065, `draft-policy.tsx`), names who may
+   delete chosen records together wherever the policy holds a grant.
 
 The record's own forms -- one session per renderer, known to the guard,
 and how a record opens in them -- moved out of `form-view.tsx` into
@@ -179,6 +223,10 @@ that should have it, from the studio, and nobody has it by default.
 - **A record whose answer was lost and found still stored stays chosen**
   and is deleted only by asking again from the bar, a new confirmation:
   there is no Delete them again.
+- **The open record a check found gone can stay open.** Where its forms
+  hold work, the detail shows a record that is not there until the
+  person presses Close the record or asks for something else, as after a
+  delete's check (0053).
 - **The open record's Save is held while a deletion over it is out**,
   even where the person opens another record meanwhile, as a run over a
   selection holds it (0166): that record's Save says the deletion's words
@@ -220,6 +268,14 @@ choice; a role typed there that may not delete would be refused at once.
 **Closing the open record only when this request deleted it.** Lost: a
 form open on a record that is not there saves nothing, and its typing
 was already listed as discarded with it.
+
+**Closing the open record a check found gone, whatever its forms hold.**
+Lost: from the lost answer on its Save was the person's again, and what
+they typed then was listed nowhere, so closing it would drop that
+unasked. **Asking the guard instead of offering Close the record** lost
+too: it would need a request of its own, worded for a record that is
+not there, where 0053's check already answers the same case with a
+button in the region.
 
 ## Older records
 

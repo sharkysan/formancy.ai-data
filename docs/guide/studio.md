@@ -215,7 +215,10 @@ ticked as `bulk.delete`. A form that offers no delete, one whose rows are
 deleted only with the record they are saved with, and one nobody may
 delete with yet offer no box, each saying why. A role ticked that delete
 is taken from keeps its box, which says why the server refuses it until
-it is unticked
+it is unticked; a grant on a form that can no longer offer one -- left
+from a generation that offered delete, or imported, naming nobody or
+not -- is listed with a Remove. A reviewer sees who may delete chosen
+records together under the draft's policy
 ([0174](../decisions/0174-the-host-page-deletes-the-chosen-records-of-a-page-and-the-studio-grants-who-may.md)).
 
 Under each field's help text, the Presentation step says what a new record
