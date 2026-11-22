@@ -142,6 +142,7 @@ describe('when the data server is not what answers', () => {
       opens: [],
       together: null,
       actions: [],
+      bulk: { delete: false },
     }
     let body: unknown = FORM
     const { base } = await serve((_request, response) => {
@@ -463,9 +464,20 @@ describe('across origins (0060)', () => {
       update: () => client.update('pg-order', CHANGE),
       supersede: () => client.supersede('pg-order', CHANGE),
       delete: () => client.delete('pg-order', { record: 'k1:7', version: '00000000000007d1' }),
+      deleteChosen: () => client.deleteChosen('pg-order', { records: [{ record: 'k1:7', version: '00000000000007d1' }] }),
       save: () => client.save('pg-order', { record: { create: { answers: { notes: 'a' } } }, rows: [] }),
       runAction: () => client.runAction('pg-order', 'close', { records: [{ record: 'k1:7', version: '00000000000007d1' }], answers: { note: 'a' } }),
       reconcile: () => client.reconcile('pg-order', lost),
+      reconcileChosen: () =>
+        client.reconcileChosen('pg-order', {
+          ok: false,
+          status: 0,
+          code: 'unknown-outcome',
+          message: TRANSPORT,
+          operation: 'delete-chosen',
+          records: [{ record: 'k1:7', version: '00000000000007d1' }],
+          origin: 'transport',
+        }),
       query: () => client.query('pg-order', 'order.customer', { operation: 'read', search: 'a' }),
       resolve: () => client.resolve('pg-order', 'order.customer', { operation: 'read', tokens: ['k1:1'] }),
       saveView: () => client.saveView('pg-order', { name: 'Mine', filter: [], sort: [{ field: 'id', direction: 'desc' }] }),
@@ -771,6 +783,7 @@ describe('a delete (0050)', () => {
       opens: [],
       together: null,
       actions: [],
+      bulk: { delete: false },
     }
     const DELETING = { cascades: false, clears: false, restricted: true }
     let body: unknown = FORM
@@ -814,6 +827,7 @@ describe('a delete (0050)', () => {
       opens: [],
       together: null,
       actions: [],
+      bulk: { delete: false },
     }
     const writes = (operations: readonly string[]) => ({ create: operations.includes('create') ? ['note'] : null, update: null })
     let body: unknown = FORM
@@ -861,6 +875,7 @@ describe('a delete (0050)', () => {
       opens: [],
       together: null,
       actions: [],
+      bulk: { delete: false },
     }
     const writes = (operations: readonly string[]) => ({
       create: operations.includes('create') ? ['valid_from'] : null,
@@ -910,6 +925,7 @@ describe('a delete (0050)', () => {
       opens: [],
       together: null,
       actions: [],
+      bulk: { delete: false },
     }
     let body: unknown = FORM
     const { base } = await serve((_request, response) => {
@@ -957,6 +973,7 @@ describe('a delete (0050)', () => {
       opens: [],
       together: null,
       actions: [],
+      bulk: { delete: false },
     }
     let body: unknown = FORM
     const { base } = await serve((_request, response) => {
@@ -1011,6 +1028,7 @@ describe('a delete (0050)', () => {
       moves: null,
       together: null,
       actions: [],
+      bulk: { delete: false },
     }
     let body: unknown = FORM
     const { base } = await serve((_request, response) => {
@@ -1288,6 +1306,7 @@ describe('a save of a record with its rows (0155)', () => {
       moves: null,
       opens: [],
       actions: [],
+      bulk: { delete: false },
     }
     let body: unknown = FORM
     const { base } = await serve((_request, response) => {

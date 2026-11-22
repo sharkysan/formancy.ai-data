@@ -382,7 +382,14 @@ export async function startPlane(
       generation: generated,
     } = await admin('/v1/form-proposals', { connection, formId, title: 'Removable', lookups: [], versionColumn: 'version', ...generation })
     const base = clerkPolicy((bindings as { fields: FieldBinding[] }).fields)
-    const policy: FormPolicy = { ...base, operations: { ...base.operations, delete: ['clerk'] }, rowFilters, lookups: {} }
+    // Clerks delete one at a time, and the chosen records of a page together (0173).
+    const policy: FormPolicy = {
+      ...base,
+      operations: { ...base.operations, delete: ['clerk'] },
+      rowFilters,
+      lookups: {},
+      bulk: { delete: { roles: ['clerk'] } },
+    }
     await admin(`/v1/forms/${formId}/versions`, {
       expectedBase: null,
       bundle: { format: 2, connection, generation: generated, base: form, presentation: EMPTY_PRESENTATION, form, bindings, policy, snapshot },

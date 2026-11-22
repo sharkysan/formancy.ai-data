@@ -265,6 +265,17 @@ function isActions(value: unknown): value is PublishedForm['actions'] {
   )
 }
 
+/**
+ * What a person may do to a page's chosen records together (0173):
+ * `delete` a yes or no, and a yes only where the form offers them delete,
+ * so a page never offers a request each record of which is refused. A
+ * reply without it is from a server older than 0173, whose page would
+ * offer no such delete.
+ */
+function isBulk(value: unknown, operations: readonly unknown[]): boolean {
+  return isRecord(value) && typeof value['delete'] === 'boolean' && (!value['delete'] || operations.includes('delete'))
+}
+
 export function isPublishedForm(body: unknown): body is PublishedForm {
   return (
     isRecord(body) &&
@@ -280,7 +291,8 @@ export function isPublishedForm(body: unknown): body is PublishedForm {
     isMoves(body['moves']) &&
     isOpens(body['opens']) &&
     isTogether(body['together']) &&
-    isActions(body['actions'])
+    isActions(body['actions']) &&
+    isBulk(body['bulk'], body['operations'] as unknown[])
   )
 }
 
