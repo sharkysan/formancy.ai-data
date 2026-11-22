@@ -570,7 +570,14 @@ the sending's start, a change's checks counted in it and not cut by it. **Held b
 over fake ports and, on both engines, `e2e-bulk.integration.test.ts` and
 `e2e-lost-answer.integration.test.ts`, first run in CI. **What it
 costs.** A set can be left half changed; one value for every record; and
-a record whose read failed is four statements on SQL Server.
+a record whose read failed is four statements on SQL Server. The host page
+asks it from the bar above the Records grid, each field ticked drawn on
+paper by the form's own renderer and typeahead, and confirms each value;
+what became of each record is the deletion's one rule, said in a change's
+words (`apps/host/src/chosen-request.ts`), and one request over a choice is
+out at a time; the studio's Policy step grants it to roles given update, in
+fields the server's own checks let it set, each one it does not offer
+saying why in their words ([0176](../decisions/0176-the-host-page-changes-the-chosen-records-of-a-page-and-the-studio-grants-who-may-and-in-which-fields.md)).
 
 
 ## 8.7 Audit
@@ -728,7 +735,10 @@ user interface is the rule, and this is what each part of it rests on.
   and deletes the records chosen of a page only after one more, Keep them
   the next Tab, which says what deleting them also does from the form's
   `deleting` and never a cascade the policy names none of
-  ([0174](../decisions/0174-the-host-page-deletes-the-chosen-records-of-a-page-and-the-studio-grants-who-may.md)).
+  ([0174](../decisions/0174-the-host-page-deletes-the-chosen-records-of-a-page-and-the-studio-grants-who-may.md)),
+  and changes them only after one that says each field and its value,
+  "cleared" for one left empty, and that each record moves from its own
+  state, never which will be refused ([0176](../decisions/0176-the-host-page-changes-the-chosen-records-of-a-page-and-the-studio-grants-who-may-and-in-which-fields.md)).
   A choice of records is a column of real checkboxes, never the grid's
   own selection, which stays the open row: each box in a cell the arrow
   keys reach, out of the Tab order so the grid stays one stop, its Space

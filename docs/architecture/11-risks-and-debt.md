@@ -190,6 +190,16 @@ request's checks are counted in its deadline and not cut by it; and on
 SQL Server a
 record whose read failed is four statements, which no deadline keeps
 inside the proxy's 60 s ([0175](../decisions/0175-chosen-records-are-changed-each-on-its-own-to-the-values-given-in-fields-a-policy-names.md)).
+The host page asks it from Change the chosen… and the studio grants it;
+the confirmation says each value and that each record moves from its own
+state, never which record will be refused, and its state field offers
+every state some chosen record may reach, moves others cannot make among
+them; a field left empty is cleared in every record; a deletion and a
+change of one choice are never out at once; a request refused whole keeps
+nothing of the values typed; the open record changed is read again, its
+forms' unsaved changes dropped where the confirmation listed them; a
+studio box ticked alone is the step's own and not in the policy; and the
+live demo grants none ([0176](../decisions/0176-the-host-page-changes-the-chosen-records-of-a-page-and-the-studio-grants-who-may-and-in-which-fields.md)).
 
 ### Two engines that mean different things
 
@@ -583,7 +593,9 @@ There is no undo
 ([0053](../decisions/0053-a-host-deletes-a-record-from-its-detail-or-its-row-after-a-confirmation-in-place.md)),
 and the chosen records of a page are deleted a page at a time, from the
 Records grid alone
-([0174](../decisions/0174-the-host-page-deletes-the-chosen-records-of-a-page-and-the-studio-grants-who-may.md)).
+([0174](../decisions/0174-the-host-page-deletes-the-chosen-records-of-a-page-and-the-studio-grants-who-may.md)),
+and changed the same way, one value for every record
+([0176](../decisions/0176-the-host-page-changes-the-chosen-records-of-a-page-and-the-studio-grants-who-may-and-in-which-fields.md)).
 An action over the open record is offered in its detail alone, never a
 child row's or a Drill down level's; every run asks a
 confirmation, after its dialog where it has one, even where its

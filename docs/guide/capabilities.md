@@ -540,10 +540,19 @@ get*](../../README.md#what-you-get) is the short version, and
   rule of the form reads together with another may be listed, and a set
   can be left half changed, each record named. It is the runtime plane's
   `POST /v1/forms/:id/records/update-chosen` and `@formancy/data-client`'s
-  `updateChosen`; the host page and the studio offer no control for it,
-  and the studio keeps a grant written by hand and shows it to a draft's
-  reviewer
+  `updateChosen`, and a draft's reviewer sees its roles and fields
   ([0175](../decisions/0175-chosen-records-are-changed-each-on-its-own-to-the-values-given-in-fields-a-policy-names.md)).
+  The host page asks it from Change the chosen… above the Records grid:
+  the fields to set ticked, each drawn on paper by the form's own renderer,
+  a lookup with its typeahead and the state field as the states some
+  chosen record may move to, then a confirmation of each value, "cleared"
+  for a field left empty; it says what became of each record by the rule a
+  deletion of them does, those not changed left chosen with why, and reads
+  the open record again where it changed it. The studio's Policy step
+  grants it to the roles given update, in the fields the server's checks
+  let a change set, each one it does not offer saying why, nobody and
+  nothing by default
+  ([0176](../decisions/0176-the-host-page-changes-the-chosen-records-of-a-page-and-the-studio-grants-who-may-and-in-which-fields.md)).
 - **A person is shown the forms they may read**, and nothing about any
   other, each with the forms whose rows a page may list below one of its
   records, derived from the published forms' foreign keys and types without

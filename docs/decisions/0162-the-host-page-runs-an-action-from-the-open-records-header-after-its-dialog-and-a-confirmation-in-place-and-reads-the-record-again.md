@@ -1,6 +1,6 @@
 # 0162 — The host page runs an action from the open record's header, after its dialog and a confirmation in place, and reads the record again
 
-- **Status:** accepted; extended by [0166](0166-a-person-chooses-a-pages-records-by-a-column-of-boxes-and-runs-an-action-over-them-from-a-bar-above-the-grid.md): an action over the records a person chose of the Records grid's page runs through the same flow, from a bar above the grid, its states over the records chosen
+- **Status:** accepted; extended by [0166](0166-a-person-chooses-a-pages-records-by-a-column-of-boxes-and-runs-an-action-over-them-from-a-bar-above-the-grid.md): an action over the records a person chose of the Records grid's page runs through the same flow, from a bar above the grid, its states over the records chosen; extended by [0176](0176-the-host-page-changes-the-chosen-records-of-a-page-and-the-studio-grants-who-may-and-in-which-fields.md): a change of the chosen records draws its fields on paper under the bar as an action’s dialog is drawn, and reads the open record again after it changed it, as after a run
 - **Date:** 2026-11-17
 - **Deciders:** Daniel Bacher
 - **Verified by:** every jsdom case below was watched failing with its
