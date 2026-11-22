@@ -89,9 +89,11 @@ export interface FieldPolicy {
  * database grants EXECUTE without UPDATE.
  *
  * `bulk` names who may delete the chosen records of a page in one request
- * (0173), each record a delete of its own. Optional, and absent -- or an
- * operation it does not name -- is nobody's, for the reason above: a server
- * older than it refuses a policy that names it.
+ * (0173), each record a delete of its own, and who may change them to the
+ * same values in the fields it lists (0175), each record an update of its
+ * own. Optional, and absent -- or an operation it does not name -- is
+ * nobody's, for the reason above: a server older than it refuses a policy
+ * that names it, and one older than 0175 a policy naming `bulk.update`.
  */
 export interface FormPolicy {
   version: 1
@@ -112,15 +114,28 @@ export interface ActionGrant {
 }
 
 /**
- * Who may delete the chosen records of a page together (0173): roles,
- * exact strings, each of which must be granted `operations.delete` too,
- * since every record of such a request is planned, scoped and sent as a
- * delete of it alone is. It narrows that grant and widens nothing. Delete
- * is the one operation it names: a change of chosen records to values is
- * not something this release reads, and a policy naming one is refused.
+ * Who may delete or change the chosen records of a page together.
+ *
+ * `delete` (0173): roles, exact strings, each of which must be granted
+ * `operations.delete` too, since every record of such a request is
+ * planned, scoped and sent as a delete of it alone is.
+ *
+ * `update` (0175): roles, each granted `operations.update` too, and the
+ * fields they may set, each to one value for every chosen record, each
+ * record then planned, scoped and sent as an update of it alone is. Every
+ * field is one each of those roles may write on update, and none is the
+ * key, a field written on create only, one the database or the server
+ * writes, a pinned one, a version chain's (0113), or the field a form's
+ * rows are saved with their record through (0155) -- `validatePolicy`'s
+ * refusals -- nor one a rule of the form reads together with another
+ * field, which the bundle's check refuses, since it reads the form.
+ *
+ * Each narrows its operation's grant to the roles that may send a page of
+ * them at once, and widens nothing.
  */
 export interface BulkGrant {
   delete?: { roles: string[] }
+  update?: { roles: string[]; fields: string[] }
 }
 
 /**

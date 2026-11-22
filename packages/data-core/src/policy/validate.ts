@@ -1,6 +1,7 @@
-import { offeredFor, offers } from '../generate/offers.js'
+import { offers } from '../generate/offers.js'
 import { isKeyValue } from '../lookup/values.js'
 import type { FieldBinding, FormBindings } from '../generate/types.js'
+import { bulkFitProblems } from './bulk-fit.js'
 import { byCodepoint, type ParsedPolicy, readPolicy } from './inputs.js'
 import { unscopedLookups } from './through.js'
 import type { FormPolicy, PolicyValidation } from './types.js'
@@ -92,34 +93,9 @@ function fitProblems(policy: ParsedPolicy, bindings: FormBindings): string[] {
   problems.push(...throughFitProblems(policy, byField))
   problems.push(...transitionFitProblems(policy, byField))
   problems.push(...actionFitProblems(policy, bindings))
+  // Who may delete or change chosen records together (0173, 0175): bulk-fit.ts.
   problems.push(...bulkFitProblems(policy, bindings))
   return problems
-}
-
-/**
- * Who may delete chosen records together (0173), fitted to the form. A
- * `bulk` on a form that offers no delete alone says something untrue,
- * whatever it grants: one that offers none, and a together child, whose
- * rows are deleted only in a save of their record (0155) -- its policy may
- * grant the delete that save uses, and `planDelete` refuses every delete
- * sent alone. Every role it grants must be one `operations.delete`
- * grants, because each record of such a request is a delete of it alone,
- * authorised, scoped and planned as one -- the grant narrows the delete
- * grant to the roles that may send a page of them at once, and a role
- * outside it would be refused every record. What else a delete is held to
- * -- read, scoping, the keys it acts through -- `deleteGrantProblems` and
- * `deleteProblems` already ask of those roles.
- */
-function bulkFitProblems(policy: ParsedPolicy, bindings: FormBindings): string[] {
-  if (policy.bulk === null) return []
-  if (!offers(bindings, 'delete')) return ['bulk names who may delete chosen records together, and this form does not offer delete']
-  if (!offeredFor(bindings, 'delete', null)) {
-    return ["bulk names who may delete chosen records together, and this form's rows are deleted only with the record they belong to, in one save"]
-  }
-  return [...policy.bulk.delete]
-    .filter((role) => !policy.operations.delete.has(role))
-    .sort(byCodepoint)
-    .map((role) => `bulk.delete grants ${role}, who may not delete with this form: each chosen record is a delete of its own`)
 }
 
 /**

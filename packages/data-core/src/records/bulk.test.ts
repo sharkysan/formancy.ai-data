@@ -114,8 +114,8 @@ describe('authorizeBulk and bulkOffered', () => {
   // its meaning: the clerk, who may delete one record, may not send a page
   // of them. Watched failing with an absent grant read as every deleter's.
   test('is nobody, by default', () => {
-    expect(authorizeBulk(DELETING, CLERK, DELETABLE)).toMatchObject({ ok: false, code: 'operation-denied' })
-    expect(bulkOffered(DELETING, CLERK, DELETABLE)).toEqual({ delete: false })
+    expect(authorizeBulk(DELETING, CLERK, DELETABLE, 'delete')).toMatchObject({ ok: false, code: 'operation-denied' })
+    expect(bulkOffered(DELETING, CLERK, DELETABLE)).toEqual({ delete: false, update: null })
   })
 
   // A role the grant names, that may delete, whose context scopes the
@@ -123,15 +123,15 @@ describe('authorizeBulk and bulkOffered', () => {
   // the clerk's. Watched failing with the grant's roles not asked: the
   // auditor was let through to a request every record of which is refused.
   test('lets through a role the grant names, and no other', () => {
-    expect(authorizeBulk(BULK, CLERK, DELETABLE)).toEqual({ ok: true })
-    expect(bulkOffered(BULK, CLERK, DELETABLE)).toEqual({ delete: true })
+    expect(authorizeBulk(BULK, CLERK, DELETABLE, 'delete')).toEqual({ ok: true })
+    expect(bulkOffered(BULK, CLERK, DELETABLE)).toEqual({ delete: true, update: null })
     for (const actor of [AUDITOR, INTAKE]) {
-      expect(authorizeBulk(BULK, actor, DELETABLE)).toEqual({
+      expect(authorizeBulk(BULK, actor, DELETABLE, 'delete')).toEqual({
         ok: false,
         code: 'operation-denied',
         message: 'no role of this actor may delete chosen records together with this form',
       })
-      expect(bulkOffered(BULK, actor, DELETABLE)).toEqual({ delete: false })
+      expect(bulkOffered(BULK, actor, DELETABLE)).toEqual({ delete: false, update: null })
     }
   })
 
@@ -141,8 +141,8 @@ describe('authorizeBulk and bulkOffered', () => {
   // Watched failing with the row filter not resolved: the clerk with no
   // tenant was let through.
   test("refuses a context that cannot scope the delete, with the delete's reason", () => {
-    expect(authorizeBulk(BULK, { ...CLERK, attributes: {} }, DELETABLE)).toMatchObject({ ok: false, code: 'missing-attribute' })
-    expect(bulkOffered(BULK, { ...CLERK, attributes: {} }, DELETABLE)).toEqual({ delete: false })
+    expect(authorizeBulk(BULK, { ...CLERK, attributes: {} }, DELETABLE, 'delete')).toMatchObject({ ok: false, code: 'missing-attribute' })
+    expect(bulkOffered(BULK, { ...CLERK, attributes: {} }, DELETABLE)).toEqual({ delete: false, update: null })
   })
 
   // The policy is fitted to the form first: a grant on a form that offers
@@ -150,8 +150,8 @@ describe('authorizeBulk and bulkOffered', () => {
   // holds -- refused as the policy that says it, never let through.
   test('refuses a grant the policy cannot fit to the form', () => {
     expect(MS_ORDER.operations.delete).not.toBe(true)
-    expect(authorizeBulk(BULK, CLERK, MS_ORDER)).toMatchObject({ ok: false, code: 'invalid-policy' })
-    expect(authorizeBulk({ ...BULK, operations: { ...BULK.operations, delete: [] } }, CLERK, DELETABLE)).toMatchObject({
+    expect(authorizeBulk(BULK, CLERK, MS_ORDER, 'delete')).toMatchObject({ ok: false, code: 'invalid-policy' })
+    expect(authorizeBulk({ ...BULK, operations: { ...BULK.operations, delete: [] } }, CLERK, DELETABLE, 'delete')).toMatchObject({
       ok: false,
       code: 'invalid-policy',
       message: expect.stringMatching(/bulk\.delete grants clerk, who may not delete with this form/),

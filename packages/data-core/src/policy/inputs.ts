@@ -93,8 +93,18 @@ export interface ParsedPolicy {
   transitions: { field: string; moves: ReadonlyArray<{ from: string | null; to: string; roles: ReadonlySet<string> }> } | null
   /** Who may run each action the policy names (0159), by the action's name; empty when it names none. */
   actions: ReadonlyMap<string, ReadonlySet<string>>
-  /** Who may delete chosen records together (0173); null when the policy names no `bulk`, and `delete` empty when `bulk` names none. */
-  bulk: { delete: ReadonlySet<string> } | null
+  /**
+   * Who may delete chosen records together (0173), and who may change them
+   * in which fields (0175); null when the policy names no `bulk`, and each
+   * operation null where `bulk` does not name it.
+   */
+  bulk: { delete: ReadonlySet<string> | null; update: ParsedBulkUpdate | null } | null
+}
+
+/** Who may change chosen records together, and the fields they may set, each once, in the policy's order (0175). */
+export interface ParsedBulkUpdate {
+  roles: ReadonlySet<string>
+  fields: readonly string[]
 }
 
 /**
@@ -300,26 +310,51 @@ function readActions(value: unknown, problems: string[]): Map<string, ReadonlySe
 }
 
 /**
- * Who may delete chosen records together (0173); an absent property is
- * none, and a `bulk` without `delete` grants nobody. `delete` is the one
- * operation read: any other, an `update` among them, is refused as every
- * property this release does not read is.
+ * The fields a grant lists, each a field key once, in the policy's order;
+ * whether each is one this form has and may grant is `bulk-fit.ts`'s.
+ */
+function readFieldList(value: unknown, where: string, problems: string[]): string[] {
+  if (!Array.isArray(value)) {
+    problems.push(`${where} is not a list of field keys`)
+    return []
+  }
+  const fields: string[] = []
+  for (const [index, field] of (value as unknown[]).entries()) {
+    const key = nameOrNull(field)
+    if (key === null) problems.push(`${where}[${String(index)}] is not a field key`)
+    else if (fields.includes(key)) problems.push(`${where} names ${key} twice`)
+    else fields.push(key)
+  }
+  return fields
+}
+
+/**
+ * Who may delete chosen records together (0173), and who may change them
+ * in which fields (0175); an absent property is none, and an operation
+ * `bulk` does not name grants nobody. `delete` and `update` are the
+ * operations read: any other is refused as every property this release
+ * does not read is.
  */
 function readBulk(value: unknown, problems: string[]): ParsedPolicy['bulk'] {
   if (value === undefined) return null
   if (!isRecord(value)) {
-    problems.push('bulk is not { delete: { roles } }')
+    problems.push('bulk is not { update: { roles, fields }, delete: { roles } }')
     return null
   }
-  unread(value, ['delete'], 'bulk.', problems)
-  const entry = value['delete']
-  if (entry === undefined) return { delete: new Set() }
-  if (!isRecord(entry)) {
-    problems.push('bulk.delete is not { roles }')
-    return null
-  }
-  unread(entry, ['roles'], 'bulk.delete.', problems)
-  return { delete: readRoles(entry['roles'], 'bulk.delete.roles', problems) }
+  unread(value, ['delete', 'update'], 'bulk.', problems)
+  const removing = value['delete']
+  let deleting: ReadonlySet<string> | null = null
+  if (isRecord(removing)) {
+    unread(removing, ['roles'], 'bulk.delete.', problems)
+    deleting = readRoles(removing['roles'], 'bulk.delete.roles', problems)
+  } else if (removing !== undefined) problems.push('bulk.delete is not { roles }')
+  const changing = value['update']
+  let updating: ParsedBulkUpdate | null = null
+  if (isRecord(changing)) {
+    unread(changing, ['roles', 'fields'], 'bulk.update.', problems)
+    updating = { roles: readRoles(changing['roles'], 'bulk.update.roles', problems), fields: readFieldList(changing['fields'], 'bulk.update.fields', problems) }
+  } else if (changing !== undefined) problems.push('bulk.update is not { roles, fields }')
+  return { delete: deleting, update: updating }
 }
 
 /**

@@ -280,10 +280,23 @@ describe('validatePolicy', () => {
     ])
     const offersNone = ['bulk names who may delete chosen records together, and this form does not offer delete']
     expect(problems({ ...ORDER_POLICY, bulk: { delete: { roles: [] } } })).toEqual(offersNone)
-    expect(problems({ ...ORDER_POLICY, bulk: {} })).toEqual(offersNone)
     // Absent, or naming nobody on a form that offers delete, it grants nobody and fits.
     expect(problems({ ...deleting, bulk: {} }, DELETABLE_ORDER)).toEqual([])
     expect(problems(deleting, DELETABLE_ORDER)).toEqual([])
+  })
+
+  // A `bulk` that names no operation grants nobody (0175): since a change
+  // of chosen records is read too, it fits a form that offers an update or
+  // a delete alone, and is refused on one that offers neither, where it
+  // says something nothing could honour. Watched failing with 0173's rule,
+  // which asked of `{}` a delete alone: the order form, which updates and
+  // never deletes, was refused a bulk that grants nothing.
+  test('refuses a bulk naming no operation only on a form that offers neither an update nor a delete alone', () => {
+    expect(problems({ ...ORDER_POLICY, bulk: {} })).toEqual([])
+    const creating: FormBindings = { ...ORDER, operations: { create: true, update: false } }
+    expect(problems({ ...ORDER_POLICY, operations: { ...ORDER_POLICY.operations, update: [] }, bulk: {} }, creating)).toEqual([
+      'bulk names who may change or delete chosen records together, and this form offers neither an update nor a delete of a record alone',
+    ])
   })
 
   // A together child's rows are deleted only inside a save of the record
@@ -316,25 +329,127 @@ describe('validatePolicy', () => {
     expect(problems(granting, together)).toEqual([])
   })
 
-  // Delete is the one operation `bulk` names: a change of chosen records
-  // to values (`update`) is not read by this release, and a grant nothing
-  // enforces is refused as every unread property is -- which is also why
-  // a server older than 0173 refuses a policy naming `bulk` at all. The
-  // shape is held too. Watched failing with `bulk` read as known and its
-  // properties not checked: `update` and `purge` were accepted.
+  // Delete and update are the operations `bulk` names (0173, 0175): any
+  // other, and any property of either beyond its own, is refused as every
+  // unread property is -- a grant nothing enforces -- which is also why a
+  // server older than 0175 refuses a policy naming `bulk.update`. The
+  // shape is held too. Watched failing with `bulk.update`'s properties
+  // not checked: `values` was accepted.
   test('refuses a bulk grant this release does not read, and one of the wrong shape', () => {
     const deleting = { ...ORDER_POLICY, operations: { ...ORDER_POLICY.operations, delete: ['manager'] } }
     const bulk = (value: unknown) => problems({ ...deleting, bulk: value }, DELETABLE_ORDER)
-    expect(bulk({ delete: { roles: ['manager'] }, update: { roles: ['manager'], fields: ['notes'] } })).toEqual([
-      'bulk.update is not something this release reads, so nothing would enforce it',
+    expect(bulk({ delete: { roles: ['manager'] }, archive: { roles: ['manager'] } })).toEqual([
+      'bulk.archive is not something this release reads, so nothing would enforce it',
     ])
     expect(bulk({ delete: { roles: ['manager'], purge: true } })).toEqual([
       'bulk.delete.purge is not something this release reads, so nothing would enforce it',
     ])
-    expect(bulk([])).toEqual(['bulk is not { delete: { roles } }'])
+    expect(bulk({ update: { roles: ['manager'], fields: ['amount'], values: { amount: '1' } } })).toEqual([
+      'bulk.update.values is not something this release reads, so nothing would enforce it',
+    ])
+    expect(bulk([])).toEqual(['bulk is not { update: { roles, fields }, delete: { roles } }'])
     expect(bulk({ delete: ['manager'] })).toEqual(['bulk.delete is not { roles }'])
     expect(bulk({ delete: { roles: 'manager' } })).toEqual(['bulk.delete.roles is not a list of roles'])
     expect(bulk({ delete: { roles: [''] } })).toEqual(['bulk.delete.roles[0] is not a role name'])
+    expect(bulk({ update: ['manager'] })).toEqual(['bulk.update is not { roles, fields }'])
+    expect(bulk({ update: { roles: ['manager'] } })).toEqual(['bulk.update.fields is not a list of field keys'])
+    expect(bulk({ update: { roles: ['manager'], fields: ['amount', 7, 'amount'] } })).toEqual([
+      'bulk.update.fields[1] is not a field key',
+      'bulk.update.fields names amount twice',
+    ])
+  })
+
+  // Changing chosen records together is an update of each (0175): a role
+  // the grant names that `operations.update` does not, or one that may not
+  // write a field it lists, would be offered a request every record of
+  // which is refused; and a grant on a form that offers no update alone
+  // says something nothing could honour. Named in the grant's order, each
+  // role in codepoint order. Watched failing with `updateFit` left out of
+  // `bulkFitProblems`: every grant below was accepted.
+  test('refuses a bulk update granted to a role that may not update, a field it may not write, or a form that offers no update', () => {
+    const changing = (roles: string[], fields: string[]) => ({ ...ORDER_POLICY, bulk: { update: { roles, fields } } })
+    expect(problems(changing(['manager'], ['amount', 'customer', 'order_date']))).toEqual([])
+    expect(problems(changing(['manager', 'clerk', 'Archivist'], ['amount']))).toEqual([
+      'bulk.update grants Archivist, who may not update with this form: each chosen record is an update of its own',
+      'bulk.update grants clerk, who may not update with this form: each chosen record is an update of its own',
+    ])
+    const both = { ...ORDER_POLICY, operations: { ...ORDER_POLICY.operations, update: BOTH } }
+    expect(problems({ ...both, bulk: { update: { roles: BOTH, fields: ['notes', 'amount'] } } })).toEqual([
+      'bulk.update.fields: notes is not one manager may write, and bulk.update grants manager its change',
+      'bulk.update.fields: amount is not one clerk may write, and bulk.update grants clerk its change',
+    ])
+    const creating: FormBindings = { ...ORDER, operations: { create: true, update: false } }
+    expect(problems({ ...changing([], []), operations: { ...ORDER_POLICY.operations, update: [] } }, creating)).toEqual([
+      'bulk.update names who may change chosen records together, and this form does not offer update',
+    ])
+  })
+
+  // No change of chosen records sets what an update alone never sets from
+  // the request, or sets only for one record: each kind refused by name,
+  // whoever may write it -- the key; a field written on create only; one
+  // the database writes; one the server stamps (0153); a pinned one; a
+  // version chain's (0113); the field a together child's rows are saved
+  // with their record through (0155); and one this form does not have.
+  // Watched failing with `unsettable` answering null: every field below
+  // was granted, the key among them.
+  test('refuses the key, a create-only field, one the database or the server writes, a pinned one, a version chain’s and the together field', () => {
+    const fielded = (fields: FieldBinding[], extra: Partial<FormBindings> = {}): FormBindings => ({ ...bindings('thing', fields, ['code']), ...extra })
+    const form = fielded(
+      [
+        column('code'),
+        column('created', { create: true, update: false }),
+        column('total', false),
+        column('changed_by', false),
+        column('tenant_id'),
+        column('valid_from'),
+        lookup('order', ['order_id'], 'order', ['id']),
+        column('note'),
+      ],
+      {
+        stamps: [
+          {
+            column: 'changed_by',
+            value: { kind: 'actor' },
+            on: 'update',
+            type: { kind: 'text', maxLength: 40, lengthUnit: 'utf16-code-units', fixedLength: false },
+          },
+        ],
+      },
+    )
+    const writing = (keys: string[]) => Object.fromEntries(keys.map((key) => [key, { read: ['clerk'], write: ['clerk'] }]))
+    const policy = (fields: string[], form: FormBindings) =>
+      problems(
+        {
+          version: 1,
+          operations: { read: ['clerk'], create: ['clerk'], update: ['clerk'] },
+          fields: writing(form.fields.filter((binding) => binding.writes.create || binding.writes.update).map((binding) => binding.field)),
+          rowFilters: [{ column: 'tenant_id', attribute: 'tenant' }],
+          lookups: { order: [] },
+          bulk: { update: { roles: ['clerk'], fields } },
+        },
+        form,
+      ).filter((problem) => problem.startsWith('bulk.'))
+    expect(policy(['note'], form)).toEqual([])
+    expect(policy(['code', 'created', 'total', 'changed_by', 'tenant_id', 'missing'], form)).toEqual([
+      "bulk.update.fields: code is the record's key, which an update never sets",
+      'bulk.update.fields: created is written on create only (0027)',
+      'bulk.update.fields: total is written by the database, never by this form',
+      'bulk.update.fields: changed_by is stamped by the server (0153)',
+      'bulk.update.fields: tenant_id is pinned by a row filter: its value comes from the context',
+      'bulk.update.fields: missing is not a field of this form',
+    ])
+    const versions = fielded(form.fields, { validity: { from: 'valid_from', to: 'valid_to', key: ['code'] } })
+    expect(policy(['valid_from'], versions)).toEqual([
+      "bulk.update.fields: valid_from is a version's start, end or chain, which a change from a date writes (0113)",
+    ])
+    const together = fielded(
+      form.fields.map((binding) =>
+        binding.field === 'order' ? { ...binding, writes: { create: true, update: true }, together: { min: 0, max: 5 } } : binding,
+      ),
+    )
+    expect(policy(['order'], together)).toEqual([
+      "bulk.update.fields: order names the record this form's rows are saved with, which a row keeps from its create (0155)",
+    ])
   })
 
   // The tenant column's value comes from the context, on create and on

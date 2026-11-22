@@ -222,9 +222,13 @@ export interface Deleting {
  * (`DriftVerdict.actions`, 0041). A routine is not described here: its run
  * describes it, and refuses one that changed. `[]` where none (0161).
  * `bulk` is what this person may do to the chosen records of a page in one
- * request (0173): `delete` exactly when `operations` holds `delete` and the
- * policy's `bulk.delete` grants a role of theirs (`bulkOffered`), each
- * record then a delete of its own; `false` otherwise.
+ * request (`bulkOffered`): `delete` exactly when `operations` holds
+ * `delete` and the policy's `bulk.delete` grants a role of theirs, each
+ * record then a delete of its own (0173), `false` otherwise; `update` the
+ * fields they may set for every chosen record, each record then an update
+ * of its own (0175) -- where `operations` holds `update` and `bulk.update`
+ * grants a role of theirs, the grant's fields `writable.update` holds, in
+ * its order -- and `null` where they may change none.
  */
 export interface PublishedForm {
   form: FormSchema
@@ -239,7 +243,7 @@ export interface PublishedForm {
   opens: LookupOpen[]
   together: { field: string; min: number; max: number } | null
   actions: FormAction[]
-  bulk: { delete: boolean }
+  bulk: { delete: boolean; update: string[] | null }
 }
 
 /**
