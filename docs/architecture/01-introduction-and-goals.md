@@ -213,7 +213,9 @@ guide, `CHANGELOG.md`'s known gaps or the record that left it out:
   record just created: it stays editable until the record is opened again,
   and the server refuses a changed value
   ([0122](../decisions/0122-a-host-page-draws-a-saved-record-for-the-update-and-a-new-one-for-the-create.md)).
-- A bulk delete, and an undo of anything written.
+- An undo of anything written, and a deletion of chosen records past the
+  page shown
+  ([0174](../decisions/0174-the-host-page-deletes-the-chosen-records-of-a-page-and-the-studio-grants-who-may.md)).
 - A host page on another origin, run in a browser; the server's suites test
   the origins it answers
   ([0060](../decisions/0060-the-runtime-plane-answers-the-origins-an-operator-lists-and-the-administrators-plane-none.md)).

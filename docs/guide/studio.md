@@ -205,6 +205,19 @@ ship-order: still allowed" or blocked, and a regeneration taken up keeps
 the actions and their words
 ([0163](../decisions/0163-the-studio-binds-a-routine-as-an-action-offering-each-parameter-only-what-the-generator-binds-and-says-what-it-does-before-it-is-granted.md)).
 
+On the Policy step, under what a delete also does, "Who may delete chosen
+records together" holds a box for each role given delete, none ticked: a
+role ticked may delete up to a page of the records it chose on the host
+page in one request, each on its own, and a note read with every box says
+that a set can end half deleted, record by record. Nobody has it until a
+box is ticked, and the policy published then holds exactly the roles
+ticked as `bulk.delete`. A form that offers no delete, one whose rows are
+deleted only with the record they are saved with, and one nobody may
+delete with yet offer no box, each saying why. A role ticked that delete
+is taken from keeps its box, which says why the server refuses it until
+it is unticked
+([0174](../decisions/0174-the-host-page-deletes-the-chosen-records-of-a-page-and-the-studio-grants-who-may.md)).
+
 Under each field's help text, the Presentation step says what a new record
 starts the field with, as the generator noted it -- "Generated: Starts with
 the column's default, “draft”." -- and takes another: a box for text and

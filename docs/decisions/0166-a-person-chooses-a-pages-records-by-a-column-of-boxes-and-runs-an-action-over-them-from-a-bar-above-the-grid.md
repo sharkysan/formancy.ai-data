@@ -1,6 +1,6 @@
 # 0166 — A person chooses a page's records by a column of boxes, and runs an action over them from a bar above the grid
 
-- **Status:** accepted
+- **Status:** accepted; extended by [0174](0174-the-host-page-deletes-the-chosen-records-of-a-page-and-the-studio-grants-who-may.md): the column and the bar are drawn where the form offers a deletion of chosen records too, the bar's Delete the chosen… asks it, the sentence a button says with nothing chosen names no action, and a deletion's answer settles the choice, each record left marked with why
 - **Date:** 2026-11-18
 - **Deciders:** Daniel Bacher
 - **Verified by:** the studio offering the scope, the host page's choice

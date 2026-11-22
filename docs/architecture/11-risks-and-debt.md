@@ -169,9 +169,16 @@ on CI's runner, 2026-11-22), and bounds nothing inside one
 record -- on PostgreSQL a record's wait for another's lock is unbounded,
 as a delete alone's is, so the proxy in front can cut that answer; a
 first record refused `schema-changed` or `permission-denied` refuses the
-request, though a trigger can meet either for some rows alone; and only a
-client of the deployment's own sends one, the host page and the studio
-offering none ([0173](../decisions/0173-chosen-records-are-deleted-each-on-its-own-with-one-answer-per-record.md)).
+request, though a trigger can meet either for some rows alone
+([0173](../decisions/0173-chosen-records-are-deleted-each-on-its-own-with-one-answer-per-record.md)).
+The host page asks it from Delete the chosen… and the studio grants it,
+and the confirmation can say only what deleting them may do, never which
+record will be refused; a record not found leaves the page and closes
+the open record, though it may be one the person may no longer see; why a
+record is still chosen is its box's title, which a person who neither
+points nor uses a screen reader does not see once the outcome is closed;
+and the live demo grants none, so its page never offers it
+([0174](../decisions/0174-the-host-page-deletes-the-chosen-records-of-a-page-and-the-studio-grants-who-may.md)).
 
 ### Two engines that mean different things
 
@@ -561,8 +568,11 @@ renderer's empty form hidden, whose lookups each ask for their first page
 A record is never in the page's address, and a reload or a closed tab does
 not ask before leaving unsaved work
 ([0047](../decisions/0047-a-hosts-workspace-lists-opens-and-edits-records-in-linked-grids.md)).
-There is no bulk delete and no undo
-([0053](../decisions/0053-a-host-deletes-a-record-from-its-detail-or-its-row-after-a-confirmation-in-place.md)).
+There is no undo
+([0053](../decisions/0053-a-host-deletes-a-record-from-its-detail-or-its-row-after-a-confirmation-in-place.md)),
+and the chosen records of a page are deleted a page at a time, from the
+Records grid alone
+([0174](../decisions/0174-the-host-page-deletes-the-chosen-records-of-a-page-and-the-studio-grants-who-may.md)).
 An action over the open record is offered in its detail alone, never a
 child row's or a Drill down level's; every run asks a
 confirmation, after its dialog where it has one, even where its

@@ -1304,6 +1304,25 @@ own, one after another in the order sent, each exactly as 6.7 deletes one
 5. data-client reads each record by `writeOutcome`, as a delete of it
    alone; a request whose answer was lost is an `UnknownChosen` naming
    every record with its version, and `reconcileChosen` reads each.
+6. On the host page ([0174](../decisions/0174-the-host-page-deletes-the-chosen-records-of-a-page-and-the-studio-grants-who-may.md)), where `bulk.delete` is true, the Records
+   grid has 6.16's column of boxes and the bar above it, and the bar's
+   Delete the chosen… asks in place under it
+   (`apps/host/src/chosen-delete-flow.ts`, its states `chosen-deletion.ts`,
+   its region `chosen-delete-region.tsx`): a confirmation counting the
+   records, in the form's `deleting` words -- a cascade only where the
+   policy names one -- listing the forms it drops, standing only while the
+   choice holds what it asked over, as 6.16's does, and waiting for a save
+   of the open record out where it is chosen. Delete them sends the
+   records chosen at the versions the page knows, the open record's Save
+   held while it is out. The answer is drawn record by record: how many
+   it deleted, each other record in the server's words, those after a stop
+   as not sent. The page is read again; the records deleted, not found or
+   found gone leave the choice, and the open record among them is closed
+   as 6.7's delete closes it; the rest stay chosen, the bar naming them
+   and each box's title saying why. A lost answer offers Check them, one
+   `reconcileChosen` read of each record not known, and nothing is sent
+   again. The studio's Policy step grants `bulk.delete` from the roles
+   given delete (`apps/studio/src/policy-bulk.tsx`).
 
 Held by `packages/data-core/src/records/bulk.test.ts` and
 `policy/validate.test.ts`; by `packages/data-server/src/routes/runtime-bulk.test.ts`
@@ -1311,10 +1330,16 @@ over fake ports and `bulk-deadline.test.ts`; on both engines by
 `e2e-bulk.integration.test.ts` through `BULK_PARITY`, the lost answer in
 `e2e-lost-answer.integration.test.ts`, and the time a page takes in
 `bulk-sized.integration.test.ts`; and by `packages/data-client/src/chosen.test.ts`
-and `deletes.integration.test.ts`. The container suites were written
-without a database, and CI is their first run. What it costs: a set left
+and `deletes.integration.test.ts`; the host page by `apps/host/src/chosen-deletion.test.ts`,
+`chosen-rows.test.ts` and `choose-column.test.tsx` without a server, and
+on both engines by `bulk-delete.test.tsx`, `page.test.tsx` and
+`plane.test.tsx`, with the browser gate's `apps/host/scripts/browser/choosing.mjs`;
+and the studio's grant by `apps/studio/src/policy-bulk.test.tsx`. The
+container suites and the browser gate were written without a database,
+and CI is their first run. What it costs: a set left
 half deleted, named record by record; a deadline chosen by the proxy in
 front, about thirteen times the slowest page `bulk-sized` measured on
 CI's runner (1,088 ms for 50 records on PostgreSQL, 2026-11-22); two
-statements a record, three for one not deleted; and no control on the host page or in
-the studio (§11).
+statements a record, three for one not deleted; and on the host page a
+record not found that closes the open record, and why a record is still
+chosen said by its box's title alone (§11).

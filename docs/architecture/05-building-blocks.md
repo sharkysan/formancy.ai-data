@@ -499,6 +499,11 @@ does that nothing binds, `src/presentation-actions.tsx` and
 `src/action-words.ts` hold its words to the server's spelling, and
 `src/drift.tsx` says what drift leaves of it
 ([0163](../decisions/0163-the-studio-binds-a-routine-as-an-action-offering-each-parameter-only-what-the-generator-binds-and-says-what-it-does-before-it-is-granted.md));
+`src/policy-bulk.tsx` grants who may delete chosen records together, a box
+for each role given delete, through `src/policy-model.ts`'s
+`withBulkDeleteRoles`, and says why nothing is offered where data-core's
+`offers` and `offeredFor` find no delete of one record
+([0174](../decisions/0174-the-host-page-deletes-the-chosen-records-of-a-page-and-the-studio-grants-who-may.md));
 `src/versions.tsx` and `src/import.tsx` download and import a version's file
 (0062). Its tests run the real `createDataServer` behind a fake `fetch`
 (`src/test-server.ts`), and `src/journey.test.tsx` fails on any request
@@ -626,7 +631,13 @@ the same flow over the records a person chose of the Records grid's page:
 `src/chosen-rows.ts` the choice, of the page shown and at the versions
 read, `src/choose-column.tsx` the grid's first column of boxes, and
 `src/selection-bar.tsx` the bar above the grid with its actions and the
-region under it ([0166](../decisions/0166-a-person-chooses-a-pages-records-by-a-column-of-boxes-and-runs-an-action-over-them-from-a-bar-above-the-grid.md));
+region under it ([0166](../decisions/0166-a-person-chooses-a-pages-records-by-a-column-of-boxes-and-runs-an-action-over-them-from-a-bar-above-the-grid.md)),
+and where the form offers it the deletion of the records chosen:
+`src/chosen-deletion.ts` its states and words, `src/chosen-delete-flow.ts`
+it against the server and the guard, and `src/chosen-delete-region.tsx`
+its confirmation and what became of each record, under the bar
+([0174](../decisions/0174-the-host-page-deletes-the-chosen-records-of-a-page-and-the-studio-grants-who-may.md)); `src/master-panes.ts` makes the record's own forms, one session
+per renderer, as the guard knows them;
 `src/unknown-notice.tsx` an unknown write (0031). The address names the
 form, layout and view, never the record (`src/layout.ts`), and an arrival
 whose address names no layout opens in the one the person chose last,

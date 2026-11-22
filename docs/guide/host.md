@@ -358,6 +358,28 @@ and a Drill down level offer none -- so more than a page of records is run
 a page at a time
 ([0166](../decisions/0166-a-person-chooses-a-pages-records-by-a-column-of-boxes-and-runs-an-action-over-them-from-a-bar-above-the-grid.md)).
 
+Where the form lets you delete the records you choose together, the bar
+holds Delete the chosen…, with the same boxes, drawn for it alone on a
+form with no action over them. Pressed with records chosen, it asks under
+the bar -- "Delete 3 chosen Order records?" -- that each is deleted on its
+own, at the version this page read it at, one that cannot be named and
+the others deleted, and what deleting them also does in the words a
+delete of one says it, records that refer to one deleted with it only
+where the form's policy names that; it lists the forms whose unsaved
+changes go with the open record where it is chosen, and Keep them is the
+next Tab. It stands only while the choice does, waits for a save of the
+open record out, and while it is out that record's Save and a second
+press send nothing. Answered, it says "Deleted 2 of 3 records.", each
+record not deleted by name in the server's words, and "Not sent, so not
+deleted: …" for any the request stopped before, as the keyboard lands
+there. The page is read again: the records deleted leave the choice, the
+open one closed as a delete closes it, and those not deleted stay chosen,
+the bar naming them and each box's title saying why. An answer that was
+lost offers Check them, which reads each record and says whether it is
+still stored or gone -- by this deletion or somebody else's, which the
+page cannot tell -- and nothing is sent again
+([0174](../decisions/0174-the-host-page-deletes-the-chosen-records-of-a-page-and-the-studio-grants-who-may.md)).
+
 New record, and a child's new row, start each field at its column's
 constant default where the form has one -- an order at `draft` -- and a
 save that leaves it sends it. New record starts a field at the starting
@@ -429,7 +451,8 @@ A loaded record is drawn for its update: a field written on create only
 account -- is disabled there, and writable on a new record
 ([0122](../decisions/0122-a-host-page-draws-a-saved-record-for-the-update-and-a-new-one-for-the-create.md)).
 
-What it does not do yet: no bulk delete and no undo, no file of a record
+What it does not do yet: no undo, no deletion of chosen records past the
+page shown, no file of a record
 and all its children at once, no copy of a record with its children; and
 on a record just created in the form, a field written on create only stays
 writable until the record is opened again, and the server refuses a
@@ -527,8 +550,8 @@ the real server on PostgreSQL, which needs Docker: the workspace in every
 layout down to 320 pixels, Stacked's line moved by its keys and a pointer,
 the grids' keyboard and colours, the record's
 journey, a delete's confirmations and answers, an action's dialog,
-confirmation and answers, the records chosen and an action over them,
-and a file downloaded, its bytes the server's.
+confirmation and answers, the records chosen, an action over them and
+their deletion, and a file downloaded, its bytes the server's.
 
 The page has a second build, for the [live demo](live-demo.md):
 `pnpm --filter @formancy/data-host build:demo` writes it to
