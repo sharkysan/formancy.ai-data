@@ -8,7 +8,7 @@ import type { ChosenRows } from './chosen-rows.js'
 import { useHeard, useSaving } from './delete-flow.js'
 import { formsAtRisk, useGuardContext, useRegistered } from './guard.js'
 import type { PaneEntry } from './guard.js'
-import { gridOwner } from './leave.js'
+import { gridOwner, unlisted } from './leave.js'
 import type { PaneWork } from './leave.js'
 import type { Opening } from './opening.js'
 import type { RendererChoice } from './prefs.js'
@@ -153,8 +153,6 @@ interface FlowState {
   buttons: Map<string, HTMLButtonElement>
   regionRef: RefObject<HTMLDivElement | null>
 }
-
-const named = (pane: PaneWork): string => `${pane.owner} ${String(pane.renderer)}`
 
 /** What holds the record's forms while a run is out: each flow its own, so the answer to one never lifts the other's. */
 const holder = (flow: FlowState): 'action' | 'selection' => (flow.latest.current.chosen === undefined ? 'action' : 'selection')
@@ -401,7 +399,7 @@ function confirmRun(flow: FlowState, atStake: (target: RunTarget) => PaneWork[],
   if (overOpen(flow, now.target) !== null && flow.latest.current.sessions.some((session) => session.isSaving())) return
   // Typed into since the question was asked: named before anything is sent.
   const risky = atStake(now.target)
-  if (risky.some((pane) => !now.discards.some((listed) => named(listed) === named(pane)))) {
+  if (unlisted(risky, now.discards)) {
     flow.set({ ...now, discards: risky, n: now.n + 1 })
     return
   }

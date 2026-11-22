@@ -165,19 +165,23 @@ export function checking(now: Deletion): Deletion {
   return now
 }
 
+/**
+ * What one read of a record whose deletion's answer was lost showed
+ * (0031), and nothing more: gone, still stored at the version sent or
+ * changed since, or not read -- refused, or a read that cannot tell. A
+ * delete's check and a deletion of chosen records' read it the same way
+ * (0053, 0174).
+ */
+export function checkedOf(found: Reconciliation): Checked {
+  if (!found.ok) return { kind: 'unread', message: found.message }
+  if (found.state === 'absent' || found.state === 'unchanged' || found.state === 'changed') return { kind: found.state }
+  return { kind: 'unread', message: 'The check could not tell.' }
+}
+
 /** What the check's read showed (0031): its own state, which takes the keyboard. */
 export function checked(now: Deletion, found: Reconciliation): Deletion {
   if (now.state !== 'unknown' && now.state !== 'checked') return now
-  const result: Checked = !found.ok
-    ? { kind: 'unread', message: found.message }
-    : found.state === 'absent'
-      ? { kind: 'absent' }
-      : found.state === 'unchanged'
-        ? { kind: 'unchanged' }
-        : found.state === 'changed'
-          ? { kind: 'changed' }
-          : { kind: 'unread', message: 'The check could not tell.' }
-  return { state: 'checked', target: now.target, unknown: now.unknown, found: result, n: numbered(now) }
+  return { state: 'checked', target: now.target, unknown: now.unknown, found: checkedOf(found), n: numbered(now) }
 }
 
 /** "Delete it again", after a check found it still at the version sent: the confirmation again, never the delete. */

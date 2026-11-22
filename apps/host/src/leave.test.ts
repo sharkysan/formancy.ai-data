@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { atRisk, discards, drillBase, drillOwner, gridOwner, lead, levelOf, WORK } from './leave.js'
+import { atRisk, discards, drillBase, drillOwner, eachOnce, gridOwner, lead, levelOf, unlisted, WORK } from './leave.js'
 import type { LeaveRequest, PaneWork } from './leave.js'
 
 /*
@@ -285,6 +285,35 @@ describe("Drill down's levels (0090)", () => {
     expect(named({ kind: 'child-row', owner: `${drillBase(2)}pg-order-line~order`, record: 'k1:4711,9' })).toEqual([
       `${drillBase(2)}pg-order-line~order angular`,
     ])
+  })
+})
+
+describe('what a confirmation lists of the forms it drops (0053, 0162, 0174)', () => {
+  const react: PaneWork = { owner: 'master', renderer: 'react', name: ['Order ', { code: 'k1:1' }], work: 'changed' }
+  const angular: PaneWork = { owner: 'master', renderer: 'angular', name: ['Order ', { code: 'k1:1' }], work: 'changed' }
+  const level: PaneWork = { owner: drillOwner(3, 'pg-order', 'order'), renderer: 'react', name: ['Order ', { code: 'k1:1' }], work: 'changed' }
+
+  // The open record's forms and a Drill down level's are gathered from
+  // two asks that can name one form twice -- the level that holds the open
+  // record -- and the list says each once, in the order first named; one
+  // form is its owner and its renderer, whatever its work has become since
+  // (watched failing with each form kept however often it was named:
+  // "expected [ { owner: 'master', …(3) }, …(2) ] to deeply equal [ {
+  // owner: 'master', …(3) }, { …(4) } ]").
+  test('names each form once, in the order first named', () => {
+    expect(eachOnce([react, level, { ...react, work: 'saving' }])).toEqual([react, level])
+  })
+
+  // What was typed into since the question was asked is named before
+  // anything is sent: a form at risk now that the list did not name; one
+  // it named, typed into further, is what the person already agreed to
+  // drop (watched failing with every form at risk asked again: "expected
+  // true to be false").
+  test('asks again only for a form it did not name', () => {
+    expect(unlisted([react], [react])).toBe(false)
+    expect(unlisted([{ ...react, work: 'saving' }], [react])).toBe(false)
+    expect(unlisted([react, angular], [react])).toBe(true)
+    expect(unlisted([], [react])).toBe(false)
   })
 })
 

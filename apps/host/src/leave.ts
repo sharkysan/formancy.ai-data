@@ -135,6 +135,24 @@ export interface PaneWork {
   work: Work | null
 }
 
+/** One form, as two lists of forms at risk name it: its owner and its renderer, whatever its work has become. */
+const sameForm = (a: PaneWork, b: PaneWork): boolean => a.owner === b.owner && a.renderer === b.renderer
+
+/** Each form once, in the order first named: a confirmation's list, gathered from the open record's forms and the Drill down levels that hold one (0053, 0094). */
+export function eachOnce(forms: readonly PaneWork[]): PaneWork[] {
+  return forms.filter((pane, index) => forms.findIndex((other) => sameForm(other, pane)) === index)
+}
+
+/**
+ * Whether `now` names a form `listed` does not: typed into since a
+ * confirmation listed what its answer drops, and so named again before
+ * anything is sent (0053, 0162, 0174). A form it listed, typed into
+ * further, is what the person already agreed to drop.
+ */
+export function unlisted(now: readonly PaneWork[], listed: readonly PaneWork[]): boolean {
+  return now.some((pane) => !listed.some((other) => sameForm(other, pane)))
+}
+
 /**
  * The owner of a deletion asked from a row of `owner`'s grid that is not the
  * record open in its detail (0053): the grid's, not the detail's. A request
