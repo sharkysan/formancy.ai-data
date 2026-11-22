@@ -18,7 +18,8 @@ const rules = (list: readonly RowFilterRule[]) => list.map((rule) => `${rule.col
 
 /**
  * A draft's policy, as the publisher approving it reads it (0065): who may
- * read, create, update and delete; each field's read and write roles;
+ * read, create, update and delete, and delete chosen records together
+ * where the policy names that (0174); each field's read and write roles;
  * which rows of the root and of each lookup's table are in reach, and
  * through which lookups the root's are reached; the moves its state field
  * is held to (0112); and the foreign keys a delete may act through. In the Policy step's words, and nothing to edit:
@@ -46,6 +47,7 @@ export function DraftPolicy({ policy, bindings, document }: { policy: FormPolicy
         {OPERATIONS.map((operation) => (
           <li key={operation}>{`Roles that may ${operation}: ${roles(policy.operations[operation])}.`}</li>
         ))}
+        {policy.bulk === undefined ? null : <li>{`Roles that may delete chosen records together: ${roles(policy.bulk.delete?.roles)}.`}</li>}
       </ul>
       <h5 id="draft-fields">Fields</h5>
       <ul aria-labelledby="draft-fields">

@@ -1,20 +1,44 @@
+import { useState } from 'react'
+import type { ReactElement } from 'react'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
-import { cleanup, screen, waitFor, within } from '@testing-library/react'
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
+import { userEvent } from '@testing-library/user-event'
 import { computeAccessibleDescription } from 'dom-accessibility-api'
+import { createBuilderSession } from '@formancy/builder-core'
 import { validatePolicy } from '@formancy/data-core'
 import type { FormBindings, FormPolicy } from '@formancy/data-core'
+import { createAdminClient } from './api.js'
+import type { Proposal, ProposalRequest } from './api.js'
+import { DraftPolicy } from './draft-policy.js'
+import { PolicyStep } from './policy.js'
 import { NO_DELETE, NOBODY_DELETES, SAVED_WITH, TOGETHER_NOTE } from './policy-bulk.js'
-import { audit, discover, generateOrder, goTo, grantOrderDelete, offerOnly, signIn, step, unnamed, writeOrderPolicy } from './test-studio.js'
+import {
+  audit,
+  discover,
+  focusedName,
+  generateOrder,
+  goTo,
+  grantOrderDelete,
+  offerOnly,
+  pressEnter,
+  servedDocument,
+  signIn,
+  step,
+  unnamed,
+  writeOrderPolicy,
+} from './test-studio.js'
 import type { User } from './test-studio.js'
-import { startPlane } from './test-server.js'
+import { startPlane, TOKENS } from './test-server.js'
 import type { TestPlane } from './test-server.js'
 
 /**
  * The Policy step's part of deleting chosen records together (0173,
  * 0174): who may, from the roles given delete, nobody until a box is
- * ticked, and nothing offered where a delete of one record is not --
- * against the real server behind a fake `fetch`, as every suite here runs,
- * and published through it. Elements are found by role and name.
+ * ticked, nothing offered where a delete of one record is not, and a
+ * grant the form cannot offer listed to remove -- against the real server
+ * behind a fake `fetch`, as every suite here runs, and published through
+ * it; and the grant as a draft's publisher reads it (0065). Elements are
+ * found by role and name.
  */
 let plane: TestPlane
 
@@ -43,6 +67,48 @@ async function publish(user: User, n: number): Promise<{ policy: FormPolicy; bin
     bundle: { policy: FormPolicy; bindings: FormBindings }
   }
   return sent.bundle
+}
+
+/** What the server's policy check says of a grant on a form that offers no delete, whatever roles it names (validatePolicy). */
+const OFFERS_NONE = 'bulk names who may delete chosen records together, and this form does not offer delete'
+
+/** The order without a version column, so with no update and no delete (0050); and with it. */
+const UNVERSIONED: ProposalRequest = {
+  connection: 'fixture',
+  root: { schema: 'sales', name: 'order' },
+  formId: 'sales-order',
+  title: 'Order',
+  lookups: [{ foreignKey: 'fk_order_customer', display: ['name'] }],
+  pinned: ['tenant_id'],
+}
+const VERSIONED: ProposalRequest = { ...UNVERSIONED, versionColumn: 'row_version' }
+
+/** Every operation the clerk's, and the rows pinned to their tenant: the policy each case starts from. */
+const FITTING: FormPolicy = {
+  version: 1,
+  operations: { read: ['clerk'], create: ['clerk'], update: ['clerk'], delete: ['clerk'] },
+  fields: {},
+  rowFilters: [{ column: 'tenant_id', attribute: 'tenant' }],
+  lookups: { customer: [{ column: 'tenant_id', attribute: 'tenant' }] },
+}
+
+/** The Policy step over a proposal, holding the policy it is given as the studio does: an imported policy, without the journey. */
+function PolicyOf({ proposal, initial }: { proposal: Proposal; initial: FormPolicy }): ReactElement {
+  const [policy, setPolicy] = useState(initial)
+  const [session] = useState(() => createBuilderSession(proposal.form))
+  return (
+    <main aria-label="Policy">
+      <PolicyStep
+        bindings={proposal.bindings}
+        snapshot={proposal.snapshot}
+        session={session}
+        policy={policy}
+        onPolicy={setPolicy}
+        stale={false}
+        onRegenerate={() => Promise.resolve(null)}
+      />
+    </main>
+  )
 }
 
 /** The Choose step on the fixture with `root` chosen and `foreignKeys` alone offered as lookups. */
@@ -149,5 +215,103 @@ describe('who may delete chosen records together', () => {
     expect(within(grants(saved)).getByText(SAVED_WITH)).toBeTruthy()
     expect(within(grants(saved)).queryAllByRole('checkbox')).toEqual([])
     expect([...(await audit()), ...unnamed()]).toEqual([])
+  })
+
+  // A grant left from a generation that offered delete, once the form is
+  // generated again without its version column and so without delete, is
+  // refused by the server: the step lists it to remove, and Enter on
+  // Remove takes it out of the policy, the keyboard on the policy check --
+  // generated again with its version column, the box is there unticked,
+  // and what publishes has no `bulk`. Watched failing with the note's
+  // Remove writing nothing: the policy check still refused the grant
+  // ("expected <li></li> to be null"); and with the keyboard moved from
+  // the notice, which goes with the grant before it moves: "expected
+  // 'the page itself' to be 'Policy check'".
+  test('lists a grant the form can no longer offer to remove, and Remove takes it out of what publishes', async () => {
+    const user = await signIn(plane)
+    await generateOrder(user)
+    const policy = await writeOrderPolicy(user)
+    await grantOrderDelete(user, policy)
+    await user.click(within(grants(policy)).getByRole('checkbox', { name: 'clerk' }))
+    await fits(policy)
+    const unversioned = await goTo(user, 'Choose')
+    await user.selectOptions(within(unversioned).getByLabelText('Version column'), '')
+    await user.click(within(unversioned).getByRole('button', { name: 'Generate the form' }))
+    await screen.findByRole('main', { name: 'Generate' })
+
+    const after = await goTo(user, 'Policy')
+    expect(within(grants(after)).getByText(NO_DELETE)).toBeTruthy()
+    const stray = within(grants(after)).getByRole('note', {
+      name: 'The policy grants clerk the deletion of chosen records together, which this form cannot offer.',
+    })
+    await waitFor(() => expect(checkSays(after).getByText(OFFERS_NONE)).toBeTruthy())
+    expect([...(await audit()), ...unnamed()]).toEqual([])
+    await pressEnter(user, within(stray).getByRole('button', { name: 'Remove the grant of deleting chosen records together' }))
+    expect(focusedName()).toBe('Policy check')
+    await waitFor(() => expect(checkSays(after).queryByText(OFFERS_NONE)).toBeNull())
+    expect(within(grants(after)).queryByRole('note')).toBeNull()
+
+    const versioned = await goTo(user, 'Choose')
+    await user.selectOptions(within(versioned).getByLabelText('Version column'), 'row_version')
+    await user.click(within(versioned).getByRole('button', { name: 'Generate the form' }))
+    await screen.findByRole('main', { name: 'Generate' })
+    const again = await goTo(user, 'Policy')
+    expect(within(grants(again)).getByRole<HTMLInputElement>('checkbox', { name: 'clerk' }).checked).toBe(false)
+    await fits(again)
+    expect((await publish(user, 1)).policy).not.toHaveProperty('bulk')
+  })
+
+  // An imported policy can hold a grant that names nobody -- `bulk: {}`,
+  // or no role -- which the server refuses on a form that offers no
+  // delete as it refuses any: with no box to untick, the step lists it to
+  // remove all the same, saying it names nobody. Watched failing with the
+  // note drawn only for a grant that names a role: nothing on the step
+  // could clear the refusal ('Unable to find an accessible element with
+  // the role "note"').
+  test.each<NonNullable<FormPolicy['bulk']>>([{}, { delete: { roles: [] } }])(
+    'lists a grant naming nobody to remove where the form offers none: %j',
+    async (bulk) => {
+      servedDocument()
+      const outcome = await createAdminClient({ token: TOKENS.admin, fetch: plane.fetch }).propose(UNVERSIONED)
+      if (!outcome.ok) throw new Error(outcome.message)
+      const user = userEvent.setup()
+      render(<PolicyOf proposal={outcome.value} initial={{ ...FITTING, bulk }} />)
+      const policy = screen.getByRole('main', { name: 'Policy' })
+      await waitFor(() => expect(checkSays(policy).getByText(OFFERS_NONE)).toBeTruthy())
+      const stray = within(grants(policy)).getByRole('note', {
+        name: 'The policy holds a grant of deleting chosen records together that names nobody, which this form cannot offer.',
+      })
+      expect([...(await audit()), ...unnamed()]).toEqual([])
+      await pressEnter(user, within(stray).getByRole('button', { name: 'Remove the grant of deleting chosen records together' }))
+      expect(focusedName()).toBe('Policy check')
+      await waitFor(() => expect(checkSays(policy).queryByText(OFFERS_NONE)).toBeNull())
+    },
+  )
+})
+
+describe('a draft’s policy, as its publisher reads it', () => {
+  // The Review step's account of what approving a draft grants (0065)
+  // names who may delete chosen records together where the policy says,
+  // nobody where it names none, and nothing where it holds no `bulk` --
+  // a grant that deletes a page of records in one request is never
+  // approved unseen. Watched failing with the line left out: the list
+  // ended at delete ("expected [ 'Roles that may read: clerk.', …(3) ] to
+  // deeply equal [ 'Roles that may read: clerk.', …(4) ]").
+  test('names who may delete chosen records together, or nobody, and nothing where the policy holds no grant', async () => {
+    const outcome = await createAdminClient({ token: TOKENS.admin, fetch: plane.fetch }).propose(VERSIONED)
+    if (!outcome.ok) throw new Error(outcome.message)
+    const { bindings, form } = outcome.value
+    const said = (policy: FormPolicy): string[] => {
+      render(<DraftPolicy policy={policy} bindings={bindings} document={form} />)
+      const items = within(screen.getByRole('list', { name: 'Who may do what' }))
+        .getAllByRole('listitem')
+        .map((item) => item.textContent ?? '')
+      cleanup()
+      return items
+    }
+    const operations = ['Roles that may read: clerk.', 'Roles that may create: clerk.', 'Roles that may update: clerk.', 'Roles that may delete: clerk.']
+    expect(said({ ...FITTING, bulk: { delete: { roles: ['clerk'] } } })).toEqual([...operations, 'Roles that may delete chosen records together: clerk.'])
+    expect(said({ ...FITTING, bulk: {} })).toEqual([...operations, 'Roles that may delete chosen records together: nobody.'])
+    expect(said(FITTING)).toEqual(operations)
   })
 })
