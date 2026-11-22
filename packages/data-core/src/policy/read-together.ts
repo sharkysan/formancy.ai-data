@@ -82,8 +82,15 @@ export function readTogetherProblems(form: FormSchema, policy: FormPolicy): stri
   const together = readTogether(form)
   return fields
     .filter((field): field is string => typeof field === 'string' && together.has(field))
-    .map(
-      (field) =>
-        `bulk.update.fields: ${field} is read by the rule on ${String(together.get(field))} together with another field, which a change of chosen records cannot run over each record's other answers`,
-    )
+    .map((field) => `bulk.update.fields: ${field} ${readTogetherReason(String(together.get(field)))}`)
+}
+
+/**
+ * Why a change of chosen records may not set a field the rule on `target`
+ * reads together with another, as the bundle's check says it after the
+ * field's key: the words the studio shows beside a field it does not offer
+ * (0176), so the two cannot say it differently.
+ */
+export function readTogetherReason(target: string): string {
+  return `is read by the rule on ${target} together with another field, which a change of chosen records cannot run over each record's other answers`
 }

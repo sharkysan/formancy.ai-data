@@ -7,7 +7,7 @@ import { headerFloor } from './widths.js'
 
 /*
  * The column a person chooses a page's records with, for an action over a
- * selection (0166) or a deletion of them (0174): drawn first, and only on a
+ * selection (0166) or a deletion or a change of them (0174, 0176): drawn first, and only on a
  * form that offers this person one. The grid's own row selection is the open row
  * (grid-options.tsx), so the choice is a column of real checkboxes, on
  * the pattern of a row's Delete (0053): a cell the arrow keys reach, which
@@ -39,8 +39,9 @@ const BOX_LOOK: CSSProperties = {
 
 /**
  * The box of one row, named for its record as its Delete names it, and
- * ticked while the record is chosen; after a deletion of the choice that
- * did not delete it, described by why until the choice changes (0174): its
+ * ticked while the record is chosen; after a deletion or a change of the
+ * choice that did not do it, described by why until the choice changes
+ * (0174, 0176): its
  * title, which is its description -- its name being its label -- and what a
  * pointer resting on it shows.
  */

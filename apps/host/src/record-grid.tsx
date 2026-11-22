@@ -36,8 +36,8 @@ export { DELETE_COLUMN } from './grid-options.js'
  * use-grid-line.ts's, the sort on the headers use-grid-sort.ts's, the boxes
  * under them and `=` on a cell use-header-filters.ts's, and the columns'
  * widths and the well's height use-grid-sizing.ts's. Where the form offers
- * this person an action over a selection or a deletion of chosen records
- * (0174), the boxes a person chooses the
+ * this person an action over a selection or a deletion or a change of
+ * chosen records (0174, 0176), the boxes a person chooses the
  * page's records with are a first column (choose-column.tsx), and each
  * page drawn is told to the choice, which a page of another list or
  * another page clears (chosen-rows.ts, 0166); what the panel draws above

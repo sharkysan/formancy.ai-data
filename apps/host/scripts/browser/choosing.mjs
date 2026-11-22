@@ -8,8 +8,14 @@
 // it leaving the grid in one stop, as from a row's Delete (0053); and the
 // run from the bar, through its dialog and its confirmation, from the
 // keyboard, the keyboard then on what the server did and the order closed
-// in the database, the other not. Then Delete the chosen… (0174) over two
-// more, one changed beside the page: its confirmation in place, the
+// in the database, the other not. Then Change the chosen… (0176) over two
+// more, one changed beside the page: its fields, Note ticked and drawn on
+// paper, the keyboard on the region and a Tab on the first field's box;
+// Continue, its confirmation in place, the keyboard on it and the next Tab
+// on Keep them; and Change them from the keyboard, the keyboard then on
+// what the server answered -- the one changed, its note in the database,
+// the other named and still chosen. Then Delete the chosen… (0174) over
+// two more, one changed beside the page: its confirmation in place, the
 // keyboard on it and the next Tab on Keep them, and Delete them from the
 // keyboard, the keyboard then on what the server answered -- the one
 // deleted, the other named and still chosen -- each state measured at
@@ -18,7 +24,7 @@
 // PostgreSQL only, as the gate is. What the engines answer -- a refusal
 // naming a record changed since, paging clearing the choice, a second
 // press while the run is out -- is the jsdom suites', on both
-// (actions.test.tsx, bulk-delete.test.tsx), and the boxes' keyboard path
+// (actions.test.tsx, bulk-update.test.tsx, bulk-delete.test.tsx), and the boxes' keyboard path
 // without a server is choose-column.test.tsx's.
 
 import { landsOn } from './deleting.mjs'
@@ -34,6 +40,10 @@ const status = (page) => records(page).getByRole('status', { name: /^$/ }).first
 const bar = (page) => records(page).getByRole('group', { name: 'Chosen records', exact: true })
 const box = (page, record) => grid(page).getByRole('checkbox', { name: `Choose Order ${record}`, exact: true })
 const chosenRegion = (page, confirming = false) => page.getByRole('region', { name: `${CLOSE_ALL_LABEL}: 1 record${confirming ? '?' : ''}`, exact: true })
+/** The change of two chosen orders: its fields, and what the server answered; with the question mark, its confirmation (0176). */
+const changingTwo = (page, confirming = false) => page.getByRole('region', { name: `Change 2 chosen Order records${confirming ? '?' : ''}`, exact: true })
+/** The change's paper, as the renderer the gate shows draws it. */
+const valuesPaper = (page) => changingTwo(page).getByRole('form', { name: /^Values to set, (React|Angular)$/ })
 /** The deletion of two chosen orders: its confirmation, and without the question mark what the server answered (0174). */
 const deletingTwo = (page, confirming = false) => page.getByRole('region', { name: `Delete 2 chosen Order records${confirming ? '?' : ''}`, exact: true })
 
@@ -63,6 +73,9 @@ export function choosingJourney(plane, { check }, run) {
     gone: '',
     kept: '',
     deleting: `deleted together at width ${String(run.customer)}`,
+    changed: '',
+    stale: '',
+    changing: `changed together at width ${String(run.customer)}`,
   }
   return [
     [
@@ -140,8 +153,67 @@ export function choosingJourney(plane, { check }, run) {
       },
     ],
     [
+      'Change the chosen…, on paper',
+      async (page) => {
+        at.changed = await plane.actionOrder(at.changing)
+        at.stale = await plane.actionOrder(at.changing)
+        await records(page).getByRole('textbox', { name: 'Search' }).fill(at.changing)
+        await records(page).getByRole('button', { name: 'Search' }).click()
+        await until(async () => (await status(page).textContent()) === 'Rows 1–2.', 'the search never listed the two orders to change')
+        await box(page, at.changed).click()
+        await box(page, at.stale).click()
+        // Changed beside the page once it was read: this one is refused, by name, and the other changed.
+        await plane.touchActionOrder(at.stale)
+        await bar(page).getByRole('button', { name: 'Change the chosen…', exact: true }).click()
+        const asking = changingTwo(page)
+        await asking.waitFor(WITHIN)
+        check('Change the chosen…: the keyboard is on its fields’ region', await landsOn(page, asking))
+        await page.keyboard.press('Tab')
+        check("the next Tab reaches the first field's box", await focusedOn(page, asking.getByRole('checkbox', { name: 'Note', exact: true })))
+        await page.keyboard.press('Space')
+        await valuesPaper(page)
+          .getByLabel(/^Note\b/)
+          .fill(`${at.changing} changed`)
+      },
+    ],
+    [
+      'Change the chosen…, confirming',
+      async (page) => {
+        await valuesPaper(page).getByRole('button', { name: 'Continue', exact: true }).click()
+        const confirming = changingTwo(page, true)
+        await confirming.waitFor(WITHIN)
+        check('Change the chosen…: the keyboard is on its confirmation', await landsOn(page, confirming))
+        await page.keyboard.press('Tab')
+        check(
+          'the next Tab reaches Keep them, never the button that changes',
+          await focusedOn(page, confirming.getByRole('button', { name: 'Keep them', exact: true })),
+        )
+      },
+    ],
+    [
+      'Change the chosen…, answered',
+      async (page) => {
+        // The gate's measure took the keyboard off the page: given back to Keep them first. Then from the keyboard: Change them, the Tab after it, and Enter.
+        await changingTwo(page, true).getByRole('button', { name: 'Keep them', exact: true }).focus()
+        await page.keyboard.press('Tab')
+        await page.keyboard.press('Enter')
+        const answered = changingTwo(page)
+        await answered.getByText('Changed 1 of 2 records.', { exact: true }).waitFor(WITHIN)
+        check('chosen records changed: the keyboard is on what the server answered', await landsOn(page, answered))
+        const [changed, stale] = [await plane.actionOrderOf(at.changed), await plane.actionOrderOf(at.stale)]
+        check(
+          'and the one read at its version is changed in the database, the other not',
+          changed?.note === `${at.changing} changed` && stale?.note === at.changing ? null : JSON.stringify({ changed, stale }),
+        )
+        await until(async () => (await bar(page).getByRole('status').textContent())?.startsWith('1 chosen.') === true, 'the bar never said one is still chosen')
+        check('the order not changed is still chosen', (await box(page, at.stale).isChecked()) ? null : 'its box was unticked')
+      },
+    ],
+    [
       'Delete the chosen…, confirming',
       async (page) => {
+        await changingTwo(page).getByRole('button', { name: 'Close', exact: true }).click()
+        await bar(page).getByRole('button', { name: 'Clear the choice', exact: true }).click()
         at.gone = await plane.actionOrder(at.deleting)
         at.kept = await plane.actionOrder(at.deleting)
         await records(page).getByRole('textbox', { name: 'Search' }).fill(at.deleting)

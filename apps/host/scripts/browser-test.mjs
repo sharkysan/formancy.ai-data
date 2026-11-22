@@ -126,6 +126,12 @@
 //     bar through its dialog and its confirmation, Keep it the next Tab and
 //     Enter on Run it from the keyboard, the keyboard then on what the
 //     server did, the order chosen closed in the database and the other not;
+//     Change the chosen… (0176) over two more, one changed beside the page,
+//     its fields' region with the next Tab on the first field's box, Note
+//     ticked and drawn on paper, Continue's confirmation with Keep them the
+//     next Tab, and Enter on Change them from the keyboard, the keyboard
+//     then on what the server answered, one order's note changed in the
+//     database and the other still chosen;
 //     and Delete the chosen… (0174) over two more, one changed beside the
 //     page, its confirmation in place with Keep them the next Tab, and Enter
 //     on Delete them from the keyboard, the keyboard then on what the server

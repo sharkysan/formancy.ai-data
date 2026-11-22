@@ -382,6 +382,39 @@ gone stays open while its forms hold work, typed once the lost answer
 gave its Save back, until you press Close the record
 ([0174](../decisions/0174-the-host-page-deletes-the-chosen-records-of-a-page-and-the-studio-grants-who-may.md)).
 
+Where the form lets you change the records you choose together, the bar
+holds Change the chosen…, before Delete the chosen…, with the same boxes.
+Pressed with records chosen, it asks under the bar -- "Change 3 chosen
+Order records" -- with a box for each field you may set, none ticked; each
+field you tick is drawn on paper below, by the renderer you show, React
+where both are, a lookup with its own typeahead, a yes or no starting at
+no, and Status as the states some chosen record may move to, which must be
+given; where none of them may move from the state it is in, Status's box
+cannot be ticked and says why. Continue runs the form's own checks on
+what you gave, then the confirmation, "Change 3 chosen Order records?",
+says each field and its value -- "Notes: cleared" for one you ticked and
+left empty, which empties it in every record, though the server refuses
+the whole change where the column may not be empty -- that each is
+changed on its own, at the version this page read it at, one that cannot
+be named and the others changed, and that Status moves from each record's
+own state; it
+lists the open record's forms whose unsaved changes go when it is read
+again, and Keep them is the next Tab. It stands only while the choice does,
+waits for a save of the open record out, and while it is out that record's
+Save and a second press send nothing; a deletion and a change of the
+choice are never out at once. Answered, it says "Changed 11 of 12
+records.", each record not changed by name in the server's words -- changed
+since, a move its state may not make -- and "Not sent, so not changed: …"
+for any the request stopped before. The page is read again: the records
+changed leave the choice, those not changed stay chosen with why on their
+boxes, and the open record changed is read again into its forms -- where
+that read is refused, the region says so, its forms left at the version
+from before the change. An answer that was lost offers Check them, which
+reads each record and says whether it is still at the version you saw,
+changed since -- by this change or somebody else's, which the page cannot
+tell -- or no longer found, and nothing is sent again
+([0176](../decisions/0176-the-host-page-changes-the-chosen-records-of-a-page-and-the-studio-grants-who-may-and-in-which-fields.md)).
+
 New record, and a child's new row, start each field at its column's
 constant default where the form has one -- an order at `draft` -- and a
 save that leaves it sends it. New record starts a field at the starting

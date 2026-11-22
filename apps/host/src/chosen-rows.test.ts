@@ -177,4 +177,19 @@ describe('the records chosen of a page', () => {
     expect(holdsAsked([at('k1:1')], [at('k1:1'), at('k1:2')])).toBe(false)
     expect(holdsAsked([at('k1:1'), at('k1:3')], [at('k1:1'), at('k1:2')])).toBe(false)
   })
+
+  // A change of the choice offers its state field as the states the
+  // records chosen may move to from those the page read them in (0176):
+  // each record's answers as the page drew it last, a page read again
+  // included, and nothing of a record no longer on it (watched failing
+  // with the answers kept from the first read: "expected 'draft' to be
+  // 'placed'").
+  test('keeps each record’s answers as the page drew it last', () => {
+    const choice = createChosenRows('Order')
+    const held = (record: string, status: string): GridRow => ({ ...row(record), answers: { status } })
+    choice.page(LIST, 0, [held('k1:1', 'draft'), held('k1:2', 'placed')])
+    choice.page(LIST, 0, [held('k1:1', 'placed')])
+    expect(choice.answers('k1:1')?.['status']).toBe('placed')
+    expect(choice.answers('k1:2')).toBeNull()
+  })
 })

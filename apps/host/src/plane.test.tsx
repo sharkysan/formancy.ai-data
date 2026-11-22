@@ -51,8 +51,9 @@ import type { Plane } from './test-plane.js'
  * may send, and one the page sends that the table does not have fails --
  * the delete route included, which the page sends since 0053, from its
  * confirmation in place, the export, since 0080, from Download CSV, a
- * run of an action, since 0162, from the action's confirmation, and a
- * deletion of chosen records, since 0174, from Delete the chosen….
+ * run of an action, since 0162, from the action's confirmation, a
+ * deletion of chosen records, since 0174, from Delete the chosen…, and a
+ * change of them, since 0176, from Change the chosen….
  *
  * And through both doors the page has: its own origin, as a host serves
  * it, and the live demo's path, behind the demo's Worker (0070), where the
@@ -63,7 +64,16 @@ import type { Plane } from './test-plane.js'
 let plane: Plane
 
 beforeAll(async () => {
-  plane = await startPlane({ children: true, deletes: true, demo: true, versions: true, saves: true, actions: true, bulk: ['removable'] })
+  plane = await startPlane({
+    children: true,
+    deletes: true,
+    demo: true,
+    versions: true,
+    saves: true,
+    actions: true,
+    bulk: ['removable'],
+    changes: ['removable'],
+  })
 })
 
 afterAll(async () => {
@@ -167,6 +177,41 @@ async function chosenJourney(user: User, removable: string): Promise<void> {
   await within(answered).findByText('Deleted 2 of 2 records.', {}, { timeout: 15_000 })
 }
 
+/**
+ * Two removable records changed together through the page (0176): chosen
+ * by Choose every record on this page and Change the chosen…, their note
+ * ticked and typed, Continue, Change them, and answered.
+ */
+async function changeJourney(user: User, removable: string): Promise<void> {
+  const note = stamp('plane-change')
+  const made: string[] = []
+  for (let n = 0; n < 2; n += 1) {
+    const created = await plane.clerk.create(removable, { note })
+    if (!created.ok || created.value.record === null) throw new Error('a removable record was not created')
+    made.push(created.value.record)
+  }
+  await chooseForm(user, removable)
+  await searchRecords(
+    user,
+    note,
+    made.map((record) => record.slice(3)),
+  )
+  const records = gridSection('Records')
+  await user.click(within(records).getByRole('button', { name: 'Choose every record on this page' }))
+  await user.click(within(records).getByRole('button', { name: 'Change the chosen…' }))
+  const asking = await screen.findByRole('region', { name: 'Change 2 chosen Removable records' }, { timeout: 15_000 })
+  await user.click(within(asking).getByRole('checkbox', { name: 'Note' }))
+  const paper = await within(asking).findByRole('form', { name: 'Values to set, React' }, { timeout: 15_000 })
+  await user.type(within(paper).getByLabelText('Note', { exact: true }), `${note} changed`)
+  await user.click(within(paper).getByRole('button', { name: 'Continue' }))
+  const confirming = await screen.findByRole('region', { name: 'Change 2 chosen Removable records?' }, { timeout: 15_000 })
+  await user.click(within(confirming).getByRole('button', { name: 'Change them' }))
+  // While the change is out the region keeps the confirmation's name, so the
+  // outcome is waited for by its own name rather than looked up at once.
+  const answered = await screen.findByRole('region', { name: 'Change 2 chosen Removable records' }, { timeout: 15_000 })
+  await within(answered).findByText('Changed 2 of 2 records.', {}, { timeout: 15_000 })
+}
+
 /** The page's doors: its own origin on each engine, and the live demo's path, behind its Worker, signed in as tenant 1's clerk. */
 const JOURNEYS = [
   ...ENGINES.map((engine) => ({ ...engine, door: 'its own origin', demo: false })),
@@ -239,9 +284,11 @@ describe.each(JOURNEYS)('what the page sends on $engine, through $door', ({ conn
     await runIt(user, closing)
     await closed(closing)
     // And on its own origin a price, whose tenant is a column of its own:
-    // the demo publishes no form over versions; and two records deleted
-    // together, which no form of the demo's grants (0174).
+    // the demo publishes no form over versions; and two records changed
+    // together and two deleted, which no form of the demo's grants (0174,
+    // 0176).
     if (door === undefined) await priceJourney(user, price)
+    if (door === undefined) await changeJourney(user, removable)
     if (door === undefined) await chosenJourney(user, removable)
 
     const page: Sent[] = door === undefined ? [...plane.sent] : [...door.sent]
@@ -279,16 +326,16 @@ describe.each(JOURNEYS)('what the page sends on $engine, through $door', ({ conn
     // origin, the tenant a column the page sends in no body since 0117
     // (watched failing with every answer sent: the tenant in the price's
     // update and in its change from a date). A deletion of chosen records is
-    // sent from Delete the chosen… on the removable form since 0174 (to be
-    // watched failing in CI with the journey's chosenJourney left out:
-    // delete-chosen unused on its own origin). Through the demo's door
-    // these two are the exceptions: the demo publishes no form over
-    // versions, and none of its forms grants a deletion of chosen records
-    // -- apps/live-demo/src/image/forms.ts writes no `bulk` -- so the page
-    // there never offers Delete the chosen…. A change of chosen records
-    // (0175) is unsent on every door until the page has a control that
-    // sends it: the runtime plane and the client offer it first.
-    const UNSENT: ReadonlySet<string> = new Set(door === undefined ? ['update-chosen'] : ['supersede', 'delete-chosen', 'update-chosen'])
+    // sent from Delete the chosen… on the removable form since 0174, and a
+    // change of them from Change the chosen… since 0176 (to be watched
+    // failing in CI with the journey's changeJourney left out:
+    // update-chosen unused on its own origin). Through the demo's door
+    // these three are the exceptions: the demo publishes no form over
+    // versions, and none of its forms grants a deletion or a change of
+    // chosen records -- apps/live-demo/src/image/forms.ts writes no `bulk`
+    // -- so the page there never offers Delete the chosen… or Change the
+    // chosen….
+    const UNSENT: ReadonlySet<string> = new Set(door === undefined ? [] : ['supersede', 'delete-chosen', 'update-chosen'])
     expect(
       ROUTES.filter(({ matches, operation }) => !UNSENT.has(operation) && !sent.some((request) => matches.test(line(request)))).map(
         ({ operation }) => operation,

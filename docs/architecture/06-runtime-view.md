@@ -1307,8 +1307,9 @@ own, one after another in the order sent, each exactly as 6.7 deletes one
 6. On the host page ([0174](../decisions/0174-the-host-page-deletes-the-chosen-records-of-a-page-and-the-studio-grants-who-may.md)), where `bulk.delete` is true, the Records
    grid has 6.16's column of boxes and the bar above it, and the bar's
    Delete the chosen… asks in place under it
-   (`apps/host/src/chosen-delete-flow.ts`, its states `chosen-deletion.ts`,
-   its region `chosen-delete-region.tsx`): a confirmation counting the
+   (`apps/host/src/chosen-flow.ts`, its states `chosen-request.ts`, which
+   6.18's change shares, its words `chosen-deletion.ts`, its region
+   `chosen-region.tsx`): a confirmation counting the
    records, in the form's `deleting` words -- a cascade only where the
    policy names one -- listing the forms it drops, standing only while the
    choice holds what it asked over, as 6.16's does, and waiting for a save
@@ -1386,6 +1387,36 @@ as 6.6 updates one ([0175](../decisions/0175-chosen-records-are-changed-each-on-
    each record by `writeOutcome` as an update of it alone; a request whose
    answer was lost is an `UnknownChosen` of `update-chosen`, and
    `reconcileChosen` reads each as an update.
+6. On the host page ([0176](../decisions/0176-the-host-page-changes-the-chosen-records-of-a-page-and-the-studio-grants-who-may-and-in-which-fields.md)), where `bulk.update` names a
+   field, the Records grid has 6.16's column of boxes and the bar above
+   it, and the bar's Change the chosen… asks in place under it, through
+   6.17's flow (`apps/host/src/chosen-flow.ts`, `chosen-request.ts`),
+   one request over the choice out at a time: a box for each field
+   offered, none ticked (`chosen-change-region.tsx`); each ticked field on
+   paper, the published form narrowed to them, its state field the states
+   some chosen record may move to from the one the page read it in,
+   required, and its box refused, saying why, where none may move
+   (`untickable`), a checkbox starting at no, its lookups the form's
+   typeahead under the update's filter (`chosen-change.ts`); Continue
+   runs the engine's submit and reads the label of each record a lookup
+   it sets names (`chosen-change-flow.ts`);
+   then a confirmation saying each field and its value, "cleared" for one
+   left empty and sent `null`, that each record is changed on its own and
+   moves from its own state, and the open record's forms that reading it
+   again drops. Change them sends the records chosen at the versions the
+   page knows, the open record's Save held while it is out. The answer is
+   drawn as 6.17's, in a change's words; the page is read again; the
+   records changed or not found leave the choice, the rest stay chosen
+   with why; and the open record changed -- or a check finds moved on --
+   is read again into its forms through the guard, as after 6.15's run, a
+   read refused said in the region (`readRefused`). A lost answer offers
+   Check them, `reconcileChosen` reading each as an update's check reads
+   one, a record it cannot find counted as known. The studio's Policy step
+   grants `bulk.update` from the roles given update and the fields every
+   role ticked may write and the server's checks let a change set
+   (`apps/studio/src/policy-bulk-change.tsx`, their reasons
+   `unsettableField` and `readTogetherReason`), a field the form no longer
+   binds kept ticked until unticked.
 
 Held by `packages/data-core/src/records/bulk-change.test.ts`,
 `policy/validate.test.ts` and `policy/read-together.test.ts`; by
@@ -1393,11 +1424,17 @@ Held by `packages/data-core/src/records/bulk-change.test.ts`,
 ports and `bulk-deadline.test.ts`; on both engines by
 `e2e-bulk.integration.test.ts` through `BULK_PARITY`, the lost answer in
 `e2e-lost-answer.integration.test.ts`, and the time a page takes in
-`bulk-sized.integration.test.ts`; and by `packages/data-client/src/chosen.test.ts`
-and `deletes.integration.test.ts`. The container suites were written
-without a database, and CI is their first run. What it costs: a set left
+`bulk-sized.integration.test.ts`; by `packages/data-client/src/chosen.test.ts`
+and `deletes.integration.test.ts`; the host page by `apps/host/src/chosen-change.test.ts`,
+`chosen-deletion.test.ts`, `chosen-rows.test.ts` and `leave.test.ts` without a server,
+and on both engines by `bulk-update.test.tsx`, `page.test.tsx` and
+`plane.test.tsx`, with the browser gate's `apps/host/scripts/browser/choosing.mjs`;
+and the studio's grant by `apps/studio/src/policy-bulk.test.tsx`. The
+container suites and the browser gate were written without a database,
+and CI is their first run. What it costs: a set left
 half changed, named record by record; one value for every record; no
 field a rule reads together with another; two statements a record, three
 for one not changed, four on SQL Server for one whose read failed, past
-what any deadline keeps inside the proxy's 60 s; and no control on the
-host page or in the studio (§11).
+what any deadline keeps inside the proxy's 60 s; and on the host page a
+confirmation that cannot say which record will be refused, and one
+request over the choice at a time (§11).

@@ -4913,7 +4913,7 @@
       ]
     },
     "0162": {
-      "reviewed": "sha256:adfda724451fcdb4bae0053fd6fba7682a49b72fbc525881c2ac8baa8a303ff9",
+      "reviewed": "sha256:d6be95b5fbc86f974306e71ee8cc8621e72f168fb19ce3008979ec5e9bb693fd",
       "limitations": [
         {
           "area": "host",
@@ -5059,7 +5059,7 @@
       ]
     },
     "0166": {
-      "reviewed": "sha256:56ca839782ea8a4c1e4beab475e56f08a51267c4052fd7531ab00ab2b7849f47",
+      "reviewed": "sha256:6f4a011495dcbb45155870ebaf43bf35648270598d59852e668d79652fac086d",
       "limitations": [
         {
           "area": "host",
@@ -5276,7 +5276,7 @@
       ]
     },
     "0174": {
-      "reviewed": "sha256:a9eb4596271f5d9d656a1bf65934e9449a87cb01a7fc0b7f9ffc868186eeccaa",
+      "reviewed": "sha256:ef8114409045ddf3a3fcf3f6f26b3f040be7ee80a710475a2fcbeed3056d98dc",
       "limitations": [
         {
           "area": "host",
@@ -5330,7 +5330,7 @@
       ]
     },
     "0175": {
-      "reviewed": "sha256:06ce5bf1ca0149091c5d625b8a24670bb9c94f50dfecc6a3af1166894b24d665",
+      "reviewed": "sha256:85db0fdb1b7ca2bce9467bc9304d4e9821847503cb7186253724ba15e5f7396b",
       "limitations": [
         {
           "area": "writes",
@@ -5367,10 +5367,6 @@
           "heldBy": "packages/data-server/src/routes/runtime-bulk-update.test.ts"
         },
         {
-          "area": "host",
-          "says": "The host page and the studio offer no change of chosen records: it is sent through @formancy/data-client or a client of the deployment’s own, by a policy whose bulk.update an administrator writes by hand, which the studio keeps and shows a draft’s publisher."
-        },
-        {
           "area": "forms",
           "says": "@formancy/data-core installs @formancy/expressions, at the exact version of its other upstream packages, to read which fields a rule of the form reads as formancy’s engine reads them.",
           "heldBy": "packages/data-core/src/policy/read-together.test.ts"
@@ -5378,6 +5374,60 @@
         {
           "area": "operations",
           "says": "Behind Cloudflare the runtime door forwards a change of chosen records only once tunnel-config has run again, and refuses it until then."
+        }
+      ]
+    },
+    "0176": {
+      "reviewed": "sha256:b8fdcdf7d9b2d82fecf45545b802cefc8fc59ba121470c76398573249492aa0d",
+      "limitations": [
+        {
+          "area": "host",
+          "says": "Where a form offers its person a change of chosen records, the Records grid has one more column, of boxes, first, as for a deletion of them or an action over a selection.",
+          "heldBy": "apps/host/src/bulk-update.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "Change the chosen… changes each chosen record on its own, so a refused one leaves the others changed, each named on the page, and nothing is undone.",
+          "heldBy": "apps/host/src/chosen-change.test.ts"
+        },
+        {
+          "area": "host",
+          "says": "The confirmation of a change of chosen records says each value and that each record moves from its own state, never which of them will be refused; its state field offers every state some chosen record may reach, and cannot be ticked where none may move from the state the page read it in.",
+          "heldBy": "apps/host/src/chosen-change.test.ts"
+        },
+        {
+          "area": "host",
+          "says": "A field ticked and left empty in a change of chosen records is cleared in every one of them; the paper requires one whose column may not be NULL only where the form's create must give it, and elsewhere such a field left empty is refused for the whole request, nothing changed.",
+          "heldBy": "packages/data-core/src/records/bulk-change.test.ts"
+        },
+        {
+          "area": "host",
+          "says": "A deletion and a change of the same choice are never out at once: asking for one while the other is out, or not known yet, asks for that one again.",
+          "heldBy": "apps/host/src/chosen-change.test.ts"
+        },
+        {
+          "area": "host",
+          "says": "A change of chosen records the server refuses whole says why and keeps nothing of the values typed: it is asked again from the bar.",
+          "heldBy": "apps/host/src/chosen-change.test.ts"
+        },
+        {
+          "area": "host",
+          "says": "The open record, chosen and changed, is read again into its forms, which drops their unsaved changes where the confirmation listed them, and while the change is out its Save sends nothing.",
+          "heldBy": "apps/host/src/bulk-update.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "Where the open record changed with the chosen records cannot be read again, its forms are left at the version from before the change: the region says so, and offers no Load of the saved record.",
+          "heldBy": "apps/host/src/bulk-update.test.tsx"
+        },
+        {
+          "area": "studio",
+          "says": "The studio offers a change of chosen records only to roles given update, in fields every role ticked may write -- any role given update, while none is ticked -- and the server’s checks let it set; a role or a field ticked alone grants nothing and is not kept in the policy.",
+          "heldBy": "apps/studio/src/policy-bulk.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "The live demo’s forms grant no change of chosen records, so its page offers none."
         }
       ]
     }

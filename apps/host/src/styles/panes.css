@@ -149,6 +149,49 @@
   color: var(--text);
 }
 
+/* A change of chosen records' fields to tick (0176): off the paper, a row
+   of boxes that wraps, each a checkbox and its field's name. */
+.change-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.change-fields legend {
+  flex-basis: 100%;
+  margin-bottom: 0.25rem;
+  padding: 0;
+}
+
+.change-field {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+/* A checkbox, not the page's text box (controls.css): 24 pixels, the least
+   WCAG 2.5.8 allows a target, violet as what the person chose, as the
+   Columns panel's (columns.css). */
+.change-field input[type='checkbox'] {
+  flex: none;
+  width: 1.5rem;
+  height: 1.5rem;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--client);
+}
+
+.change-field label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 /* A record a delete could not find: neither a refusal nor done, so neither
    the warm colour nor teal -- the room's own edge. */
 .notice[data-kind='gone'] {

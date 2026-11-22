@@ -91,7 +91,7 @@ import { disableFields } from './widgets.js'
 
 export type Renderer = 'react' | 'angular'
 
-/** What holds a form's Save while it is out: the record's deletion (0053), an action over it (0162) or a selection that holds it (0166), or chosen records' deletion that holds it (0174). */
+/** What holds a form's Save while it is out: the record's deletion (0053), an action over it (0162) or a selection that holds it (0166), or chosen records' deletion or change that holds it (0174, 0176). */
 export type HoldBy = 'delete' | 'action' | 'selection' | 'bulk'
 
 export type SaveResult =
@@ -182,7 +182,7 @@ export interface SessionOptions {
  * The browser's clock, as a host supplies it: a generated form carries logic
  * rules, and the engine never reads an ambient clock.
  */
-const CAPABILITIES = {
+export const CAPABILITIES = {
   now: () => Date.now(),
   today: () => new Date().toISOString().slice(0, 10),
   random: () => Math.random(),
@@ -563,8 +563,8 @@ export function createSession({ client, formId, definition, renderer, namespace,
     },
     /**
      * While the record's deletion is out (0053), an action over it (0162) or
-     * over a selection that holds it (0166), or a deletion of chosen records
-     * that holds it (0174), a press sends nothing and says `message`;
+     * over a selection that holds it (0166), or a deletion or a change of
+     * chosen records that holds it (0174, 0176), a press sends nothing and says `message`;
      * `release` lifts what `by` held, whatever it came to, and leaves the others'.
      */
     hold(message: string, by: HoldBy = 'delete'): void {

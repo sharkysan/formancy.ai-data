@@ -1,6 +1,6 @@
 # 0175 — Chosen records are changed each on its own to the values given, in fields a policy names
 
-- **Status:** accepted
+- **Status:** accepted; extended by [0176](0176-the-host-page-changes-the-chosen-records-of-a-page-and-the-studio-grants-who-may-and-in-which-fields.md): the host page sends a change of chosen records from Change the chosen…, and the studio’s Policy step grants `bulk.update`, each field it does not offer saying why in `unsettableField`’s and `readTogetherReason`’s words, so its cost that only a client of the deployment’s own sends one, and plane.test’s exception for the route, hold no longer but on the live demo’s door, whose forms grant none
 - **Date:** 2026-11-22
 - **Deciders:** Daniel Bacher
 - **Verified by:** the server's half of changing chosen records -- the

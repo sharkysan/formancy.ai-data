@@ -322,7 +322,7 @@ export function columnDefsOf(
   boxed: ReadonlySet<string> = new Set(),
   widths: readonly ColumnWidth[] = [],
   floors: ReadonlyMap<string, number> = new Map(),
-  /** The column of the boxes a person chooses records with (choose-column.tsx, 0166): first, where the form offers this person an action over a selection or a deletion of chosen records (0174). */
+  /** The column of the boxes a person chooses records with (choose-column.tsx, 0166): first, where the form offers this person an action over a selection or a deletion or a change of chosen records (0174, 0176). */
   choose?: ColDef<GridRow>,
 ): ColDef<GridRow>[] {
   const first = columns.find((column) => column.shown)?.key

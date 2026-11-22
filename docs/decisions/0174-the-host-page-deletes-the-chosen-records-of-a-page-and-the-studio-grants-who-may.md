@@ -1,6 +1,6 @@
 # 0174 — The host page deletes the chosen records of a page, and the studio grants who may
 
-- **Status:** accepted
+- **Status:** accepted; extended by [0176](0176-the-host-page-changes-the-chosen-records-of-a-page-and-the-studio-grants-who-may-and-in-which-fields.md): a deletion of the chosen records and a change of them are one rule -- their states, what became of each record, the marks, the settled choice, the hold and Check them -- in `chosen-request.ts` and `chosen-flow.ts`, the files that held the deletion alone renamed, and one of them is out at a time
 - **Date:** 2026-11-22
 - **Deciders:** Daniel Bacher
 - **Verified by:** the host page's Delete the chosen…, its confirmation

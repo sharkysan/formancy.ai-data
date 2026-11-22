@@ -220,14 +220,36 @@ from a generation that offered delete, or imported, naming nobody or
 not -- is listed with a Remove. A reviewer sees who may delete chosen
 records together under the draft's policy
 ([0174](../decisions/0174-the-host-page-deletes-the-chosen-records-of-a-page-and-the-studio-grants-who-may.md)).
-Who may change chosen records together, `bulk.update`, has no control
-here: an administrator writes it into the policy by hand. Ticking or
-unticking a delete box, and the Remove of a delete grant, keep it as it
-is; a form that offers an update of one record but no delete -- rows
-saved with their record -- lists neither it nor a `bulk` that names no
-operation as a grant to remove; and a reviewer sees its roles and fields
-under the draft's policy
+Ticking or unticking a delete box, and the Remove of a delete grant, keep
+who may change chosen records together, `bulk.update`, as it is; a form
+that offers an update of one record but no delete -- rows saved with their
+record -- lists neither it nor a `bulk` that names no operation as a grant
+to remove; and a reviewer sees its roles and fields under the draft's
+policy
 ([0175](../decisions/0175-chosen-records-are-changed-each-on-its-own-to-the-values-given-in-fields-a-policy-names.md)).
+
+"Who may change chosen records together, and in which fields" grants it:
+a box for each role given update, under Roles that may change them, and
+one for each field of the form, under Fields they may set, none ticked,
+each read with a note of what changing together does -- each record on its
+own, one value for every record, a set that can end half changed. A field
+no change of chosen records may set is shown unticked and not offered,
+saying why in the server's own words: the record's key, a field written on
+create only or by the database, one the server stamps or a row filter
+pins, a version chain's, the field rows are saved with their record by,
+one a rule of the form reads together with another, and one a role you
+ticked may not write -- every role the grant names must write each of its
+fields -- or, before any role is ticked, one nobody given update writes.
+Nothing is granted until a role and a field are both ticked, which the
+step says, as you tick, while only one is; then the policy holds exactly
+`bulk.update { roles, fields }`. A role or a field a grant names that the
+server refuses keeps its box, ticked and saying why, until it is
+unticked -- a field the form no longer has among them, after the form's
+own, by its key. A form that offers no update, and one nobody may update
+with yet, offer no box, each saying why; rows saved with their record keep an
+update of a row alone, so they offer this, never the field that names the
+record they are saved with
+([0176](../decisions/0176-the-host-page-changes-the-chosen-records-of-a-page-and-the-studio-grants-who-may-and-in-which-fields.md)).
 
 Under each field's help text, the Presentation step says what a new record
 starts the field with, as the generator noted it -- "Generated: Starts with

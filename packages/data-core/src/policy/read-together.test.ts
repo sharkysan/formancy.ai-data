@@ -1,6 +1,6 @@
 import type { FormSchema, LogicRule } from '@formancy/spec'
 import { describe, expect, test } from 'vitest'
-import { readTogether, readTogetherProblems } from './read-together.js'
+import { readTogether, readTogetherProblems, readTogetherReason } from './read-together.js'
 import type { FormPolicy } from './types.js'
 
 /*
@@ -130,5 +130,14 @@ describe('readTogetherProblems', () => {
     expect(readTogetherProblems(visible, policy(['amount']))).toEqual([])
     const { bulk: _bulk, ...granting } = policy([])
     expect(readTogetherProblems(visible, granting)).toEqual([])
+  })
+
+  // The studio says why it offers no such field in these words (0176):
+  // the reason after the key is readTogetherReason's, one function for
+  // the check and the box (watched failing with the check worded on its
+  // own: "expected [ Array(1) ] to deeply equal [ Array(1) ]").
+  test('says why in the words the studio shows beside the field', () => {
+    const visible = form([{ target: 'notes', kind: 'visible', cel: 'status == "shipped"' }])
+    expect(readTogetherProblems(visible, policy(['status']))).toEqual([`bulk.update.fields: status ${readTogetherReason('notes')}`])
   })
 })

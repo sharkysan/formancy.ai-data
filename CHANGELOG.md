@@ -43,6 +43,11 @@ which are kept unchanged under a heading of their own below it (0171).
   to one value for every record, checked once, each record answered as its
   update alone, so a refused one leaves the rest changed.
   `@formancy/data-core` now depends on `@formancy/expressions` 0.13.0.
+- **The host page changes the chosen records of a page, and the studio
+  grants who may and in which fields**
+  ([0176](docs/decisions/0176-the-host-page-changes-the-chosen-records-of-a-page-and-the-studio-grants-who-may-and-in-which-fields.md)):
+  Change the chosen… draws the fields ticked on paper, confirms each value,
+  and answers by the rule a deletion of them does.
 
 ### Changed
 

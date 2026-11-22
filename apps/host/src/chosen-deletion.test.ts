@@ -1,46 +1,49 @@
 import { describe, expect, test } from 'vitest'
 import type { ChosenRecordOutcome, DeleteChosenOutcome, Reconciliation, UnknownChosen } from '@formancy/data-client'
 import {
-  answer,
-  ask,
   CASCADES_CHOSEN,
+  CLEARS_CHOSEN,
+  EACH_ON_ITS_OWN,
+  GONE,
+  lead,
+  MAY_HAVE,
+  NONE_DELETED,
+  NOT_SENT_ONE,
+  REMOVED_CHOSEN,
+  RESTRICTED_CHOSEN,
+  STILL_OPEN,
+} from './chosen-deletion.js'
+import {
+  answer,
+  askDelete,
   checked,
   checking,
   chosenWork,
-  CLEARS_CHOSEN,
   close,
-  EACH_ON_ITS_OWN,
   frameOf,
-  GONE,
-  goneOf,
   heading,
   IDLE,
   keepOpen,
-  lead,
+  leftOf,
   lines,
-  MAY_HAVE,
   marksOf,
-  NONE_DELETED,
-  NOT_SENT_ONE,
   notSent,
   recordClosed,
-  REMOVED_CHOSEN,
-  RESTRICTED_CHOSEN,
   saysDone,
   send,
   settledText,
-  STILL_OPEN,
   stillOpenText,
   summary,
   toCheck,
-} from './chosen-deletion.js'
-import type { ChosenDeletion, ChosenTarget } from './chosen-deletion.js'
+} from './chosen-request.js'
+import type { ChosenRequest, ChosenTarget } from './chosen-request.js'
 import { CASCADES, NOT_FOUND, REMOVED, RESTRICTED } from './deletion.js'
 import type { Said } from './leave.js'
 import { DECLINED_BY } from './words.js'
 
 /*
- * A deletion of the records chosen of a page (0174), as a table of what
+ * A deletion of the records chosen of a page (0174), through the rule a
+ * change of them shares (chosen-request.ts, 0176), as a table of what
  * each answer the client can give makes of each record: its fate, what
  * the region says of it, what its box is marked with, which records leave
  * the choice and what the guard counts. Pure: the region and the bar are
@@ -50,12 +53,12 @@ import { DECLINED_BY } from './words.js'
 
 const at = (record: string, version = '1') => ({ record, version })
 const target = (...records: string[]): ChosenTarget => ({ noun: 'Order', records: records.map((record) => at(record)) })
-const sending = (records: readonly string[]): ChosenDeletion =>
+const sending = (records: readonly string[]): ChosenRequest =>
   send(
-    ask(IDLE, target(...records), []),
+    askDelete(IDLE, target(...records), []),
     records.map((record) => at(record)),
   )
-const answered = (now: ChosenDeletion): ChosenDeletion & { state: 'answered' } => {
+const answered = (now: ChosenRequest): ChosenRequest & { state: 'answered' } => {
   if (now.state !== 'answered') throw new Error(`the deletion is ${now.state}, not answered`)
   return now
 }
@@ -91,8 +94,8 @@ describe('the confirmation', () => {
     expect(lead({ cascades: true, clears: false, restricted: false }, 3)).toEqual([EACH_ON_ITS_OWN, REMOVED_CHOSEN, CASCADES_CHOSEN])
     expect(lead({ cascades: false, clears: true, restricted: true }, 2)).toEqual([EACH_ON_ITS_OWN, REMOVED_CHOSEN, CLEARS_CHOSEN, RESTRICTED_CHOSEN])
     expect(lead({ cascades: true, clears: false, restricted: true }, 1)).toEqual([REMOVED, CASCADES, RESTRICTED])
-    expect(heading(target('k1:7', 'k1:8', 'k1:10'), true)).toBe('Delete 3 chosen Order records?')
-    expect(heading(target('k1:7'), false)).toBe('Delete 1 chosen Order record')
+    expect(heading('delete', target('k1:7', 'k1:8', 'k1:10'), true)).toBe('Delete 3 chosen Order records?')
+    expect(heading('delete', target('k1:7'), false)).toBe('Delete 1 chosen Order record')
   })
 
   // A deletion out, or one whose fate is not known yet, is asked again --
@@ -103,9 +106,9 @@ describe('the confirmation', () => {
   // "expected { state: 'confirming', …(3) } to match object { state:
   // 'sending', n: 2, …(1) }").
   test('asked again while out is the same deletion, focused again, and sends the versions given', () => {
-    const out = send(ask(IDLE, target('k1:1', 'k1:2'), []), [at('k1:1', '4'), at('k1:2')])
+    const out = send(askDelete(IDLE, target('k1:1', 'k1:2'), []), [at('k1:1', '4'), at('k1:2')])
     expect(out).toMatchObject({ state: 'sending', target: { records: [at('k1:1', '4'), at('k1:2')] } })
-    const again = ask(out, target('k1:3'), [])
+    const again = askDelete(out, target('k1:3'), [])
     expect(again).toMatchObject({ state: 'sending', n: out.state === 'idle' ? 0 : out.n + 1, target: { records: [at('k1:1', '4'), at('k1:2')] } })
     expect(chosenWork(again)).toBe('deleting')
     expect(close(again)).toBe(again)
@@ -148,7 +151,7 @@ describe('what the server answered', () => {
       `Order k1:6: The connection to the database closed before the answer arrived. ${MAY_HAVE}`,
     ])
     expect(text(notSent(now) ?? [])).toBe('Not sent, so not deleted: Order k1:7 and Order k1:8.')
-    expect([...goneOf(now)]).toEqual(['k1:1', 'k1:3'])
+    expect([...leftOf(now)]).toEqual(['k1:1', 'k1:3'])
     expect(Object.fromEntries(marksOf(now))).toEqual({
       'k1:2': `Not deleted. ${STALE}`,
       'k1:4': `Not deleted. ${REFERENCED}`,
@@ -212,7 +215,7 @@ describe('what the server answered', () => {
     expect(now.state).toBe('refused')
     expect(now).toMatchObject({ message: 'The form no longer matches its table.', declined: false })
     expect(chosenWork(now)).toBeNull()
-    expect([...goneOf(now)]).toEqual([])
+    expect([...leftOf(now)]).toEqual([])
   })
 })
 
@@ -257,7 +260,7 @@ describe('a request whose answer was lost', () => {
       'Order k1:2: It is still stored, and has changed since you saw it.',
       'Order k1:4: The database is not answering. Whether it was deleted is still unknown.',
     ])
-    expect([...goneOf(found)]).toEqual(['k1:3'])
+    expect([...leftOf(found)]).toEqual(['k1:3'])
     expect(marksOf(found).get('k1:1')).toBe('Not deleted. It is still stored, at the version you saw.')
     expect(chosenWork(found)).toBe('delete-unknown')
     expect(toCheck(found)?.records).toEqual([at('k1:4')])

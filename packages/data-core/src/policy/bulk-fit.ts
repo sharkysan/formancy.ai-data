@@ -63,10 +63,8 @@ function updateFit(policy: ParsedPolicy, grant: ParsedBulkUpdate | null, binding
     .filter((role) => !policy.operations.update.has(role))
     .sort(byCodepoint)
     .map((role) => `bulk.update grants ${role}, who may not update with this form: each chosen record is an update of its own`)
-  const pinned = new Set(policy.rowFilters.map((rule) => rule.column))
   for (const field of grant.fields) {
-    const binding = bindings.fields.find((candidate) => candidate.field === field)
-    const refused = binding === undefined ? 'is not a field of this form' : unsettable(binding, bindings, pinned)
+    const refused = unsettableField(policy, bindings, field)
     if (refused !== null) {
       problems.push(`bulk.update.fields: ${field} ${refused}`)
       continue
@@ -77,6 +75,26 @@ function updateFit(policy: ParsedPolicy, grant: ParsedBulkUpdate | null, binding
     }
   }
   return problems
+}
+
+/**
+ * Why no change of chosen records may set `field` of this form, whoever
+ * is granted it, or `null` where one may (0175): what `validatePolicy`
+ * refuses a `bulk.update` field for, in its words -- a field that is not
+ * the form's, or `unsettable`'s first reason. The studio offers a field by
+ * it (0176), so a box it draws and the check it publishes past are one
+ * rule. Whether a role may write it is the grant's other check, and
+ * whether a rule reads it together with another is the form's
+ * (`readTogether`).
+ */
+export function unsettableField(
+  policy: { readonly rowFilters: ReadonlyArray<{ readonly column: string }> },
+  bindings: FormBindings,
+  field: string,
+): string | null {
+  const binding = bindings.fields.find((candidate) => candidate.field === field)
+  if (binding === undefined) return 'is not a field of this form'
+  return unsettable(binding, bindings, new Set(policy.rowFilters.map((rule) => rule.column)))
 }
 
 /**

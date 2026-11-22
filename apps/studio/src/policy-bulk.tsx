@@ -42,8 +42,8 @@ interface GrantProps {
  * check says in its words; on a form that offers none, the grant is listed
  * to be removed (`StrayGrant`).
  *
- * Who may change them (0175), `bulk.update`, has no control here: an
- * administrator writes it by hand, and every edit here keeps it
+ * Who may change them (0175), `bulk.update`, is granted beside it
+ * (policy-bulk-change.tsx, 0176), and every edit here keeps it
  * (`withBulkDeleteRoles`). It is no stray grant where the form offers an
  * update alone, nor is a `bulk` that names no operation; one the form
  * cannot offer is the policy check's to name.

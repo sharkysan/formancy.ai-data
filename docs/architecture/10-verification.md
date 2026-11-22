@@ -405,6 +405,39 @@ No test holds the Drill down levels that hold a chosen record other than
 the open one: the fixture has no form that is its own child and may be
 deleted.
 
+The host page's change of the records chosen and the studio's grant of it
+([0176](../decisions/0176-the-host-page-changes-the-chosen-records-of-a-page-and-the-studio-grants-who-may-and-in-which-fields.md)) were written on 2026-11-22 without a database. What needs
+none ran and was watched failing with its rule taken out: the fields
+offered, the paper narrowed to those ticked with no default, the state
+field's states from those the page read, what is sent and how the
+confirmation says each value, a deletion and a change never out at once,
+and each record's fate in a change's words, a lost answer checked as an
+update's -- and, after review, the state field required and its box
+refused where no chosen record may move, a checkbox at no, a record a
+check cannot find counted as known, and a read again refused said in the
+region (`apps/host/src/chosen-change.test.ts`); the deletion's own table,
+its assertions as 0174 wrote them, run against the rule the two now share
+(`chosen-deletion.test.ts`); the answers the choice keeps
+(`chosen-rows.test.ts`) and the open record read again after a change
+(`leave.test.ts`), each run with a configuration of its own that starts no
+database; the reasons the studio shows, one function with the server's
+checks (`packages/data-core/src/policy/validate.test.ts`,
+`policy/read-together.test.ts`); and the Policy step's boxes, nobody by
+default, each refused field said why, publishing exactly what is ticked,
+a field offered only where every role ticked may write it, one the form
+no longer binds kept ticked until unticked, and nothing granted yet said
+in a live region (`apps/studio/src/policy-bulk.test.tsx`). The change
+against the real server on both engines -- changed, stale, a move refused from its own
+state, a field cleared, the paper under React and under Angular with a
+lookup's typeahead, the open record read again, and said where that read
+is refused, the state field's box refused over shipped orders, a lost
+answer and Check them, a question closed by a change of the choice, a
+second press sending nothing and the open record's Save held
+(`bulk-update.test.tsx`), axe in each state (`page.test.tsx`), the route
+sent on the page's own origin (`plane.test.tsx`) -- and the browser
+gate's three states run first in CI. No test holds a lookup's label that
+cannot be read.
+
 `sharedCases()` derives every case id, and a test declares the ones it
 asserts with `covers()`. The release report keeps a matrix of every case on
 each engine and fails a run in which one is missing or failed on either. What

@@ -250,8 +250,7 @@ export function withActionRoles(policy: FormPolicy, name: string, roles: readonl
 /**
  * The policy with who may delete the chosen records of a page together
  * (0173) set to `roles`, and who may change them (0175) kept as the policy
- * holds it: the studio offers no control for that grant, which an
- * administrator writes by hand, so nothing here may lose it.
+ * holds it, which `withBulkUpdate` sets.
  * `bulk.delete` is left out when it names nobody, and `bulk` when it then
  * names neither -- absent is nobody's, and a policy that grants none stays
  * one a server older than 0173 still reads.
@@ -260,6 +259,22 @@ export function withBulkDeleteRoles(policy: FormPolicy, roles: readonly string[]
   const { bulk, ...rest } = policy
   const { delete: _, ...kept } = bulk ?? {}
   const next: NonNullable<FormPolicy['bulk']> = roles.length === 0 ? kept : { ...kept, delete: { roles: [...roles] } }
+  return next.update === undefined && next.delete === undefined ? rest : { ...rest, bulk: next }
+}
+
+/**
+ * The policy with who may change the chosen records of a page together,
+ * and in which fields (0175, 0176), set to `roles` and `fields`, and who
+ * may delete them kept as the policy holds it. Exactly `bulk.update {
+ * roles, fields }`, left out when it names no role or no field -- a grant
+ * of nobody, or of nothing, which the server would refuse -- and `bulk`
+ * when it then names neither.
+ */
+export function withBulkUpdate(policy: FormPolicy, roles: readonly string[], fields: readonly string[]): FormPolicy {
+  const { bulk, ...rest } = policy
+  const { update: _, ...kept } = bulk ?? {}
+  const next: NonNullable<FormPolicy['bulk']> =
+    roles.length === 0 || fields.length === 0 ? kept : { ...kept, update: { roles: [...roles], fields: [...fields] } }
   return next.update === undefined && next.delete === undefined ? rest : { ...rest, bulk: next }
 }
 

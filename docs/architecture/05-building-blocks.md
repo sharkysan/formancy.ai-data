@@ -512,6 +512,11 @@ there to remove, which `src/draft-policy.tsx` names to a draft's reviewer
 keeping through every edit a change of chosen records written by hand,
 `bulk.update`, which it names to the reviewer with its fields
 ([0175](../decisions/0175-chosen-records-are-changed-each-on-its-own-to-the-values-given-in-fields-a-policy-names.md));
+`src/policy-bulk-change.tsx` grants who may change them and in which
+fields, a box for each role given update and for each field, through
+`src/policy-model.ts`'s `withBulkUpdate`, a field it does not offer saying
+why in data-core's `unsettableField` and `readTogetherReason`
+([0176](../decisions/0176-the-host-page-changes-the-chosen-records-of-a-page-and-the-studio-grants-who-may-and-in-which-fields.md));
 `src/versions.tsx` and `src/import.tsx` download and import a version's file
 (0062). Its tests run the real `createDataServer` behind a fake `fetch`
 (`src/test-server.ts`), and `src/journey.test.tsx` fails on any request
@@ -640,11 +645,16 @@ the same flow over the records a person chose of the Records grid's page:
 read, `src/choose-column.tsx` the grid's first column of boxes, and
 `src/selection-bar.tsx` the bar above the grid with its actions and the
 region under it ([0166](../decisions/0166-a-person-chooses-a-pages-records-by-a-column-of-boxes-and-runs-an-action-over-them-from-a-bar-above-the-grid.md)),
-and where the form offers it the deletion of the records chosen:
-`src/chosen-deletion.ts` its states and words, `src/chosen-delete-flow.ts`
-it against the server and the guard, and `src/chosen-delete-region.tsx`
-its confirmation and what became of each record, under the bar
-([0174](../decisions/0174-the-host-page-deletes-the-chosen-records-of-a-page-and-the-studio-grants-who-may.md)); `src/master-panes.ts` makes the record's own forms, one session
+and where the form offers them the deletion or the change of the records
+chosen, one rule for both: `src/chosen-request.ts` their states and what
+became of each record, `src/chosen-flow.ts` and `src/chosen-flow-state.ts`
+a request against the server and the guard, and `src/chosen-region.tsx`
+its confirmation and what the server answered, under the bar
+([0174](../decisions/0174-the-host-page-deletes-the-chosen-records-of-a-page-and-the-studio-grants-who-may.md));
+`src/chosen-deletion.ts` what a deletion alone says, and
+`src/chosen-change.ts`, `src/chosen-change-flow.ts` and
+`src/chosen-change-region.tsx` a change's fields on paper, its values and
+its words ([0176](../decisions/0176-the-host-page-changes-the-chosen-records-of-a-page-and-the-studio-grants-who-may-and-in-which-fields.md)); `src/master-panes.ts` makes the record's own forms, one session
 per renderer, as the guard knows them;
 `src/unknown-notice.tsx` an unknown write (0031). The address names the
 form, layout and view, never the record (`src/layout.ts`), and an arrival

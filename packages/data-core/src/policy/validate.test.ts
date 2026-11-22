@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import type { FieldBinding, FieldWrites, FormBindings } from '../generate/types.js'
 import type { FormPolicy } from './types.js'
+import { unsettableField } from './bulk-fit.js'
 import { validatePolicy } from './validate.js'
 
 /*
@@ -449,6 +450,19 @@ describe('validatePolicy', () => {
     )
     expect(policy(['order'], together)).toEqual([
       "bulk.update.fields: order names the record this form's rows are saved with, which a row keeps from its create (0155)",
+    ])
+    // The studio offers a field by `unsettableField` (0176): each reason it
+    // shows beside a box is the one this check refuses the grant for, one
+    // function the check asks too, and a field it offers is one the check
+    // accepts (watched failing with the pinned column left out of
+    // `unsettableField`: "expected [ …(5) ] to deeply equal [ …(6) ]").
+    const refused = ['code', 'created', 'total', 'changed_by', 'tenant_id', 'missing']
+    const why = (field: string, of: FormBindings): string | null => unsettableField({ rowFilters: [{ column: 'tenant_id' }] }, of, field)
+    expect(policy(refused, form)).toEqual(refused.map((field) => `bulk.update.fields: ${field} ${String(why(field, form))}`))
+    expect([why('note', form), why('order', together), why('valid_from', versions)]).toEqual([
+      null,
+      "names the record this form's rows are saved with, which a row keeps from its create (0155)",
+      "is a version's start, end or chain, which a change from a date writes (0113)",
     ])
   })
 

@@ -31,3 +31,23 @@ export function withoutField(form: FormSchema, key: string): FormSchema {
     ...(form.logic === undefined ? {} : { logic: { ...form.logic, ...(rules === undefined ? {} : { rules }) } }),
   }
 }
+
+/**
+ * `form` narrowed to `keys`: every other field left out by `withoutField`,
+ * and a section, row or other container left with none of them dropped
+ * with its heading, as nothing of it is drawn -- the fields a change of
+ * chosen records sets, on paper (0176).
+ */
+export function onlyFields(form: FormSchema, keys: readonly string[]): FormSchema {
+  type Node = NonNullable<FormSchema['layouts']>[number]['nodes'][number]
+  const narrowed = form.model.fields.reduce((left, field) => (keys.includes(field.key) ? left : withoutField(left, field.key)), form)
+  const held = (nodes: readonly Node[]): Node[] =>
+    nodes.flatMap((node): Node[] => {
+      if (node.kind === 'field') return [node]
+      if (!('children' in node)) return []
+      const children = held(node.children)
+      return children.length === 0 ? [] : [{ ...node, children }]
+    })
+  if (narrowed.layouts === undefined) return narrowed
+  return { ...narrowed, layouts: narrowed.layouts.map((layout) => ({ ...layout, nodes: held(layout.nodes) })) }
+}

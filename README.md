@@ -118,8 +118,8 @@ and [host page's](./docs/guide/host.md) pages picture them.
   and its rows in one transaction, and a lost answer said, never sent again.
 - **Actions**: a routine your database keeps, run over the open record or
   the records a person chose, in one transaction.
-- **Deletes, copies and CSV files** -- the records a person chose deleted
-  together, each named that was not -- and **rules a record keeps**: status
+- **Deletes, copies and CSV files** -- the records a person chose changed
+  or deleted together, each named that was not -- and **rules a record keeps**: status
   moves by role, versions from a date, and your triggers' own refusals.
 - **The studio**, for every step from connecting to drift, with review by a
   second person where you want it.
@@ -129,8 +129,8 @@ and [host page's](./docs/guide/host.md) pages picture them.
 ## What it does not do yet
 
 - No undo, and no file or copy of a record with its children.
-- An action, or a deletion of chosen records, covers at most one page of
-  them at a time.
+- An action, or a change or a deletion of chosen records, covers at most
+  one page of them at a time.
 - A SQL Server older than 2019 cannot be discovered; no test runs on Azure
   SQL or logs in as an Entra principal.
 - No host page on another origin has run in a browser, and nothing through

@@ -131,6 +131,28 @@ describe('what each way of leaving a form discards', () => {
     expect(of({ kind: 'ran', record: 'k1:1', label: 'Close the order', agreed: ['react', 'angular'] })).toEqual([])
   })
 
+  // The open record read again once a change of the chosen records changed
+  // it (0176) is the same read: its own forms, never its deletion nor the
+  // records grid's request -- which is out, or just answered -- nor what
+  // its confirmation listed; and the notice says why it reads (watched
+  // failing with the request dropping as a row's does: "expected [ 'master
+  // react', …(2) ] to deeply equal [ 'master angular' ]").
+  test('the record read again after a change of chosen records drops its own forms, and asks only about those not listed', () => {
+    const changing: PaneWork[] = [
+      { owner: 'master', renderer: 'react', name: ['Order ', { code: 'k1:1' }], work: 'changed' },
+      { owner: 'master', renderer: 'angular', name: ['Order ', { code: 'k1:1' }], work: 'changed' },
+      { owner: 'master', renderer: null, name: ['Order ', { code: 'k1:1' }], work: 'deleting' },
+      { owner: gridOwner('master'), renderer: null, name: ['Change 2 chosen Order records'], work: 'changing' },
+    ]
+    const of = (request: LeaveRequest): string[] => atRisk(request, changing).map((pane) => `${pane.owner} ${String(pane.renderer)}`)
+    expect(of({ kind: 'changed-chosen', record: 'k1:1', agreed: ['react'] })).toEqual(['master angular'])
+    expect(lead({ kind: 'changed-chosen', record: 'k1:1' })).toEqual([
+      'Reading ',
+      { code: 'k1:1' },
+      ' again, since it was changed with the chosen records, closes these forms:',
+    ])
+  })
+
   // The renderer switch hides a renderer's forms everywhere on the page,
   // and a hidden form is not mounted: its work goes with it, so it is asked
   // about, in the record and in every child, and the shown renderer's is not.
@@ -345,7 +367,8 @@ describe('what the notice says', () => {
 
   // Each kind of unsaved work in its own words: a save the server has not
   // answered and one that may have been stored are not "changes", and
-  // discarding them is not the same loss.
+  // discarding them is not the same loss; nor is a change of chosen
+  // records out, or one that may have been made (0176), a deletion.
   test('says each kind of work in its own sentence', () => {
     expect(WORK).toEqual({
       changed: 'changes that are not saved.',
@@ -355,6 +378,8 @@ describe('what the notice says', () => {
       'delete-unknown': 'a deletion that may have been done, not yet checked.',
       running: 'an action the server has not answered yet.',
       'run-unknown': 'an action that may have run, not yet checked.',
+      changing: 'a change the server has not answered yet.',
+      'change-unknown': 'a change that may have been made, not yet checked.',
     })
   })
 })
