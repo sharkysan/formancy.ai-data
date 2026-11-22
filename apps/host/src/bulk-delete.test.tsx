@@ -11,6 +11,7 @@ import { barSays, box, choiceBar, choiceSaid } from './test-choosing.js'
 import {
   answer,
   chooseForm,
+  chooseRenderer,
   control,
   formLink,
   gridSection,
@@ -239,6 +240,8 @@ describe.each(ENGINES)('deleting the chosen records on $engine', (engine) => {
     const line = await plane.clerk.create(engine.lines, { order, line_no: '1', quantity: '1', unit_price: '1.00' })
     if (!line.ok || line.value.record === null) throw new Error('the line was not created')
     const user = await chosenPage(plane.fetch, engine.formId, notes, [order, other])
+    // Both renderers on, so the Angular form can be typed into while it asks.
+    await chooseRenderer(user)
     await load(user, order)
     await loaded(order)
     await answer(user, 'React', 'Notes', `${notes} typed`)
@@ -404,9 +407,11 @@ describe.each(ENGINES)('deleting the chosen records on $engine', (engine) => {
   // delete in 0053's words; Clear the choice closes that. Pressed with
   // nothing chosen, Delete the chosen… is no dead end: it says what to do
   // first and sends nothing. And a form that grants a delete of one record
-  // and no deletion of chosen records -- an order's lines, each row with
-  // its Delete -- has neither the boxes nor the bar: they follow
-  // `bulk.delete`, never a delete alone (to be watched failing in CI with
+  // and no deletion of chosen records -- an order's lines on SQL Server,
+  // each row with its Delete; on PostgreSQL their typed key offers no
+  // delete at all, so there is no such form to ask -- has neither the boxes
+  // nor the bar: they follow `bulk.delete`, never a delete alone (to be
+  // watched failing in CI with
   // the question kept past its choice: the region still there, 1 chosen;
   // and with Escape left to the page: the keyboard on the region still).
   test('a question closes when the choice changes, nothing sent; and nothing chosen says what to do first', async () => {
@@ -447,6 +452,7 @@ describe.each(ENGINES)('deleting the chosen records on $engine', (engine) => {
     expect(deletesSent(from)).toBe(0)
     expect([await stored(engine.removable, first), await stored(engine.removable, second)]).toEqual([true, true])
 
+    if (engine.engine !== 'SQL Server') return
     const order = await freshOrder(engine, note)
     const line = await plane.clerk.create(engine.lines, { order, line_no: '1', quantity: '1', unit_price: '1.00' })
     if (!line.ok) throw new Error(line.message)
@@ -501,7 +507,14 @@ describe.each(ENGINES)('deleting the chosen records on $engine', (engine) => {
       return shown as HTMLElement
     }, ARRIVES)
     await user.click(within(asked).getByRole('button', { name: 'Discard and continue' }))
-    await loaded(third)
+    // Loaded after the typing was discarded, which its status line says first.
+    await waitFor(
+      () =>
+        expect(within(screen.getByRole('region', { name: `Order ${third}` })).getAllByRole('status')[0]?.textContent).toMatch(
+          new RegExp(`^Discarded the unsaved changes\\. Loaded record ${third.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} into `),
+        ),
+      ARRIVES,
+    )
     await answer(user, 'React', 'Notes', `${notes} typed on another`)
     await save(user, 'React')
     await said('React', heldSaid)

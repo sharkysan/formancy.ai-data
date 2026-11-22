@@ -83,8 +83,8 @@
   closed by Escape, by Keep them, by a box unticked and by Clear the
   choice, the keyboard back on the bar's button, one record's question in
   a delete's own words, nothing chosen saying what to do first, and no
-  box on the order lines, which grant a delete and no deletion of chosen
-  records; a second press while out sending nothing, the open order's
+  box on SQL Server's order lines, which grant a delete and no deletion
+  of chosen records (on PostgreSQL they offer no delete to ask); a second press while out sending nothing, the open order's
   Save held, and another order's opened meanwhile; and Delete them
   waiting for a save of the open order out, then sending the version it
   moved to.
