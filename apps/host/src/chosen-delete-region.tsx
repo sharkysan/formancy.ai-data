@@ -1,7 +1,8 @@
 import type { KeyboardEvent, ReactElement } from 'react'
 import type { Deleting } from '@formancy/data-client'
 import type { ChosenDelete } from './chosen-delete-flow.js'
-import { DISCARDED_WITH_THEM, heading, lead, lines, NONE_DELETED, notSent, summary } from './chosen-deletion.js'
+import { DISCARDED_WITH_THEM, frameOf, heading, lead, lines, NONE_DELETED, notSent, saysDone, stillOpenText, summary } from './chosen-deletion.js'
+import type { ChosenDeletion } from './chosen-deletion.js'
 import { DELETING, SAVE_OUT } from './deletion.js'
 import { RENDERER_NAMES, WORK } from './leave.js'
 import { ServerDid } from './server-did.js'
@@ -20,15 +21,17 @@ import { DECLINED_BY, RegionHeading, Words } from './words.js'
  *   deletes; Escape is Keep them. While a save of the open record chosen
  *   is out, Delete them says so and waits; while the deletion is out, both
  *   answers say so and do nothing.
- * - **answered**: "Deleted 2 of 3 records." in the room's teal for a
- *   moment (0146) -- what the server did -- then each record not deleted,
- *   by the words a row's Delete names it with, in the server's words, and
- *   the records the request stopped before; the region the keyboard is
- *   taken to is described by all of it, so it is said as it lands. Framed
- *   in teal where some were deleted, in the warm colour of a refusal where
- *   none was. A record whose fate is not known offers Check them, framed
- *   as a save that may have been stored is, and Close only once every
- *   fate is: the guard counts it until then.
+ * - **answered**: "Deleted 2 of 3 records.", in the room's teal for a
+ *   moment where it deleted some (0146) -- what the server did -- then each
+ *   record not deleted, by the words a row's Delete names it with, in the
+ *   server's words, and the records the request stopped before; the region
+ *   the keyboard is taken to is described by all of it, so it is said as it
+ *   lands. Framed in teal where some were deleted, in the warm colour of a
+ *   refusal where none was. A record whose fate is not known offers Check
+ *   them, framed as a save that may have been stored is, and Close only
+ *   once every fate is: the guard counts it until then. The open record a
+ *   check found gone and left open, its forms holding work, is named, with
+ *   Close the record.
  * - **refused**: the server's sentence verbatim, a reason the deployment
  *   worded said as its own (0156), and that none was deleted.
  *
@@ -41,7 +44,8 @@ export function ChosenDeleteRegion({ flow, idBase }: { flow: ChosenDelete; idBas
   const now = flow.deletion
   if (now.state === 'idle' || flow.deleting === null) return null
   if (now.state === 'confirming' || now.state === 'sending') return <ChosenConfirm flow={flow} deleting={flow.deleting} idBase={idBase} />
-  return <ChosenOutcome flow={flow} idBase={idBase} />
+  if (now.state === 'refused') return <ChosenRefused flow={flow} now={now} idBase={idBase} />
+  return <ChosenAnswered flow={flow} now={now} idBase={idBase} />
 }
 
 function ChosenConfirm({ flow, deleting, idBase }: { flow: ChosenDelete; deleting: Deleting; idBase: string }): ReactElement | null {
@@ -110,53 +114,71 @@ function ChosenConfirm({ flow, deleting, idBase }: { flow: ChosenDelete; deletin
   )
 }
 
-/** What the server answered, a focused region the keyboard is taken to, never an alert -- which would say it twice. */
-function ChosenOutcome({ flow, idBase }: { flow: ChosenDelete; idBase: string }): ReactElement | null {
-  const now = flow.deletion
-  const headingId = `${idBase}-heading`
-  const region = { role: 'region', 'aria-labelledby': headingId, tabIndex: -1, ref: flow.regionRef } as const
-  const closes = (
+/** The props of what the server answered: the flow, and its state as drawn. */
+interface Answered<State extends ChosenDeletion['state']> {
+  flow: ChosenDelete
+  now: ChosenDeletion & { state: State }
+  idBase: string
+}
+
+/** What the server answered is a focused region the keyboard is taken to, never an alert -- which would say it twice. */
+const regionOf = (flow: ChosenDelete, idBase: string) =>
+  ({ role: 'region', 'aria-labelledby': `${idBase}-heading`, tabIndex: -1, ref: flow.regionRef }) as const
+
+function Close({ flow }: { flow: ChosenDelete }): ReactElement {
+  return (
     <button type="button" className="button" onClick={flow.close}>
       Close
     </button>
   )
-  if (now.state === 'refused') {
-    const described = now.declined ? `${idBase}-message ${idBase}-declined ${idBase}-none` : `${idBase}-message ${idBase}-none`
-    return (
-      <div {...region} className="notice" data-kind="refused" aria-describedby={described}>
-        <RegionHeading level={4} id={headingId}>
-          Not deleted
-        </RegionHeading>
-        <p id={`${idBase}-message`} className="notice-text">
-          {now.message}
+}
+
+/** The request refused whole, in the server's words: nothing deleted. */
+function ChosenRefused({ flow, now, idBase }: Answered<'refused'>): ReactElement {
+  const described = now.declined ? `${idBase}-message ${idBase}-declined ${idBase}-none` : `${idBase}-message ${idBase}-none`
+  return (
+    <div {...regionOf(flow, idBase)} className="notice" data-kind="refused" aria-describedby={described}>
+      <RegionHeading level={4} id={`${idBase}-heading`}>
+        Not deleted
+      </RegionHeading>
+      <p id={`${idBase}-message`} className="notice-text">
+        {now.message}
+      </p>
+      {now.declined ? (
+        <p id={`${idBase}-declined`} className="notice-text">
+          {DECLINED_BY}
         </p>
-        {now.declined ? (
-          <p id={`${idBase}-declined`} className="notice-text">
-            {DECLINED_BY}
-          </p>
-        ) : null}
-        <p id={`${idBase}-none`} className="notice-text">
-          {NONE_DELETED}
-        </p>
-        <div className="notice-actions">{closes}</div>
+      ) : null}
+      <p id={`${idBase}-none`} className="notice-text">
+        {NONE_DELETED}
+      </p>
+      <div className="notice-actions">
+        <Close flow={flow} />
       </div>
-    )
-  }
-  if (now.state !== 'answered') return null
+    </div>
+  )
+}
+
+/** What became of each record: how many were deleted, each not deleted, those never sent, and the open record a check left open. */
+function ChosenAnswered({ flow, now, idBase }: Answered<'answered'>): ReactElement {
   const named = lines(now)
   const stopped = notSent(now)
-  const unknown = now.each.some(({ fate }) => fate.kind === 'unknown' || fate.kind === 'lost')
-  // Teal where the server deleted some of them, as what it did; the warm colour of a refusal where it deleted none.
-  const deletedAny = now.each.some(({ fate }) => fate.kind === 'deleted' || fate.kind === 'gone')
-  // Every sentence it says, in order: how many it deleted, each record it did not, and those it never sent.
-  const described = [`${idBase}-summary`, ...(named.length === 0 ? [] : [`${idBase}-each`]), ...(stopped === null ? [] : [`${idBase}-stopped`])].join(' ')
+  const frame = frameOf(now)
+  const open = flow.stillOpen
+  // Every sentence it says, in order: how many it deleted, each record it did not, those it never sent, and the record left open.
+  const described = [
+    `${idBase}-summary`,
+    ...(named.length === 0 ? [] : [`${idBase}-each`]),
+    ...(stopped === null ? [] : [`${idBase}-stopped`]),
+    ...(open === null ? [] : [`${idBase}-open`]),
+  ].join(' ')
   return (
-    <div {...region} className="notice" data-kind={unknown ? 'unknown' : deletedAny ? 'done' : 'refused'} aria-describedby={described}>
-      <RegionHeading level={4} id={headingId}>
+    <div {...regionOf(flow, idBase)} className="notice" data-kind={frame} aria-describedby={described}>
+      <RegionHeading level={4} id={`${idBase}-heading`}>
         {heading(now.target, false)}
       </RegionHeading>
       <p id={`${idBase}-summary`} className="notice-text">
-        {now.lost ? summary(now) : <ServerDid said={now.n}>{summary(now)}</ServerDid>}
+        {saysDone(now) ? <ServerDid said={now.said}>{summary(now)}</ServerDid> : summary(now)}
       </p>
       {named.length === 0 ? null : (
         <ul id={`${idBase}-each`} className="notice-list">
@@ -172,13 +194,23 @@ function ChosenOutcome({ flow, idBase }: { flow: ChosenDelete; idBase: string })
           <Words said={stopped} />
         </p>
       )}
+      {open === null ? null : (
+        <p id={`${idBase}-open`} className="notice-text">
+          <Words said={stillOpenText(now.target.noun, open)} />
+        </p>
+      )}
       <div className="notice-actions">
-        {unknown ? (
+        {open === null ? null : (
+          <button type="button" className="button" onClick={flow.closeRecord}>
+            Close the record
+          </button>
+        )}
+        {frame === 'unknown' ? (
           <button type="button" className="button" aria-disabled={now.checking ? 'true' : undefined} onClick={flow.check}>
             Check them
           </button>
         ) : (
-          closes
+          <Close flow={flow} />
         )}
       </div>
     </div>

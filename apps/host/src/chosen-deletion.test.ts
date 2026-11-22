@@ -10,20 +10,27 @@ import {
   CLEARS_CHOSEN,
   close,
   EACH_ON_ITS_OWN,
+  frameOf,
   GONE,
   goneOf,
   heading,
   IDLE,
+  keepOpen,
   lead,
   lines,
   MAY_HAVE,
   marksOf,
+  NONE_DELETED,
   NOT_SENT_ONE,
   notSent,
+  recordClosed,
   REMOVED_CHOSEN,
   RESTRICTED_CHOSEN,
+  saysDone,
   send,
   settledText,
+  STILL_OPEN,
+  stillOpenText,
   summary,
   toCheck,
 } from './chosen-deletion.js'
@@ -167,6 +174,34 @@ describe('what the server answered', () => {
     expect(settledText(now, [], (token) => token)).toBe('Nothing chosen.')
   })
 
+  // The count is said in the room's teal only as what the server did
+  // (0146): where this request deleted some, once for its answer -- a
+  // check, which says nothing new of what it deleted, leaves the number
+  // the teal is said by as it was -- and never "Deleted 0 of 2 records.",
+  // framed as a refusal is, nor the page's own sentence after a lost
+  // answer (watched failing with the teal said wherever the request was
+  // answered: "expected [ true, true, true ] to deeply equal [ true,
+  // false, false ]").
+  test('says the count in teal only where this request deleted some, once for its answer', () => {
+    const some = answered(answer(sending(['k1:1', 'k1:2']), { ok: true, value: [deleted('k1:1'), lostOne('k1:2')] }))
+    const none = answered(answer(sending(['k1:1', 'k1:2']), { ok: true, value: [refused(409, 'stale', STALE), refused(409, 'referenced', REFERENCED)] }))
+    const lost = answered(
+      answer(sending(['k1:1']), {
+        ok: false,
+        status: 0,
+        code: 'unknown-outcome',
+        message: 'lost',
+        operation: 'delete-chosen',
+        records: [at('k1:1')],
+        origin: 'transport',
+      }),
+    )
+    expect([saysDone(some), saysDone(none), saysDone(lost)]).toEqual([true, false, false])
+    expect([frameOf(some), frameOf(none), frameOf(lost)]).toEqual(['unknown', 'refused', 'unknown'])
+    const read = answered(checked(checking(some), [{ record: 'k1:2', reconciliation: { ok: true, state: 'absent' } }]))
+    expect([read.said, read.n, frameOf(read)]).toEqual([some.said, some.n + 1, 'done'])
+  })
+
   // Refused whole -- a drift, a connection the database will not let
   // delete, the deadline at the first record -- is nothing deleted, in the
   // server's words, and holds nothing (watched failing with the refusal
@@ -232,5 +267,46 @@ describe('a request whose answer was lost', () => {
     expect(chosenWork(all)).toBeNull()
     expect(toCheck(all)).toBeNull()
     expect(GONE).toBe('It is not there any more: this deletion, or somebody else’s, deleted it.')
+  })
+
+  // A check that finds none gone says only what it read: every record
+  // still stored is none deleted; some still stored and the rest unread
+  // counts those it read and leaves the others unknown; none read is the
+  // client's sentence still -- never "0 of 2 records are not there any
+  // more: … deleted them", which says a deletion deleted something when
+  // nothing was (watched failing with that sentence for every record
+  // kept: "expected [ …(2) ] to deeply equal [ …(2) ]").
+  test('found gone nowhere says what was read, never that a deletion deleted them', () => {
+    const lost = answered(answer(sending(['k1:1', 'k1:2']), { ...LOST, records: [at('k1:1'), at('k1:2')] }))
+    const kept = (record: string) => read(record, { ok: true, state: 'unchanged', current: stored })
+    const unread = (record: string) => read(record, { ok: false, status: 503, code: 'unavailable', message: 'The database is not answering.' })
+    const all = answered(checked(checking(lost), [kept('k1:1'), kept('k1:2')]))
+    expect([summary(all), chosenWork(all)]).toEqual([NONE_DELETED, null])
+    const some = answered(checked(checking(lost), [kept('k1:1'), unread('k1:2')]))
+    expect(summary(some)).toBe('1 of 2 records is still stored, not deleted; whether the other was deleted is still unknown.')
+    const none = answered(checked(checking(lost), [unread('k1:1'), unread('k1:2')]))
+    expect(summary(none)).toBe(LOST.message)
+  })
+
+  // The open record a check found gone, where its forms hold work the
+  // person typed once the lost answer gave them their Save back, is left
+  // open: the region says so, kept through a later check, and Close the
+  // record is its person's, as after a delete's check (0053) -- closed,
+  // the line goes and the region takes the keyboard again, a new state
+  // (watched failing with the record forgotten by the next check:
+  // "expected null to be 'k1:1'").
+  test('leaves the open record a check found gone open, until Close the record', () => {
+    const lost = answered(answer(sending(['k1:1', 'k1:2']), { ...LOST, records: [at('k1:1'), at('k1:2')] }))
+    const gone = answered(checked(checking(lost), [read('k1:1', { ok: true, state: 'absent' })]))
+    const open = answered(keepOpen(gone, 'k1:1'))
+    expect(open.open).toBe('k1:1')
+    expect(open.n).toBe(gone.n)
+    expect(text(stillOpenText(open.target.noun, 'k1:1'))).toBe(`Order k1:1 ${STILL_OPEN}`)
+    const again = answered(checked(checking(open), [read('k1:2', { ok: true, state: 'unchanged', current: stored })]))
+    expect(again.open).toBe('k1:1')
+    const closed = answered(recordClosed(again))
+    expect([closed.open, closed.n]).toEqual([null, again.n + 1])
+    expect(recordClosed(closed)).toBe(closed)
+    expect(keepOpen(IDLE, 'k1:1')).toBe(IDLE)
   })
 })

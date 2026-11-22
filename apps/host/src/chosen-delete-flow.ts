@@ -2,15 +2,31 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { RefObject } from 'react'
 import type { DataClient, Deleting, FormMenuEntry, PublishedForm } from '@formancy/data-client'
 import { useRegionFocus } from './action-flow.js'
-import { answer, ask, checked, checking, chosenWork, close, goneOf, heading, IDLE, marksOf, send, settledText, toCheck } from './chosen-deletion.js'
+import {
+  answer,
+  ask,
+  checked,
+  checking,
+  chosenWork,
+  close,
+  goneOf,
+  heading,
+  IDLE,
+  keepOpen,
+  marksOf,
+  recordClosed,
+  send,
+  settledText,
+  toCheck,
+} from './chosen-deletion.js'
 import type { ChosenDeletion, ChosenTarget } from './chosen-deletion.js'
 import { holdsAsked } from './chosen-rows.js'
 import type { ChosenRows } from './chosen-rows.js'
 import { useSaving } from './delete-flow.js'
 import { HELD } from './deletion.js'
 import { formsAtRisk, useGuardContext, useRegistered } from './guard.js'
-import type { PaneEntry } from './guard.js'
-import { gridOwner } from './leave.js'
+import type { PaneEntry, Registry } from './guard.js'
+import { eachOnce, gridOwner, unlisted } from './leave.js'
 import type { PaneWork } from './leave.js'
 import type { RecordGridHandle } from './record-grid.js'
 import type { Session } from './session.js'
@@ -44,8 +60,11 @@ import type { HeldLevels } from './use-drill.js'
  *   found gone, leave the choice, and those not deleted stay chosen, each
  *   marked with why on its box; the open record, where it left the page, is
  *   closed as a delete closes it, and every level that held one dropped.
- *   A check reads what is not known, and settles the choice again. Nothing
- *   is sent again from an outcome.
+ *   A check reads what is not known, and settles the choice again -- but
+ *   the open record it finds gone, where its forms hold work, is left
+ *   open until Close the record, as after a delete's check (0053): its
+ *   Save was given back when the answer was lost, and what was typed since
+ *   was never listed. Nothing is sent again from an outcome.
  * - **The keyboard** goes to every state that asks something of the
  *   person, each time it is a new one -- a deletion out asked again
  *   included -- and back to the bar's button on Keep them and Close.
@@ -63,6 +82,8 @@ export interface ChosenDelete {
   buttonRef: RefObject<HTMLButtonElement | null>
   /** A save of the open record is out, and the confirmation is over it: Delete them waits for the answer. */
   saving: boolean
+  /** The open record a check found gone, left open while its forms hold work, and still the one open: Close the record closes it. */
+  stillOpen: string | null
   ask(): void
   /** Keep them, or Escape: nothing sent, the keyboard back on the bar's button. */
   keep: () => void
@@ -72,6 +93,8 @@ export interface ChosenDelete {
   check: () => void
   /** Close what the server answered: the keyboard back on the bar's button. */
   close: () => void
+  /** Close the record a check found gone and left open: its forms emptied, the region the keyboard's again. */
+  closeRecord: () => void
 }
 
 export interface ChosenDeleteOptions {
@@ -101,10 +124,9 @@ interface FlowState {
   latest: { current: ChosenDeleteOptions }
   regionRef: RefObject<HTMLDivElement | null>
   buttonRef: RefObject<HTMLButtonElement | null>
+  /** Every pane the guard knows: what a deletion drops is read from it as the guard would read it. */
+  registry: Registry
 }
-
-/** Two lists of forms at risk name the same forms. */
-const named = (pane: PaneWork): string => `${pane.owner} ${String(pane.renderer)}`
 
 /** The record the detail's forms hold, by its token. */
 const openRecord = (flow: FlowState): string | null => flow.latest.current.sessions[0]?.state().record ?? null
@@ -113,6 +135,16 @@ const openRecord = (flow: FlowState): string | null => flow.latest.current.sessi
 const overOpen = (flow: FlowState, target: ChosenTarget): string | null => {
   const open = openRecord(flow)
   return open !== null && target.records.some((each) => each.record === open) ? open : null
+}
+
+/** The forms the open record's closing drops that hold work: its own, its sections', and every Drill down level's. */
+const openAtRisk = (flow: FlowState): PaneWork[] => formsAtRisk(flow.registry, { kind: 'new' })
+
+/** The forms that hold work which deleting `target`'s records drops, as the guard would list them: the open record's, and the levels that hold one, each once. */
+function atStake(flow: FlowState, target: ChosenTarget): PaneWork[] {
+  const { entry, drill } = flow.latest.current
+  const levels = target.records.flatMap(({ record }) => drill.levels.atRisk(entry.id, record))
+  return eachOnce([...(overOpen(flow, target) === null ? [] : openAtRisk(flow)), ...levels])
 }
 
 const release = (flow: FlowState): void => {
@@ -153,8 +185,9 @@ export function useChosenDelete(options: ChosenDeleteOptions): ChosenDelete {
       latest,
       regionRef,
       buttonRef,
+      registry,
     }),
-    [],
+    [registry],
   )
   const savingNow = useSaving(options.sessions)
   const entry = useChosenEntry(flow)
@@ -166,14 +199,7 @@ export function useChosenDelete(options: ChosenDeleteOptions): ChosenDelete {
     () => latest.current.onShow('records'),
     () => guard.waiting(),
   )
-
-  /** The forms that hold work which deleting `target`'s records drops, as the guard would list them: the open record's, and the levels that hold one, each once. */
-  const atStake = (target: ChosenTarget): PaneWork[] => {
-    const { id } = latest.current.entry
-    const levels = target.records.flatMap(({ record }) => latest.current.drill.levels.atRisk(id, record))
-    const forms = [...(overOpen(flow, target) === null ? [] : formsAtRisk(registry, { kind: 'new' })), ...levels]
-    return forms.filter((pane, index) => forms.findIndex((other) => named(other) === named(pane)) === index)
-  }
+  const left = deletion.state === 'answered' ? deletion.open : null
 
   return {
     offered: definition.bulk.delete && definition.deleting !== null,
@@ -183,16 +209,28 @@ export function useChosenDelete(options: ChosenDeleteOptions): ChosenDelete {
     buttonRef,
     // Delete them waits for a save of the open record only where it is one of the records asked over.
     saving: savingNow && deletion.state === 'confirming' && overOpen(flow, deletion.target) !== null,
-    ask() {
-      const records = latest.current.chosen.records()
-      // Nothing chosen, nothing asked: the bar says what to do first.
-      if (records.length === 0) return
-      for (const other of registry.entries()) if (other !== entry) other.close?.()
-      const target: ChosenTarget = { noun: latest.current.entry.title, records }
-      flow.set(ask(current.current, target, atStake(target)))
-    },
-    confirm: () => confirmDeletion(flow, atStake),
+    // Opened another, or closed by the person meanwhile: nothing of it is left to close.
+    stillOpen: left !== null && openRecord(flow) === left ? left : null,
+    ask: () => askDeletion(flow, entry),
+    confirm: () => confirmDeletion(flow),
     check: () => checkDeletion(flow),
+    ...regionAnswers(flow),
+  }
+}
+
+/** Delete the chosen…: every other owner's question closed, and this one asked over the records chosen now; nothing chosen, nothing asked -- the bar says what to do first. */
+function askDeletion(flow: FlowState, entry: PaneEntry): void {
+  const records = flow.latest.current.chosen.records()
+  if (records.length === 0) return
+  for (const other of flow.registry.entries()) if (other !== entry) other.close?.()
+  const target: ChosenTarget = { noun: flow.latest.current.entry.title, records }
+  flow.set(ask(flow.current.current, target, atStake(flow, target)))
+}
+
+/** The answers that end what the region shows, each only in the state it is drawn in. */
+function regionAnswers(flow: FlowState): Pick<ChosenDelete, 'keep' | 'close' | 'closeRecord'> {
+  const { current } = flow
+  return {
     keep() {
       if (current.current.state !== 'confirming') return
       flow.set(IDLE)
@@ -203,6 +241,13 @@ export function useChosenDelete(options: ChosenDeleteOptions): ChosenDelete {
       if ((now.state !== 'answered' && now.state !== 'refused') || chosenWork(now) !== null) return
       flow.set(IDLE)
       back(flow)
+    },
+    closeRecord() {
+      const now = current.current
+      if (now.state !== 'answered' || now.open === null) return
+      const record = now.open
+      flow.set(recordClosed(now))
+      if (openRecord(flow) === record) flow.latest.current.onGone(record)
     },
   }
 }
@@ -244,7 +289,7 @@ function useChosenEntry(flow: FlowState): PaneEntry {
 }
 
 /** Delete them: sent, unless the choice changed, a save of the open record chosen is out, or a form it drops was typed into since it asked. */
-function confirmDeletion(flow: FlowState, atStake: (target: ChosenTarget) => PaneWork[]): void {
+function confirmDeletion(flow: FlowState): void {
   const now = flow.current.current
   // A choice changed since it asked is not what it confirms: closed, nothing sent.
   if (now.state !== 'confirming' || dropped(flow)) return
@@ -253,8 +298,8 @@ function confirmDeletion(flow: FlowState, atStake: (target: ChosenTarget) => Pan
   // A save out moves the version the deletion would name: Delete them waits for its answer, and says so.
   if (open !== null && sessions.some((session) => session.isSaving())) return
   // Typed into since the question was asked: named before anything is sent.
-  const risky = atStake(now.target)
-  if (risky.some((pane) => !now.discards.some((listed) => named(listed) === named(pane)))) {
+  const risky = atStake(flow, now.target)
+  if (unlisted(risky, now.discards)) {
     flow.set({ ...now, discards: risky, n: now.n + 1 })
     return
   }
@@ -271,23 +316,28 @@ function confirmDeletion(flow: FlowState, atStake: (target: ChosenTarget) => Pan
     if (flow.sent.current !== mine) return
     release(flow)
     flow.set(answer(flow.current.current, outcome))
-    settled(flow)
+    settled(flow, 'answer')
   })
 }
 
 /**
  * The page once the server answered, or a check read what was not known:
  * the records that have left it leave the choice and the detail, each
- * still chosen is marked with why, and the grid's page is read again.
+ * still chosen is marked with why, and the grid's page is read again. The
+ * open record a check found gone stays open where its forms hold work
+ * (`keepOpen`): its Save was the person's again from the lost answer on.
  */
-function settled(flow: FlowState): void {
+function settled(flow: FlowState, by: 'answer' | 'check'): void {
   const now = flow.current.current
   if (now.state !== 'answered') return
   const { chosen, grid, onGone } = flow.latest.current
   const gone = goneOf(now)
   const left = [...chosen.now().chosen].filter((token) => !gone.has(token))
   chosen.settle(gone, marksOf(now), settledText(now, left, chosen.name))
-  for (const record of gone) onGone(record)
+  const open = by === 'check' ? openRecord(flow) : null
+  const stays = open !== null && gone.has(open) && openAtRisk(flow).length > 0 ? open : null
+  for (const record of gone) if (record !== stays) onGone(record)
+  if (stays !== null) flow.set(keepOpen(now, stays))
   grid.current?.reload()
 }
 
@@ -303,6 +353,6 @@ function checkDeletion(flow: FlowState): void {
     // Discarded, or another deletion's since: this check is not what the page shows.
     if (flow.current.current !== started) return
     flow.set(checked(started, found))
-    settled(flow)
+    settled(flow, 'check')
   })
 }

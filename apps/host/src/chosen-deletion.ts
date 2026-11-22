@@ -1,7 +1,7 @@
 import { isUnknownChosen, isUnknownWrite } from '@formancy/data-client'
 import type { ChosenRecordOutcome, DeleteChosenOutcome, Deleting, Reconciliation, UnknownChosen } from '@formancy/data-client'
 import { chosenText } from './chosen-rows.js'
-import { checkedText, lead as leadOne, NOT_FOUND } from './deletion.js'
+import { checkedOf, checkedText, lead as leadOne, NOT_FOUND } from './deletion.js'
 import { listed } from './grid-datasource.js'
 import type { PaneWork, Said, Work } from './leave.js'
 import { counted } from './running.js'
@@ -32,8 +32,11 @@ import { DECLINED_BY } from './words.js'
  * - **A check** reads each record whose fate is unknown (data-client's
  *   `reconcileChosen`): at the version sent or changed since, it was not
  *   deleted; gone, it was deleted -- by this request or by somebody
- *   else's, which the page cannot tell apart and says. Nothing is sent
- *   again from an outcome: a delete of what is left is a new question.
+ *   else's, which the page cannot tell apart and says; none gone, it says
+ *   only what it read. The open record it finds gone, where its forms
+ *   hold work, is left open until Close the record (`keepOpen`). Nothing
+ *   is sent again from an outcome: a delete of what is left is a new
+ *   question.
  *
  * `n` counts the states that take the keyboard: each is a new region to
  * focus, even when it looks like the last one.
@@ -73,8 +76,23 @@ export type ChosenDeletion =
   /** `discards`: the forms that hold work which the deletion drops with the records they hold. */
   | { state: 'confirming'; target: ChosenTarget; discards: readonly PaneWork[]; n: number }
   | { state: 'sending'; target: ChosenTarget; n: number }
-  /** `unknown`: what a check reads the records of whose fate is not known -- the request's, where its answer was lost; `checking`, while it reads. */
-  | { state: 'answered'; target: ChosenTarget; each: readonly Fated[]; lost: boolean; unknown: UnknownChosen | null; checking: boolean; n: number }
+  /**
+   * `unknown`: what a check reads the records of whose fate is not known -- the request's, where its answer was lost; `checking`, while it
+   * reads. `open`: the open record a check found gone, left open since its forms hold work, until Close the record (`keepOpen`). `said`:
+   * the number of the state the server's answer made, which a check and a record closed leave as it was: what the count's teal is said
+   * by (0146), once for the answer.
+   */
+  | {
+      state: 'answered'
+      target: ChosenTarget
+      each: readonly Fated[]
+      lost: boolean
+      unknown: UnknownChosen | null
+      checking: boolean
+      open: string | null
+      said: number
+      n: number
+    }
   | { state: 'refused'; target: ChosenTarget; message: string; declined: boolean; n: number }
 
 export const IDLE: ChosenDeletion = { state: 'idle' }
@@ -100,6 +118,8 @@ export const NONE_DELETED = 'None of the chosen records was deleted.'
 export const GONE = 'It is not there any more: this deletion, or somebody else’s, deleted it.'
 /** A record whose own answer was lost. */
 export const MAY_HAVE = 'It may have been deleted.'
+/** After the open record's name, where a check found it gone and its forms hold work: it is not closed by itself (0053). */
+export const STILL_OPEN = 'is still open in the detail, with work in its forms: Close the record discards it.'
 /** Before the records the request stopped before. */
 export const NOT_SENT = 'Not sent, so not deleted:'
 /** One of them, on its box. */
@@ -171,11 +191,11 @@ export function answer(now: ChosenDeletion, outcome: DeleteChosenOutcome): Chose
   if (outcome.ok) {
     // The client takes a 200 only with an entry for every record sent, in the order sent (0173).
     const each = target.records.map((sent, index): Fated => ({ ...sent, fate: fateOf(outcome.value[index] as ChosenRecordOutcome) }))
-    return { state: 'answered', target, each, lost: false, unknown: unknownOf(outcome.value, target), checking: false, n }
+    return { state: 'answered', target, each, lost: false, unknown: unknownOf(outcome.value, target), checking: false, open: null, said: n, n }
   }
   if (isUnknownChosen(outcome)) {
     const each = outcome.records.map(({ record, version }): Fated => ({ record, version, fate: { kind: 'lost' } }))
-    return { state: 'answered', target, each, lost: true, unknown: outcome, checking: false, n }
+    return { state: 'answered', target, each, lost: true, unknown: outcome, checking: false, open: null, said: n, n }
   }
   return { state: 'refused', target, message: outcome.message, declined: outcome.code === 'declined', n }
 }
@@ -217,12 +237,18 @@ export function toCheck(now: ChosenDeletion): UnknownChosen | null {
   return records.length === 0 ? null : { ...now.unknown, records }
 }
 
-/** What one read of a record shows about whether this deletion deleted it (0031). */
+/** What one read of a record shows about whether this deletion deleted it, read as a delete's check reads it (0031, 0053). */
 function fateRead(read: Reconciliation): Fate {
-  if (!read.ok) return { kind: 'unknown', said: checkedText({ kind: 'unread', message: read.message }) }
-  if (read.state === 'unchanged' || read.state === 'changed') return { kind: 'kept', changed: read.state === 'changed' }
-  if (read.state === 'absent') return { kind: 'gone' }
-  return { kind: 'unknown', said: checkedText({ kind: 'unread', message: 'The check could not tell.' }) }
+  const found = checkedOf(read)
+  switch (found.kind) {
+    case 'absent':
+      return { kind: 'gone' }
+    case 'unchanged':
+    case 'changed':
+      return { kind: 'kept', changed: found.kind === 'changed' }
+    case 'unread':
+      return { kind: 'unknown', said: checkedText(found) }
+  }
 }
 
 /** What the check's reads showed, each record by its token: its own state, which takes the keyboard. */
@@ -234,6 +260,26 @@ export function checked(now: ChosenDeletion, found: ReadonlyArray<{ record: stri
     return shown === undefined || !unknownFate(one.fate) ? one : { ...one, fate: fateRead(shown) }
   })
   return { ...now, each, checking: false, n: numbered(now) }
+}
+
+/**
+ * A check found the open record gone, and its forms hold work -- typed
+ * once the lost answer gave the person their Save back, which the
+ * confirmation never listed: it is left open, and the region says so,
+ * until Close the record, as after a delete's check (0053).
+ */
+export function keepOpen(now: ChosenDeletion, record: string): ChosenDeletion {
+  return now.state === 'answered' ? { ...now, open: record } : now
+}
+
+/** Close the record pressed: its line goes, and the region takes the keyboard again, a new state. */
+export function recordClosed(now: ChosenDeletion): ChosenDeletion {
+  return now.state === 'answered' && now.open !== null ? { ...now, open: null, n: numbered(now) } : now
+}
+
+/** "Order `k1:3` is still open in the detail, …": what the region says of the open record a check found gone, left open. */
+export function stillOpenText(noun: string, record: string): Said {
+  return [`${noun} `, { code: record }, ` ${STILL_OPEN}`]
 }
 
 /** Closed by another request, Keep them, or Close: only what holds no work closes. */
@@ -300,15 +346,40 @@ export function settledText(now: ChosenDeletion, left: readonly string[], name: 
 /**
  * What the answered region says first: how many of the records this
  * request deleted; where its answer was lost, the client's sentence until
- * a check has read every record, and then how many are gone, by whoever's
- * deletion.
+ * a check has read the records, and then only what it read -- how many
+ * are gone, by whoever's deletion; none gone, how many are still stored,
+ * the rest still unknown; or none deleted, every one found stored.
  */
 export function summary(now: ChosenDeletion & { state: 'answered' }): string {
   const n = now.each.length
-  if (!now.lost) return deletedText(now.each.filter(({ fate }) => fate.kind === 'deleted').length, n)
-  if (now.each.some(({ fate }) => fate.kind === 'lost') || now.unknown === null) return now.unknown?.message ?? MAY_HAVE
-  const gone = now.each.filter(({ fate }) => fate.kind === 'gone').length
-  return `${String(gone)} of ${counted(n)} ${gone === 1 ? 'is' : 'are'} not there any more: this deletion, or somebody else’s, deleted ${gone === 1 ? 'it' : 'them'}.`
+  const counting = (kind: Fate['kind']): number => now.each.filter(({ fate }) => fate.kind === kind).length
+  if (!now.lost) return deletedText(counting('deleted'), n)
+  if (counting('lost') > 0 || now.unknown === null) return now.unknown?.message ?? MAY_HAVE
+  const gone = counting('gone')
+  if (gone > 0)
+    return `${String(gone)} of ${counted(n)} ${gone === 1 ? 'is' : 'are'} not there any more: this deletion, or somebody else’s, deleted ${gone === 1 ? 'it' : 'them'}.`
+  const kept = counting('kept')
+  if (kept === n) return NONE_DELETED
+  // Nothing read yet: every record still may have been deleted, as the client said.
+  if (kept === 0) return now.unknown.message
+  const others = n - kept === 1 ? 'the other was' : 'the others were'
+  return `${String(kept)} of ${counted(n)} ${kept === 1 ? 'is' : 'are'} still stored, not deleted; whether ${others} deleted is still unknown.`
+}
+
+/** Whether the count is said in the room's teal, as what the server did (0146): only where this request's answer says it deleted some. */
+export function saysDone(now: ChosenDeletion & { state: 'answered' }): boolean {
+  return !now.lost && now.each.some(({ fate }) => fate.kind === 'deleted')
+}
+
+/**
+ * How the answered region is framed: as a save that may have been stored
+ * is, while a fate is not known; in teal where some were deleted -- by this
+ * request, or found gone by a check; and in a refusal's warm colour where
+ * none was.
+ */
+export function frameOf(now: ChosenDeletion & { state: 'answered' }): 'unknown' | 'done' | 'refused' {
+  if (now.each.some(({ fate }) => unknownFate(fate))) return 'unknown'
+  return now.each.some(({ fate }) => fate.kind === 'deleted' || fate.kind === 'gone') ? 'done' : 'refused'
 }
 
 /**

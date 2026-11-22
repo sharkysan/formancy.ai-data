@@ -1,14 +1,29 @@
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import { computeAccessibleDescription } from 'dom-accessibility-api'
-import { CASCADES_CHOSEN, DISCARDED_WITH_THEM, EACH_ON_ITS_OWN, REMOVED_CHOSEN, RESTRICTED_CHOSEN } from './chosen-deletion.js'
+import { CASCADES_CHOSEN, DISCARDED_WITH_THEM, EACH_ON_ITS_OWN, NONE_DELETED, REMOVED_CHOSEN, RESTRICTED_CHOSEN, STILL_OPEN } from './chosen-deletion.js'
 import { NONE_CHOSEN } from './chosen-rows.js'
 import { HELD, NOT_FOUND, REMOVED, RESTRICTED, SAVE_OUT } from './deletion.js'
 import { WORK } from './leave.js'
 import { CHOOSE_FIRST } from './selection-bar.js'
 import { audit, focusedName, paragraphs, unnamed } from './test-accessible.js'
 import { barSays, box, choiceBar, choiceSaid } from './test-choosing.js'
-import { answer, chooseForm, formLink, gridSection, load, loaded, mount, said, save, searchRecords, signIn, stamp, unsavedNotice } from './test-host.js'
+import {
+  answer,
+  chooseForm,
+  control,
+  formLink,
+  gridSection,
+  load,
+  loaded,
+  mount,
+  said,
+  save,
+  searchRecords,
+  signIn,
+  stamp,
+  unsavedNotice,
+} from './test-host.js'
 import type { User } from './test-host.js'
 import { holdingRequests, holdingWrites, losingWrites } from './test-network.js'
 import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
@@ -22,10 +37,12 @@ import type { Engine, Plane } from './test-plane.js'
  * since, gone, referred to, or not known until Check them reads it --
  * the page read again, the records deleted gone from the choice and those
  * not deleted still chosen, each box saying why; the open record closed
- * where it was deleted, and its Save held while the deletion is out; a
- * question closed by a change of the choice, a second press sending
- * nothing, and the guard counting a deletion not known. What the database
- * holds is asked beside the page, as tenant 1's clerk.
+ * where it was deleted or not found, left open where a check found it gone
+ * with work in its forms, and its Save held while the deletion is out; a
+ * question closed by Escape, Keep them and a change of the choice, a
+ * second press sending nothing, and the guard counting a deletion not
+ * known. What the database holds is asked beside the page, as tenant 1's
+ * clerk.
  *
  * Found by role and accessible name. The reads the accessibility tree
  * cannot answer: what the wire carried, by path; and what the database
@@ -167,6 +184,8 @@ describe.each(ENGINES)('deleting the chosen records on $engine', (engine) => {
     await plane.db.referToRemovable(engine.connection, referred)
 
     const confirming = await askDelete(user, 5, 'Removable')
+    // Its heading is the region's own, a level under the bar's grid, as a delete's is (delete.test.tsx).
+    expect(within(confirming).getByRole('heading', { level: 4 }).textContent).toBe(deleting(5, 'Removable', true))
     expect(computeAccessibleDescription(confirming)).toBe([EACH_ON_ITS_OWN, REMOVED_CHOSEN, RESTRICTED_CHOSEN].join(' '))
     expect(computeAccessibleDescription(confirming)).not.toContain(CASCADES_CHOSEN)
     expect([...(await audit()), ...unnamed()]).toEqual([])
@@ -177,6 +196,7 @@ describe.each(ENGINES)('deleting the chosen records on $engine', (engine) => {
     await user.keyboard('{Enter}')
 
     const answered = await outcome(5, 'Removable')
+    expect(within(answered).getByRole('heading', { level: 4 }).textContent).toBe(deleting(5, 'Removable'))
     const each = [`Removable ${moved}: ${STALE}`, `Removable ${gone}: ${NOT_FOUND}`, `Removable ${referred}: ${REFERENCED}`]
     expect(paragraphs(answered)[0]).toBe('Deleted 2 of 5 records.')
     expect(
@@ -206,10 +226,13 @@ describe.each(ENGINES)('deleting the chosen records on $engine', (engine) => {
   // deletes its lines through, the confirmation says other records that
   // refer to one go with it, and they do: an order and its line deleted
   // with another order. The open order is one of them, with typing in its
-  // form: the confirmation lists that form as discarded with it, and once
-  // it is deleted the detail is closed as a delete closes it, the keyboard
-  // staying on what the server answered (to be watched failing in CI with
-  // the open record left open: no heading "No record open").
+  // form: the confirmation lists that form as discarded with it; Angular's
+  // typed into while it asks is named too before anything is sent, as a
+  // delete's is; and once it is deleted the detail is closed as a delete
+  // closes it, the keyboard staying on what the server answered (to be
+  // watched failing in CI with the open record left open: no heading "No
+  // record open"; and with the list taken once, at the question:
+  // Angular's draft deleted unnamed).
   test('says and does what a cascade the form names does, and closes the open record it deleted', async () => {
     const notes = stamp('cascade')
     const [order, other] = [await freshOrder(engine, notes), await freshOrder(engine, notes)]
@@ -225,6 +248,17 @@ describe.each(ENGINES)('deleting the chosen records on $engine', (engine) => {
     expect(paragraphs(confirming)).toEqual([EACH_ON_ITS_OWN, REMOVED_CHOSEN, CASCADES_CHOSEN, DISCARDED_WITH_THEM])
     expect(within(confirming).getByRole('listitem').textContent).toBe(`Order ${order}, React: ${WORK.changed}`)
     expect([...(await audit()), ...unnamed()]).toEqual([])
+    const from = plane.sent.length
+    await answer(user, 'Angular', 'Notes', `${notes} typed while it asked`)
+    await user.click(within(confirming).getByRole('button', { name: 'Delete them' }))
+    await waitFor(() => expect(within(confirming).getAllByRole('listitem')).toHaveLength(2), ARRIVES)
+    expect(
+      within(confirming)
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toEqual([`Order ${order}, React: ${WORK.changed}`, `Order ${order}, Angular: ${WORK.changed}`])
+    await waitFor(() => expect(focusedName()).toBe(deleting(2, 'Order', true)))
+    expect(deletesSent(from)).toBe(0)
     await user.click(within(confirming).getByRole('button', { name: 'Delete them' }))
 
     const answered = await outcome(2, 'Order')
@@ -245,9 +279,9 @@ describe.each(ENGINES)('deleting the chosen records on $engine', (engine) => {
   // both gone, which this deletion or another did, the page cannot tell
   // apart and says; nothing is sent again, and once checked the guard
   // lets the grid go. Lost before it reached the server, the check finds
-  // each still stored at the version read, and keeps them chosen (to be
-  // watched failing in CI with Check them sending the deletion again: two
-  // requests on the wire).
+  // each still stored at the version read, says none was deleted, and
+  // keeps them chosen (to be watched failing in CI with Check them sending
+  // the deletion again: two requests on the wire).
   test.each(['after', 'before'] as const)('a lost answer %s the server deleted them is checked record by record, nothing sent again', async (when) => {
     const note = stamp(`lost-${when}`)
     const records = await removables(engine, note, 2)
@@ -281,6 +315,8 @@ describe.each(ENGINES)('deleting the chosen records on $engine', (engine) => {
       expect([await stored(engine.removable, first), await stored(engine.removable, second)]).toEqual([false, false])
       await barSays(NONE_CHOSEN)
     } else {
+      // Said as none deleted, never as "0 of 2 records are not there any more: … deleted them."
+      expect(paragraphs(checked)[0]).toBe(NONE_DELETED)
       expect(
         within(checked)
           .getAllByRole('listitem')
@@ -291,14 +327,88 @@ describe.each(ENGINES)('deleting the chosen records on $engine', (engine) => {
     expect([...(await audit()), ...unnamed()]).toEqual([])
   })
 
+  // The open order chosen, its deletion's answer lost after the server
+  // deleted it: the lost answer gives its Save back, and what is typed
+  // then was never listed. Check them finds it gone and leaves it open,
+  // the typing kept, the region naming it and offering Close the record,
+  // as after a delete's check (0053); pressed, the detail closes and the
+  // region takes the keyboard again (to be watched failing in CI with the
+  // record closed by the check, its typing gone: no button "Close the
+  // record").
+  test('a check leaves the open record it finds gone open while its forms hold work, until Close the record', async () => {
+    const notes = stamp('kept-open')
+    const orders = [await freshOrder(engine, notes), await freshOrder(engine, notes)]
+    const [order, other] = orders as [string, string]
+    const losing = losingWrites(plane.fetch, { when: 'after', writes: /\/records\/delete-chosen$/ })
+    const user = await chosenPage(losing.fetch, engine.formId, notes, orders)
+    await load(user, order)
+    await loaded(order)
+    await user.click(box(order))
+    await user.click(box(other))
+    await user.click(within(await askDelete(user, 2, 'Order')).getByRole('button', { name: 'Delete them' }))
+    const unknown = await outcome(2, 'Order')
+    await answer(user, 'React', 'Notes', `${notes} typed after`)
+    await user.click(within(unknown).getByRole('button', { name: 'Check them' }))
+
+    const checked = screen.getByRole('region', { name: deleting(2, 'Order') })
+    const closes = await within(checked).findByRole('button', { name: 'Close the record' }, ARRIVES)
+    const open = `Order ${order} ${STILL_OPEN}`
+    expect(paragraphs(checked)).toEqual(['2 of 2 records are not there any more: this deletion, or somebody else’s, deleted them.', open])
+    expect(computeAccessibleDescription(checked)).toBe(paragraphs(checked).join(' '))
+    expect(control('React', 'Notes').value).toBe(`${notes} typed after`)
+    expect(screen.getByRole('heading', { level: 3, name: `Order ${order}` })).toBeTruthy()
+    expect([await stored(engine.formId, order), await stored(engine.formId, other)]).toEqual([false, false])
+    expect([...(await audit()), ...unnamed()]).toEqual([])
+
+    await user.click(closes)
+    await waitFor(() => expect(screen.getByRole('heading', { level: 3, name: 'No record open' })).toBeTruthy(), ARRIVES)
+    await waitFor(() => expect(focusedName()).toBe(deleting(2, 'Order')))
+    expect(within(checked).queryByRole('button', { name: 'Close the record' })).toBeNull()
+    expect(paragraphs(checked)).not.toContain(open)
+  })
+
+  // The open order chosen, typed into, and deleted beside the page before
+  // Delete them: answered not found -- never called deleted -- it leaves
+  // the choice and the page, and the detail is closed with the typing its
+  // confirmation listed, as when it is deleted; the other order is (to be
+  // watched failing in CI with a record not found left open: no heading
+  // "No record open").
+  test('closes the open record the server cannot find, its typing listed and discarded', async () => {
+    const notes = stamp('not-found')
+    const orders = [await freshOrder(engine, notes), await freshOrder(engine, notes)]
+    const [order, other] = orders as [string, string]
+    const user = await chosenPage(plane.fetch, engine.formId, notes, orders)
+    await load(user, order)
+    await loaded(order)
+    await answer(user, 'React', 'Notes', `${notes} typed`)
+    await user.click(box(order))
+    await user.click(box(other))
+    const read = await plane.clerk.read(engine.formId, order)
+    if (!read.ok || read.value.version === null) throw new Error('the order did not read')
+    if (!(await plane.clerk.delete(engine.formId, { record: order, version: read.value.version })).ok) throw new Error('it was not deleted beside the page')
+    const confirming = await askDelete(user, 2, 'Order')
+    expect(within(confirming).getByRole('listitem').textContent).toBe(`Order ${order}, React: ${WORK.changed}`)
+    await user.click(within(confirming).getByRole('button', { name: 'Delete them' }))
+
+    const answered = await outcome(2, 'Order')
+    expect(computeAccessibleDescription(answered)).toBe(['Deleted 1 of 2 records.', `Order ${order}: ${NOT_FOUND}`].join(' '))
+    expect(await stored(engine.formId, other)).toBe(false)
+    expect(screen.getByRole('heading', { level: 3, name: 'No record open' })).toBeTruthy()
+    await barSays(NONE_CHOSEN)
+  })
+
   // A question over the choice stands only while the choice holds what it
-  // asked over: a box unticked closes it, nothing sent, and asked again
-  // over one record it is that record's delete in 0053's words; Clear the
-  // choice closes that. Pressed with nothing chosen, Delete the chosen… is
-  // no dead end: it says what to do first and sends nothing. And a form
-  // that grants no deletion of chosen records has neither the boxes nor
-  // the bar (to be watched failing in CI with the question kept past its
-  // choice: the region still there, 1 chosen).
+  // asked over: Escape is Keep them, and either closes it, nothing sent,
+  // the keyboard back on Delete the chosen…; a box unticked closes it,
+  // nothing sent, and asked again over one record it is that record's
+  // delete in 0053's words; Clear the choice closes that. Pressed with
+  // nothing chosen, Delete the chosen… is no dead end: it says what to do
+  // first and sends nothing. And a form that grants a delete of one record
+  // and no deletion of chosen records -- an order's lines, each row with
+  // its Delete -- has neither the boxes nor the bar: they follow
+  // `bulk.delete`, never a delete alone (to be watched failing in CI with
+  // the question kept past its choice: the region still there, 1 chosen;
+  // and with Escape left to the page: the keyboard on the region still).
   test('a question closes when the choice changes, nothing sent; and nothing chosen says what to do first', async () => {
     const note = stamp('closes')
     const records = await removables(engine, note, 2)
@@ -315,6 +425,17 @@ describe.each(ENGINES)('deleting the chosen records on $engine', (engine) => {
     await user.click(removableBox(first))
     await user.click(removableBox(second))
     await askDelete(user, 2, 'Removable')
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('region', { name: deleting(2, 'Removable', true) })).toBeNull()
+    await waitFor(() => expect(focusedName()).toBe('Delete the chosen…'))
+    const kept = await askDelete(user, 2, 'Removable')
+    await user.click(within(kept).getByRole('button', { name: 'Keep them' }))
+    expect(screen.queryByRole('region', { name: deleting(2, 'Removable', true) })).toBeNull()
+    await waitFor(() => expect(focusedName()).toBe('Delete the chosen…'))
+    expect(deletesSent(from)).toBe(0)
+    await barSays('2 chosen.')
+
+    await askDelete(user, 2, 'Removable')
     await user.click(removableBox(second))
     await barSays('1 chosen.')
     expect(screen.queryByRole('region', { name: deleting(2, 'Removable', true) })).toBeNull()
@@ -326,7 +447,11 @@ describe.each(ENGINES)('deleting the chosen records on $engine', (engine) => {
     expect(deletesSent(from)).toBe(0)
     expect([await stored(engine.removable, first), await stored(engine.removable, second)]).toEqual([true, true])
 
-    await chooseForm(user, engine.employees)
+    const order = await freshOrder(engine, note)
+    const line = await plane.clerk.create(engine.lines, { order, line_no: '1', quantity: '1', unit_price: '1.00' })
+    if (!line.ok) throw new Error(line.message)
+    await chooseForm(user, engine.lines)
+    await within(gridSection('Records')).findAllByRole('button', { name: /^Delete Order line / }, ARRIVES)
     expect(within(gridSection('Records')).queryAllByRole('checkbox', { name: /^Choose / })).toEqual([])
     expect(within(gridSection('Records')).queryByRole('group', { name: 'Chosen records' })).toBeNull()
   })
@@ -335,13 +460,15 @@ describe.each(ENGINES)('deleting the chosen records on $engine', (engine) => {
   // says it is deleting, and the bar's button asks for the deletion out
   // again, its region focused, never a second one; the open record, one of
   // them, holds its Save, which sends nothing and says why -- an update
-  // would race the delete. Once answered, both are deleted, once (to be
-  // watched failing in CI with the open record's Save left unheld: an
-  // update sent while the deletion was out).
+  // would race the delete -- and so does the Save of another record opened
+  // while it is out, as 0174's cost says: the hold is the forms', not the
+  // record's. Once answered, both are deleted, once (to be watched failing
+  // in CI with the open record's Save left unheld: an update sent while
+  // the deletion was out).
   test('a second press while it is out sends nothing, and the open record’s Save is held', async () => {
     const notes = stamp('held')
-    const orders = [await freshOrder(engine, notes), await freshOrder(engine, notes)]
-    const [order, other] = orders as [string, string]
+    const orders = [await freshOrder(engine, notes), await freshOrder(engine, notes), await freshOrder(engine, notes)]
+    const [order, other, third] = orders as [string, string, string]
     const holding = holdingRequests(plane.fetch, ({ method, path }) => method === 'POST' && path.endsWith('/records/delete-chosen'))
     const user = await chosenPage(holding.fetch, engine.formId, notes, orders)
     await load(user, order)
@@ -362,8 +489,24 @@ describe.each(ENGINES)('deleting the chosen records on $engine', (engine) => {
     const from = plane.sent.length
     await answer(user, 'React', 'Notes', `${notes} typed`)
     await save(user, 'React')
-    await said('React', new RegExp(`^${HELD.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`))
+    const heldSaid = new RegExp(`^${HELD.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`)
+    await said('React', heldSaid)
     expect(plane.sent.slice(from).filter((request) => request.path.endsWith('/records/update'))).toEqual([])
+
+    // Another record opened while it is out, the held typing discarded: its Save is held too.
+    await load(user, third)
+    const asked = await waitFor(() => {
+      const shown = unsavedNotice()
+      expect(shown).not.toBeNull()
+      return shown as HTMLElement
+    }, ARRIVES)
+    await user.click(within(asked).getByRole('button', { name: 'Discard and continue' }))
+    await loaded(third)
+    await answer(user, 'React', 'Notes', `${notes} typed on another`)
+    await save(user, 'React')
+    await said('React', heldSaid)
+    expect(plane.sent.slice(from).filter((request) => request.path.endsWith('/records/update'))).toEqual([])
+    expect(holding.held).toHaveLength(1)
 
     await holding.pass()
     await outcome(2, 'Order')

@@ -165,7 +165,9 @@ export function choosingJourney(plane, { check }, run) {
     [
       'Delete the chosen…, answered',
       async (page) => {
-        // From the keyboard: Delete them, the Tab after Keep them, and Enter.
+        // The gate's measure took the keyboard off the page: given back to Keep them first, as acting.mjs's
+        // 'An action, done' does. Then from the keyboard: Delete them, the Tab after Keep them, and Enter.
+        await deletingTwo(page, true).getByRole('button', { name: 'Keep them', exact: true }).focus()
         await page.keyboard.press('Tab')
         await page.keyboard.press('Enter')
         const answered = deletingTwo(page)
