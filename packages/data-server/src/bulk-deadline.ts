@@ -16,9 +16,11 @@ import { lookupDeadlineProblem } from './lookup-deadline.js'
  * each record, never during one: a record whose write has started runs to
  * its answer, bounded as a write alone is, and every record after the
  * deadline is answered not sent. A change's membership checks, once for
- * the request before its first record (0175), are inside it, each bounded
- * by the lookup deadline. So a request takes at most the deadline and one
- * record, or one check, more.
+ * the request before its first record (0175), are counted in it but run
+ * one after another without reading it, each bounded by the lookup
+ * deadline alone; checks that outlast it leave every record not sent. So a
+ * request takes at most the deadline and one record more, or every check it
+ * makes, whichever ends later.
  */
 
 export type BulkDeadlineSetting = { ok: true; ms: number } | { ok: false; problem: string }
@@ -26,7 +28,8 @@ export type BulkDeadlineSetting = { ok: true; ms: number } | { ok: false; proble
 /**
  * The deadline where the deployment names none: 14 s, chosen by what
  * bounds it (0173, 2026-11-22): a request answers within the deadline and
- * one record more, and a record on SQL Server is up to three statements --
+ * one record more, or once its checks are done where those end later, and
+ * a record on SQL Server is up to three statements --
  * the root's description, the delete, and, where it deleted nothing, the
  * read that says why; a change is three too (0175) -- the read that carries
  * the root's description, the update, and where it changed nothing the read

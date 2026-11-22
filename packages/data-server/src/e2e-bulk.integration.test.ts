@@ -538,11 +538,13 @@ describe.each([
     expect((await read(theirs.record, otherClerk)).json()).toMatchObject({ answers: { notes: 'chosen: another tenant' } })
   })
 
-  // A selection is checked once for the request, before any record is
-  // read: another tenant's customer is no option of this clerk's, and a
-  // customer number of their own tenant that names no row is not one of
-  // the options -- each 422 for the request, and no order changed.
-  test('refuses the request once for a customer outside the lookup’s filter, changing no order', async () => {
+  // A selection is refused for the request, before any record is read, in
+  // either of the two ways an update alone refuses it: another tenant's
+  // customer as the answers are decoded, since its key carries the tenant
+  // the row filter pins, before any statement; and a customer number of
+  // the clerk's own tenant that names no row by the membership check, run
+  // once. Each is 422 for the request, and no order changed.
+  test('refuses the request once for another tenant’s customer and for one that names no row, changing no order', async () => {
     const first = await order('draft', 'chosen: kept by its lookup')
     const second = await order('draft', 'chosen: kept by its lookup too')
     const theirs = await changed([first, second], { customer: theirCustomer, notes: 'never written' })

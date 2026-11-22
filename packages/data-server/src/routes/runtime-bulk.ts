@@ -67,7 +67,10 @@ import type { WriteAnswer } from './write-once.js'
  * 4 to 7 run once per sending of the write id (0031), so a sending that
  * arrives again is answered with the first one's answer -- each record's
  * outcome as it was -- and asks the database nothing. The deadline is
- * counted from the start of 4, so 6's checks are inside it. A request goes
+ * counted from the start of 4, so 6's checks are counted in it; they run
+ * one after another without reading it, each bounded by the lookup
+ * deadline, and checks that outlast it leave every record not sent, so
+ * such a request takes as long as its checks. A request goes
  * on after its client leaves, as a write does. 200 with `{ records }` in
  * the order sent. The trail names every record by its keyed hash, their
  * count, and what became of each by its code (`outcomes`); never a value.
@@ -247,10 +250,9 @@ async function changedEach(
   const unoffered = await memberships(open, decided.memberships, request.log, steps.lookupDeadlineMs)
   if (unoffered !== undefined) return unoffered
   const vouched = new Set(decided.memberships.map(vouchedAs))
-  return eachChosen(steps, request, 'update-chosen', body.records, until, async (record, version) => {
-    const { answer } = await updateOne(steps, request, bundle, open, { record, version, answers: body.answers }, vouched)
-    return answer
-  })
+  return eachChosen(steps, request, 'update-chosen', body.records, until, (record, version) =>
+    updateOne(steps, request, bundle, open, { record, version, answers: body.answers }, { vouched }),
+  )
 }
 
 /**

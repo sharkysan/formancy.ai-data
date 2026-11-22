@@ -3,6 +3,7 @@ import { authorizeBulk, bulkOffered } from '../policy/evaluate.js'
 import type { FormPolicy } from '../policy/types.js'
 import { bulkAnswers, readChangeBody } from './bulk.js'
 import { planUpdate } from './plan.js'
+import { audited, auditedForm, AUDITED_POLICY, signedIn } from './test-stamps.js'
 import { actor, AUDITOR, CLERK, described, ORDER_POLICY, ORDER_TOKEN, PG, PG_ORDER } from './test-support.js'
 
 /*
@@ -148,6 +149,24 @@ describe('bulkAnswers', () => {
     expect(checks[0]?.filters).toEqual({
       kind: 'restricted',
       equal: [{ column: 'tenant_id', type: { kind: 'integer', min: '-2147483648', max: '2147483647' }, value: '1' }],
+    })
+  })
+
+  // What a change stamps (0153) is the signed-in person's, the same for
+  // every record, so a person whose id the stamped column cannot hold is
+  // refused for the request, once, before any record is read -- not fifty
+  // times over, each record's update `unstampable` in turn. Watched
+  // failing with the stamps left to each record's plan: the request was
+  // decided `{ ok: true }`.
+  test('refuses the request for a stamp the signed-in person cannot fill', () => {
+    const source = audited('postgres')
+    const { bindings } = auditedForm(source)
+    const stamping: FormPolicy = { ...AUDITED_POLICY, bulk: { update: { roles: ['clerk'], fields: ['note'] } } }
+    expect(bulkAnswers(source, bindings, stamping, signedIn('bob'), { note: 'x' })).toEqual({ ok: true, memberships: [] })
+    expect(bulkAnswers(source, bindings, stamping, signedIn('b'.repeat(41)), { note: 'x' })).toEqual({
+      ok: false,
+      code: 'unstampable',
+      message: "changed_by cannot hold the signed-in person's id: At most 40 characters, counting an emoji as two.",
     })
   })
 

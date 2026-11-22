@@ -12,6 +12,7 @@ import { decodeAnswers, invalid, membershipChecks } from './plan.js'
 import type { FormRecord, InvalidValues, MembershipCheck, PlanRefusal } from './plan-types.js'
 import { prepare, refuse } from './prepare.js'
 import { filtersFor, throughFields } from './scope.js'
+import { stampsOf } from './stamps.js'
 import { decodeRecordKey } from './token.js'
 
 /*
@@ -144,9 +145,11 @@ export function chosenTwice(snapshot: MetadataSnapshot, bindings: FormBindings, 
  * (`checkSubmittedFields`); then every answer through its column's codec,
  * by the same `decodeAnswers` `planUpdate` runs, against the same columns
  * the context pins, collecting every error -- 422 `invalid-values` for the
- * request, never fifty of them. The key is not among the columns held
- * fixed, as `planUpdate` holds it, because no field of the key may be
- * granted. `null` clears a field where its column may be NULL, and is
+ * request, never fifty of them; then what the change stamps (0153), the
+ * signed-in person's whichever record it is -- `unstampable` or
+ * `missing-attribute` for the request, where `planUpdate` would refuse
+ * every record so. The key is not among the columns held fixed, as
+ * `planUpdate` holds it, because no field of the key may be granted. `null` clears a field where its column may be NULL, and is
  * refused `required` where it may not; an empty text is text.
  *
  * What depends on the record is not here: each record's echoes, its
@@ -179,6 +182,9 @@ export function bulkAnswers(
   const fixed = new Map(filters.filter.map((term) => [term.column, term.value]))
   const decoded = decodeAnswers(prepared, bindings, new Map(Object.entries(answers)), fixed, 'update', scoping.fields)
   if (decoded.errors.length > 0) return invalid(decoded.errors)
+  // Who a change stamps is the signed-in person's, as each record's plan finds it again: one that cannot be stamped is the request's refusal.
+  const stamps = stampsOf(prepared, bindings, context, 'update')
+  if (!stamps.ok) return stamps
   const memberships = membershipChecks(snapshot, bindings, policy, context, 'update', decoded.selections)
   return memberships.ok ? { ok: true, memberships: memberships.checks } : memberships
 }
