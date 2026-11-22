@@ -201,3 +201,23 @@ describe('the built server, with an action deadline (0161)', () => {
     STARTS,
   )
 })
+
+describe('the built server, with a deadline for chosen records (0173)', () => {
+  // main.ts reads how long a request over chosen records may go on sending
+  // them before anything opens, by the lookup deadline's rule: one that is
+  // not a whole number of milliseconds stops the server before it listens,
+  // naming the setting and quoting what was written, and one that is
+  // starts it. Watched failing with main.ts reading no such deadline: the
+  // server listened at "20s".
+  test(
+    'stops at start on a deadline for chosen records that is not a whole number of milliseconds, and starts on one that is',
+    async () => {
+      const junk = await start({ FORMANCY_DATA_BULK_DEADLINE_MS: '20s' })
+      expect([junk.listening, junk.code]).toEqual([false, 1])
+      expect(junk.stderr.trim()).toBe('FORMANCY_DATA_BULK_DEADLINE_MS is a whole number of milliseconds from 1 to 2147483647; it is "20s".')
+      const taken = await start({ FORMANCY_DATA_BULK_DEADLINE_MS: '30000' })
+      expect(taken.listening, taken.stderr).toBe(true)
+    },
+    STARTS,
+  )
+})

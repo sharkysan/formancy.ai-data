@@ -1,5 +1,6 @@
 import {
   authorizeOperation,
+  bulkOffered,
   copiedFields,
   deleteEffects,
   driftRefusal,
@@ -44,6 +45,7 @@ import type { AuditSink, RuntimeAuditEvent, RuntimeOperation } from '../audit.js
 import { auditedForm, auditRequests, recordReference, selectionReferences } from '../audit.js'
 import { loadPublished } from '../published.js'
 import { formActions, registerActionRoute } from './runtime-actions.js'
+import { registerBulkRoute } from './runtime-bulk.js'
 import { registerDeleteRoute } from './runtime-deletes.js'
 import { NOT_FOUND, planRefusal, recordFailure, unknownOutcome } from './runtime-errors.js'
 import { registerExportRoute } from './runtime-exports.js'
@@ -75,6 +77,8 @@ export interface RuntimeOptions {
   saveDeadlineMs: number
   /** How long a run of an action may take before the database stops it (0161). */
   actionDeadlineMs: number
+  /** How long a request that deletes chosen records may go on sending them (0173). */
+  bulkDeadlineMs: number
 }
 
 declare module 'fastify' {
@@ -87,7 +91,8 @@ declare module 'fastify' {
      * record -- moves its policy's state field (0112). `action`: the name
      * of the action run, once the form binds it (0161). `records`: every
      * record a run over a selection addressed, once the form binds it
-     * (0165), whose count is then `rows`.
+     * (0165), whose count is then `rows` -- or every record a delete of
+     * chosen records named (0173), and `outcomes` what became of each.
      */
     auditTrail?: {
       formVersion: number | null
@@ -97,6 +102,7 @@ declare module 'fastify' {
       moved?: boolean | null
       action?: string
       records?: string[]
+      outcomes?: string[] | null
     }
   }
 }
@@ -117,6 +123,7 @@ export const ROUTE_OPERATIONS: Readonly<Record<string, RuntimeOperation>> = {
   'POST /v1/forms/:id/records/create': 'create',
   'POST /v1/forms/:id/records/update': 'update',
   'POST /v1/forms/:id/records/delete': 'delete',
+  'POST /v1/forms/:id/records/delete-chosen': 'delete-chosen',
   'POST /v1/forms/:id/records/supersede': 'supersede',
   'POST /v1/forms/:id/records/save': 'save',
   'POST /v1/forms/:id/actions/:action/run': 'action',
@@ -174,6 +181,7 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
         moved: trail.repeated === true ? null : (trail.moved ?? null),
         ...(trail.action === undefined ? {} : { action: trail.action }),
         ...(trail.records === undefined ? {} : { records: selectionReferences(key, trail.records) }),
+        ...(trail.outcomes === undefined ? {} : { outcomes: trail.outcomes }),
       }
     },
   })
@@ -238,7 +246,7 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
    */
   async function sendOnce(
     request: FastifyRequest<{ Params: { id: string } }>,
-    operation: UnknownOutcome['operation'] | `action:${string}`,
+    operation: UnknownOutcome['operation'] | 'delete-chosen' | `action:${string}`,
     id: string | undefined,
     perform: () => Promise<WriteAnswer>,
   ): Promise<WriteAnswer & { repeated?: boolean }> {
@@ -313,13 +321,17 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
     const trail = reply.request.auditTrail
     if (trail !== undefined && answer.record !== undefined) trail.record = answer.record
     if (trail !== undefined && answer.repeated === true) trail.repeated = true
-    if (isRecord(answer.body) && answer.body['code'] === 'declined' && answer.repeated !== true) {
-      reply.log.info(
-        { form: (reply.request.params as { id?: unknown }).id, code: 'declined' },
-        'refused: the deployment declined a write, in words that go to the person and to no log',
-      )
-    }
+    if (answer.repeated !== true) noted(reply.request, answer)
     return reply.code(answer.status).send(answer.body)
+  }
+
+  /** A write's answer said in the log, once: a declined one by its code and the form, never its reason -- a single write's, or a chosen record's (0173). */
+  function noted(request: FastifyRequest, answer: WriteAnswer): void {
+    if (!isRecord(answer.body) || answer.body['code'] !== 'declined') return
+    request.log.info(
+      { form: (request.params as { id?: unknown }).id, code: 'declined' },
+      'refused: the deployment declined a write, in words that go to the person and to no log',
+    )
   }
 
   /**
@@ -482,6 +494,8 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
       together,
       // The actions this person may run, as the root as described now leaves them runnable (0161).
       actions: formActions(bundle, actor, verdict),
+      // What this person may do to a page's chosen records together, where the database still allows a delete (0173).
+      bulk: { delete: operations.includes('delete') && bulkOffered(bundle.policy, actor, bundle.bindings).delete },
     } satisfies PublishedForm
   })
 
@@ -543,6 +557,9 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
 
   // One record, by its token and the version read (0050): the update's steps, a delete's answers.
   registerDeleteRoute(app, { published, connection, context, sendOnce, lost, refusal, answered })
+
+  // The chosen records of a page, each a delete of its own in the order sent, once per sending (0173).
+  registerBulkRoute(app, { published, connection, context, sendOnce, lost, refusal, answered, noted, bulkDeadlineMs: options.bulkDeadlineMs })
 
   // A change from a date (0113): the update's read and steps, a create's answer.
   registerSupersedeRoute(app, {

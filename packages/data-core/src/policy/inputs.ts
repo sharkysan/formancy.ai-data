@@ -93,6 +93,8 @@ export interface ParsedPolicy {
   transitions: { field: string; moves: ReadonlyArray<{ from: string | null; to: string; roles: ReadonlySet<string> }> } | null
   /** Who may run each action the policy names (0159), by the action's name; empty when it names none. */
   actions: ReadonlyMap<string, ReadonlySet<string>>
+  /** Who may delete chosen records together (0173); null when the policy names no `bulk`, and `delete` empty when `bulk` names none. */
+  bulk: { delete: ReadonlySet<string> } | null
 }
 
 /**
@@ -298,6 +300,29 @@ function readActions(value: unknown, problems: string[]): Map<string, ReadonlySe
 }
 
 /**
+ * Who may delete chosen records together (0173); an absent property is
+ * none, and a `bulk` without `delete` grants nobody. `delete` is the one
+ * operation read: any other, an `update` among them, is refused as every
+ * property this release does not read is.
+ */
+function readBulk(value: unknown, problems: string[]): ParsedPolicy['bulk'] {
+  if (value === undefined) return null
+  if (!isRecord(value)) {
+    problems.push('bulk is not { delete: { roles } }')
+    return null
+  }
+  unread(value, ['delete'], 'bulk.', problems)
+  const entry = value['delete']
+  if (entry === undefined) return { delete: new Set() }
+  if (!isRecord(entry)) {
+    problems.push('bulk.delete is not { roles }')
+    return null
+  }
+  unread(entry, ['roles'], 'bulk.delete.', problems)
+  return { delete: readRoles(entry['roles'], 'bulk.delete.roles', problems) }
+}
+
+/**
  * The policy as the rest of this module uses it, or every reason it cannot be.
  *
  * Every problem rather than the first, because a person fixes a policy from
@@ -307,7 +332,7 @@ function readActions(value: unknown, problems: string[]): Map<string, ReadonlySe
 export function readPolicy(policy: unknown): { parsed: ParsedPolicy; problems: [] } | { parsed: null; problems: string[] } {
   if (!isRecord(policy)) return { parsed: null, problems: ['the policy is not an object'] }
   const problems: string[] = []
-  unread(policy, ['version', 'operations', 'fields', 'rowFilters', 'lookups', 'through', 'cascades', 'transitions', 'actions'], '', problems)
+  unread(policy, ['version', 'operations', 'fields', 'rowFilters', 'lookups', 'through', 'cascades', 'transitions', 'actions', 'bulk'], '', problems)
   if (policy['version'] !== 1) problems.push('version is not 1, the only policy version this release reads')
 
   const rawOperations = policy['operations']
@@ -339,7 +364,8 @@ export function readPolicy(policy: unknown): { parsed: ParsedPolicy; problems: [
   const cascades = readCascades(policy['cascades'], problems)
   const transitions = readTransitions(policy['transitions'], problems)
   const actions = readActions(policy['actions'], problems)
+  const bulk = readBulk(policy['bulk'], problems)
 
   if (problems.length > 0) return { parsed: null, problems }
-  return { parsed: { operations, fields, rowFilters, lookups, through, cascades, transitions, actions }, problems: [] }
+  return { parsed: { operations, fields, rowFilters, lookups, through, cascades, transitions, actions, bulk }, problems: [] }
 }

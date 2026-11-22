@@ -138,10 +138,17 @@ describe('a runtime server with an origin listed (0060)', () => {
 
 describe('the router’s printed routes', () => {
   // A line the reader skipped would be a route doors.json never decided.
+  // A child that goes on with its parent's segment, as `-chosen` under
+  // `/records/delete` does (0173), is that route, never a refusal -- watched
+  // failing with the reader taking only children that start with a slash:
+  // the built server's routes could not be read -- and one at the top goes
+  // on from nothing.
   test('are read whole, HEAD folded into GET, and anything else refused', () => {
     const text = [
       '├── /health (GET, HEAD)',
       '└── /v1/forms/:id (GET, HEAD)',
+      '    ├── /records/delete (POST)',
+      '    │   └── -chosen (POST)',
       '    ├── /records/read (POST)',
       '    └── /versions (POST, GET, HEAD)',
       '        └── /:version (GET, HEAD)',
@@ -150,6 +157,8 @@ describe('the router’s printed routes', () => {
     expect(parsePrintedRoutes(text)).toEqual([
       { method: 'GET', path: '/health' },
       { method: 'GET', path: '/v1/forms/:id' },
+      { method: 'POST', path: '/v1/forms/:id/records/delete' },
+      { method: 'POST', path: '/v1/forms/:id/records/delete-chosen' },
       { method: 'POST', path: '/v1/forms/:id/records/read' },
       { method: 'POST', path: '/v1/forms/:id/versions' },
       { method: 'GET', path: '/v1/forms/:id/versions' },
@@ -158,6 +167,7 @@ describe('the router’s printed routes', () => {
     expect(() => parsePrintedRoutes('├── /v1/forms/:id')).toThrow(/not a route with its methods/)
     expect(() => parsePrintedRoutes('├── /x (HEAD)')).toThrow(/HEAD without GET/)
     expect(() => parsePrintedRoutes('    ├── /orphan (GET)')).toThrow(/under no route/)
+    expect(() => parsePrintedRoutes('├── -chosen (POST)')).toThrow(/goes on from no route/)
   })
 })
 

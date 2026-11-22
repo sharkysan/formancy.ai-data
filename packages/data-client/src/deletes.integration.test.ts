@@ -62,4 +62,36 @@ describe.each(ENGINES)('a deletion through the client on $engine', ({ connection
     expect(await clerk.read(formId, record)).toMatchObject({ ok: false, status: 404, code: 'not-found' })
     expect(await clerk.delete(formId, { record, version: saved.version ?? '' })).toMatchObject({ ok: false, status: 404, code: 'not-found' })
   })
+
+  // The chosen records of a page deleted together (0173): the form says a
+  // clerk may, and each record is read as its delete alone would be -- the
+  // clerk's own deleted, one changed since it was read stale, another
+  // tenant's not found -- in the order sent, the request going on past the
+  // two it could not delete. What was kept is there to read.
+  test('deletes chosen records each on its own, and reads each as a delete of it alone', async () => {
+    const clerk = plane.client()
+    expect(expectOk(await clerk.form(formId))).toMatchObject({ bulk: { delete: true } })
+    const created = async (note: string, as = clerk) => {
+      const made = expectOk(await as.create(formId, { note }))
+      return { record: made.record ?? '', version: made.version ?? '' }
+    }
+    const first = await created(`chosen through the client ${connection}`)
+    const changed = await created(`changed since it was read ${connection}`)
+    const theirs = await created(`another tenant's ${connection}`, plane.client(plane.tokens.otherClerk))
+    const last = await created(`chosen last ${connection}`)
+    expectOk(await clerk.update(formId, { ...changed, answers: { note: 'changed' } }))
+
+    const outcome = await clerk.deleteChosen(formId, { records: [first, changed, theirs, last] })
+    expect(outcome).toEqual({
+      ok: true,
+      value: [
+        { ok: true, value: { record: first.record, deleted: true } },
+        { ok: false, status: 409, code: 'stale', message: expect.any(String) },
+        { ok: false, status: 404, code: 'not-found', message: 'No such record.' },
+        { ok: true, value: { record: last.record, deleted: true } },
+      ],
+    })
+    expect(await clerk.read(formId, first.record)).toMatchObject({ ok: false, status: 404 })
+    expect(expectOk(await clerk.read(formId, changed.record))).toMatchObject({ record: changed.record })
+  })
 })

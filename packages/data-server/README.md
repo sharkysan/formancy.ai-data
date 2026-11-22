@@ -498,6 +498,29 @@ existed would be documented and inert.
   `create`, it adds `copied`, the fields a copy of a record carries into a
   new one for this person, from `copiedFields`, and `null` otherwise
   ([0107](../../docs/decisions/0107-a-record-is-duplicated-into-a-new-one-of-the-fields-the-server-names.md)).
+
+  `POST /v1/forms/:id/records/delete-chosen` deletes the chosen records of
+  a page, `{ records: [{ record, version }] }`, one to `LIST_PAGE_SIZE`,
+  with a write id, under the policy's `bulk.delete`, each role of which
+  must be one `operations.delete` grants ([0173](../../docs/decisions/0173-chosen-records-are-deleted-each-on-its-own-with-one-answer-per-record.md)): 400 for a body of none or
+  more than a page, and before any statement 403 for a person the grant
+  does not name and 400 `duplicate-record` for a key named twice; then
+  each record in the order sent is the delete above, its status and body
+  that record's outcome. A refusal about a record and the request goes on;
+  `unknown-outcome` or `unavailable` and it stops, every record after it
+  `{ sent: false }`, as is every record once
+  `FORMANCY_DATA_BULK_DEADLINE_MS` has passed; a record whose delete
+  throws stops it too, answered 500 `internal` in the server's own words,
+  the error in the log. A first record refused for what the form or its
+  connection is -- 409 `drift` or `schema-changed`, 403
+  `permission-denied`, or 500 for a configuration the server cannot
+  apply -- is the request's answer, once. 200 `{ records }` in the order sent, once per
+  write id. Audited as `delete-chosen`, every record by its keyed hash in
+  `records`, their count in `rows`, and each record's code in
+  `outcomes`. `GET /v1/forms/:id` adds `bulk: { delete }`, `true` where
+  it lists `delete` and the grant names a role of the person's.
+  `src/routes/runtime-bulk.test.ts` holds the route over fake ports and
+  `src/e2e-bulk.integration.test.ts` on both engines.
   It names `writable: { create, update }`, the fields each write it lists
   accepts from this person, from `writableFields`, and `null` for one it
   does not list
@@ -596,10 +619,15 @@ existed would be documented and inert.
   event carries `rows`: for an `export`, how many records its file held,
   or held when it was refused, 0 before any statement; for a `save`, its
   row changes (0155); for an `action` over a selection, how many records
-  it addressed (0165); `null` for every other operation -- a number,
-  never which records (0079). An `action` over a selection alone names
-  them too, in `records`: each record's keyed hash in the order sent,
-  `null` without an audit key, and its `record` is `null` (0165). And `moved`: on
+  it addressed (0165); for a `delete-chosen`, how many records it named
+  (0173); `null` for every other operation -- a number, never which
+  records (0079). An `action` over a selection and a `delete-chosen` alone
+  name them too, in `records`: each record's keyed hash in the order sent,
+  `null` without an audit key, and their `record` is `null` (0165, 0173).
+  A `delete-chosen` adds `outcomes`, what became of each record by its
+  code in the same order -- `done`, the code its delete was refused with,
+  `unknown-outcome`, `not-sent` -- never a message, and `null` where the
+  request was answered as a whole or answered again. And `moved`: on
   a create or an update of a form whose policy names a state field's moves,
   whether the write as planned moves it, `null` otherwise, and for a write
   refused before it was planned or answered again -- whether, never from
@@ -788,6 +816,7 @@ one-key settings rotate by restart; a key set rotates as below.
 | `FORMANCY_DATA_LOOKUP_DEADLINE_MS` | How long a lookup statement may run, in milliseconds counted from when the adapter is asked for it, before the server stops it ([0061](../../docs/decisions/0061-a-lookup-statement-stops-when-its-request-is-abandoned-or-its-deadline-passes.md)): a whole number from 1 to 2147483647, the longest a Node timer holds. Unset, `DEFAULT_LOOKUP_DEADLINE_MS` from `@formancy/data-core`, the slowest lookup answer `docs/performance.md` measured, which describes that machine and data: a slower or larger deployment raises it. Anything else stops the process with a sentence naming the setting, and `createDataServer` refuses the same as `runtime.lookupDeadlineMs`. On SQL Server mssql's default request timeout of 15 s still cuts any deadline set above it, answered `unavailable`. |
 | `FORMANCY_DATA_SAVE_DEADLINE_MS` | How long a save of a record with its rows (`POST /v1/forms/:id/records/save`) may wait for a lock, in milliseconds, and after which none of its steps starts: past it the save is rolled back and answered `503 unavailable` ([0155](../../docs/decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md)). A whole number from 1 to 2147483647; unset, `DEFAULT_SAVE_DEADLINE_MS` from `@formancy/data-core`, measured as `save-limits.ts` says. On PostgreSQL it bounds each statement of the save too; on SQL Server it does not, and a statement slow for another reason than a lock runs to mssql's request timeout of 15 s, which nothing here sets. So where the allowlist has a SQL Server connection, twice it must be below that timeout -- 7,499 at most -- or the process stops with a sentence naming the setting, since a save may run nearly twice the deadline before it is rolled back, and past the timeout it would be `unknown-outcome` instead. Anything else stops the process too. `createDataServer` refuses `runtime.saveDeadlineMs` only where it is not a whole number from 1 to 2147483647: the fit to mssql's timeout is checked by the runnable server (`main.ts`) alone, so an embedder whose registry has a SQL Server connection holds its own deadline to it. It is not a deadline on the whole transaction. |
 | `FORMANCY_DATA_ACTION_DEADLINE_MS` | How long a run of an action (`POST /v1/forms/:id/actions/:action/run`) may take, in milliseconds, before the database stops it ([0161](../../docs/decisions/0161-the-runtime-plane-runs-an-action-once-per-write-id-under-a-deadline-and-never-queues-it.md)): on PostgreSQL the statement timeout set before each of its statements to what remains of it, past which the run is rolled back and answered `503 action-timeout`; on SQL Server mssql's request timeout for its one batch, with half of it the lock's own bound, past which the run may have committed and is answered `502 unknown-outcome` ([0160](../../docs/decisions/0160-an-action-runs-in-one-transaction-that-locks-the-record-moves-its-version-and-calls-the-routine-guarded-and-never-retried.md)). The statement that describes the root and the routine before the run is not under it: on PostgreSQL nothing bounds that one, and on SQL Server mssql's default request timeout does. A whole number from 1 to 2147483647; unset, 15000, mssql's default request timeout, chosen and not measured. A run holds its record's lock for up to it, so a save of the record waits as long; on SQL Server, above 15000, a save waiting on a run may end as `unknown-outcome`, its own batch timing out first. Anything else stops the process, and `createDataServer` refuses `runtime.actionDeadlineMs` by the same rule. |
+| `FORMANCY_DATA_BULK_DEADLINE_MS` | How long a delete of chosen records (`POST /v1/forms/:id/records/delete-chosen`) may go on sending them, in milliseconds, checked before each record and never during one: every record after it is answered `{ sent: false }`, so a request takes at most the deadline and one record more ([0173](../../docs/decisions/0173-chosen-records-are-deleted-each-on-its-own-with-one-answer-per-record.md)). A whole number from 1 to 2147483647; unset, 14000, chosen and not measured: a last record on SQL Server, up to three statements -- the root's description, the delete and, where it deleted nothing, the read that says why -- each bounded by mssql's 15 s request timeout, then answers before nginx's default `proxy_read_timeout` of 60 s. From 15000 up, such an answer can be cut by that proxy, which a client reads as every record's delete unknown. On PostgreSQL nothing bounds a record's wait for a lock. Anything else stops the process, and `createDataServer` refuses `runtime.bulkDeadlineMs` by the same rule. |
 | `PORT` | The port it listens on, 4390 when unset. |
 
 `src/rate-limit.test.ts` holds what the rate-limit setting accepts and
@@ -796,7 +825,8 @@ refuses, `src/trusted-proxies.test.ts` what the proxy list does,
 `src/lookup-deadline.test.ts` what the lookup deadline accepts,
 `src/save-deadline.test.ts` what the save deadline accepts and when it
 must be below mssql's request timeout,
-`src/routes/runtime-actions.test.ts` what the action deadline accepts, and
+`src/routes/runtime-actions.test.ts` what the action deadline accepts,
+`src/bulk-deadline.test.ts` what the deadline for chosen records accepts, and
 `src/publisher-roles.test.ts` what the publisher roles do.
 
 The log is JSON lines on standard output: Fastify's lines for each request,

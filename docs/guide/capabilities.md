@@ -512,6 +512,18 @@ get*](../../README.md#what-you-get) is the short version, and
   delete locks every table it reaches first. The rows a cascade reaches
   are the database's, asked of no form's policy
   ([0051](../decisions/0051-a-delete-reaches-other-tables-only-through-foreign-keys-the-policy-names.md)).
+- **The chosen records of a page can be deleted in one request**, up to
+  `LIST_PAGE_SIZE`, where the policy's `bulk.delete` grants a role that
+  may delete: each record deleted on its own, as a delete of it alone
+  would be, in the order sent, and answered with what became of each --
+  deleted, refused in its delete's own words, or not sent once a record's
+  answer was lost or `FORMANCY_DATA_BULK_DEADLINE_MS`, 14 s unset and
+  chosen, has passed. A set can be left half deleted, each record named.
+  It is the runtime plane's `POST /v1/forms/:id/records/delete-chosen` and
+  `@formancy/data-client`'s `deleteChosen`, which reads a lost request
+  record by record (`reconcileChosen`); the host page and the studio
+  offer no control for it, and a policy names the grant by hand
+  ([0173](../decisions/0173-chosen-records-are-deleted-each-on-its-own-with-one-answer-per-record.md)).
 - **A person is shown the forms they may read**, and nothing about any
   other, each with the forms whose rows a page may list below one of its
   records, derived from the published forms' foreign keys and types without

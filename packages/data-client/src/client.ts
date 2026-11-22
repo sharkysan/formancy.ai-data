@@ -16,6 +16,8 @@ import type {
 } from '@formancy/data-core'
 import { actionOutcome } from './actions.js'
 import type { ActionOutcome } from './actions.js'
+import { deleteChosenOutcome, reconcileChosen } from './chosen.js'
+import type { DeleteChosenOutcome, UnknownChosen } from './chosen.js'
 import { reconcile } from './reconcile.js'
 import type { Reconciliation } from './reconcile.js'
 import { saveOutcome } from './saves.js'
@@ -398,6 +400,29 @@ export function createDataClient(options: DataClientOptions) {
     },
 
     /**
+     * `POST …/records/delete-chosen` (0173): the chosen records of a page,
+     * one to `LIST_PAGE_SIZE`, each at the version its person read, each
+     * deleted on its own as `delete` deletes one, in the order sent. The
+     * answer is each record's outcome in that order, read as `delete`'s
+     * would be, or `not-sent` for one the server sent nothing for; a
+     * refusal is of the request, nothing deleted; an `UnknownChosen` when
+     * nobody can say what became of any, which `reconcileChosen` reads.
+     * Exactly the route's key is sent, with a write id of its own.
+     */
+    deleteChosen: async (formId: string, chosen: { records: ReadonlyArray<{ record: string; version: string }> }): Promise<DeleteChosenOutcome> => {
+      const records = chosen.records.map(({ record, version }) => ({ record, version }))
+      const answer = await exchange({
+        method: 'POST',
+        names: [formId],
+        route: ([form]) => `/v1/forms/${String(form)}/records/delete-chosen`,
+        body: { records },
+        // New for every call, as every write's is (0031).
+        headers: { [WRITE_ID_HEADER]: newWriteId() },
+      })
+      return 'sent' in answer ? invalidName : deleteChosenOutcome(answer, { records })
+    },
+
+    /**
      * `POST …/records/save` (0155): a record -- created, or updated only if
      * it is still at `version`, an update that may change nothing -- and
      * the rows of its together children, created, updated and deleted, in
@@ -477,6 +502,9 @@ export function createDataClient(options: DataClientOptions) {
 
     /** Reads what an unknown write addressed and says what that shows; never sends the write again (0031). */
     reconcile: (formId: string, unknown: UnknownWrite): Promise<Reconciliation> => reconcile(read, formId, unknown),
+
+    /** Reads each record an unknown delete of chosen records addressed, one at a time, and says what each shows; never sends it again (0031, 0173). */
+    reconcileChosen: (formId: string, unknown: UnknownChosen) => reconcileChosen(read, formId, unknown),
 
     /** `POST …/lookups/:source/query`: one page of the options this person may pick for this operation. */
     query: (

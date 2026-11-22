@@ -87,6 +87,11 @@ export interface FieldPolicy {
  * must be granted read, and may read every field the action passes to its
  * routine. It needs no update: an action is an operation of its own, as a
  * database grants EXECUTE without UPDATE.
+ *
+ * `bulk` names who may delete the chosen records of a page in one request
+ * (0173), each record a delete of its own. Optional, and absent -- or an
+ * operation it does not name -- is nobody's, for the reason above: a server
+ * older than it refuses a policy that names it.
  */
 export interface FormPolicy {
   version: 1
@@ -98,11 +103,24 @@ export interface FormPolicy {
   cascades?: CascadeRule[]
   transitions?: TransitionRule
   actions?: Record<string, ActionGrant>
+  bulk?: BulkGrant
 }
 
 /** Who may run one action (0159): roles, exact strings, as an operation's are. */
 export interface ActionGrant {
   roles: string[]
+}
+
+/**
+ * Who may delete the chosen records of a page together (0173): roles,
+ * exact strings, each of which must be granted `operations.delete` too,
+ * since every record of such a request is planned, scoped and sent as a
+ * delete of it alone is. It narrows that grant and widens nothing. Delete
+ * is the one operation it names: a change of chosen records to values is
+ * not something this release reads, and a policy naming one is refused.
+ */
+export interface BulkGrant {
+  delete?: { roles: string[] }
 }
 
 /**

@@ -297,6 +297,33 @@ order, its arguments read before the first call and its own numbers (`packages/d
 the client's reading (`packages/data-client/src/transport.test.ts`, run
 with a configuration of its own that starts no database).
 
+A delete of chosen records ([0173](../decisions/0173-chosen-records-are-deleted-each-on-its-own-with-one-answer-per-record.md)) is held on both engines by
+`packages/data-fixtures/src/bulk.ts`, `BULK_PARITY`: one expectation per
+case for both, which `packages/data-server/src/e2e-bulk.integration.test.ts`
+asserts through the real server, and the lost answer
+`e2e-lost-answer.integration.test.ts` cuts at its TCP hop. It is no
+family of shared cases and no test declares it with `covers()`: the
+server's suites run on the default images alone, and the report holds a
+shared case on every image of the matrix, where these would be missing;
+each record's delete is held on every image by `DELETE_PARITY` and
+`CASCADE_PARITY`, and `packages/data-fixtures/src/cases.test.ts` holds
+the export to its reason. Written on 2026-11-22 without a database, so CI
+is their first run; what needs none ran and was watched failing with its
+rule taken out: the grant and the body
+(`packages/data-core/src/policy/validate.test.ts`, `records/bulk.test.ts`),
+the route, its deadline and the trail over fake ports
+(`packages/data-server/src/routes/runtime-bulk.test.ts`,
+`bulk-deadline.test.ts`), the built server's start
+(`scripts/server-start.test.mjs`), the doors (`scripts/cloudflare/doors.test.mjs`)
+and the form's `bulk` as the client takes it
+(`packages/data-client/src/transport.test.ts`, run alone without the
+package's database setup, which it does not use).
+`bulk-sized.integration.test.ts` measures a page on the default images,
+prints its timings to the log, which is what a CI run keeps of them, and
+holds a page done within the default deadline; its first run on
+2026-11-22 deleted 50 records in at most 1,088 ms on PostgreSQL and
+296 ms on SQL Server.
+
 The studio's offer of the scope and the host page's choice of rows
 ([0166](../decisions/0166-a-person-chooses-a-pages-records-by-a-column-of-boxes-and-runs-an-action-over-them-from-a-bar-above-the-grid.md)) were
 written on 2026-11-18 without a database. What needs none ran and was

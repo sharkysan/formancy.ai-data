@@ -167,7 +167,9 @@ export { canonicalFloat32 } from './codecs/numbers.js'
 export { decodeRowversion, encodeRowversion } from './codecs/rowversion.js'
 export {
   authorizeAction,
+  authorizeBulk,
   authorizeOperation,
+  bulkOffered,
   checkSubmittedFields,
   checkTransition,
   forcedValues,
@@ -188,6 +190,7 @@ export type { DeleteReachFacts, DeleteReview, ReachedKey } from './policy/cascad
 export type { ThroughKeyType } from './policy/through.js'
 export type {
   ActionGrant,
+  BulkGrant,
   CascadeRule,
   DeleteAction,
   FieldPolicy,
@@ -246,6 +249,8 @@ export { planCreate, planRead, planUpdate } from './records/plan.js'
 export { planSupersede, versionFields } from './records/supersede.js'
 export type { PlannedMove } from './records/transition.js'
 export { planDelete } from './records/delete.js'
+export { chosenTwice, readBulkBody } from './records/bulk.js'
+export type { ChosenAnswer, ChosenBody, ChosenOutcome } from './records/bulk.js'
 export { deleteTerms, reachesPast } from './records/delete-terms.js'
 export type { DeleteTerms, ReachTerms } from './records/delete-terms.js'
 export { copiedFields } from './records/copy.js'

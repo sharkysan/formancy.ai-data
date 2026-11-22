@@ -22,7 +22,9 @@ import type { FastifyRequest } from 'fastify'
  * another write -- a delete's included (0050), whose answer is a token and
  * `deleted`, so nothing of a deleted record is kept, and a save of a record
  * with its rows (0155), whose answer is the record and every row it wrote,
- * kept under the same byte cap as any other -- and a run of an action
+ * kept under the same byte cap as any other -- a delete of a page's
+ * chosen records (0173), `delete-chosen`, whose answer is each record's
+ * outcome as a delete of it alone answers it -- and a run of an action
  * (0161), each action an operation of its own, `action:<name>`, whose
  * answer is the tokens it addressed; and the same id with another body is
  * refused, because
@@ -58,7 +60,17 @@ export interface WriteAnswer {
  * images, the fixture's order saved with 49 lines answered 7,508 bytes on
  * PostgreSQL and 9,758 on SQL Server, so the cap holds about 4,400 and
  * 3,400 of those, and saves of more than about 21 lines on PostgreSQL,
- * 16 on SQL Server, fill it before the count does. Oldest dropped first,
+ * 16 on SQL Server, fill it before the count does. A delete of a page of
+ * chosen records (0173) keeps one answer per record: counted on 2026-11-22
+ * as the JSON the route answers in the server's own sentences, 50 records
+ * deleted are 3,663 bytes with seven-digit keys and 50 stale ones 7,713, so
+ * the cap holds about 9,100 and 4,300 such pages and the count bounds
+ * first; 50 declined in a deployment's own words at their longest -- a
+ * message of 2,046 UTF-16 code units, `REFUSAL_LONGEST`, prefix included,
+ * so 2,027 of reason -- are about 105 KB in ASCII and up to about 307 KB
+ * in a script of three UTF-8 bytes to a code unit, so between about 320
+ * and 109 of them fill it. bulk-sized.integration.test.ts reports a page
+ * of deletes' bytes through the real server. Oldest dropped first,
  * so a person sending large records under fresh ids cannot make this
  * server hold more: a resend that arrives after its answer was dropped is
  * applied again.
@@ -99,7 +111,7 @@ interface Kept {
 interface Scope {
   actor: string
   form: string
-  operation: 'create' | 'update' | 'delete' | 'supersede' | 'save' | `action:${string}`
+  operation: 'create' | 'update' | 'delete' | 'delete-chosen' | 'supersede' | 'save' | `action:${string}`
   id: string
   body: unknown
 }

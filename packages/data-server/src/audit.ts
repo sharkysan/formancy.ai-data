@@ -26,6 +26,7 @@ export type RuntimeOperation =
   | 'create'
   | 'update'
   | 'delete'
+  | 'delete-chosen'
   | 'supersede'
   | 'save'
   | 'action'
@@ -85,7 +86,8 @@ export interface RuntimeAuditEvent extends AuditEventBase {
    * changes the save carried -- creates, updates and deletes of its
    * children's rows, whatever became of them -- 0 for a body that is not
    * one. `action` over a selection (0165): how many records it addressed.
-   * `null` for every other operation. A number, never which records:
+   * `delete-chosen` (0173): how many records it named, whatever became of
+   * them. `null` for every other operation. A number, never which records:
    * an operator can see that somebody took ten thousand rows, or changed
    * twenty lines of an order, and the trail is still no copy of them. A
    * save's event names no child form, row, token or ref.
@@ -118,9 +120,26 @@ export interface RuntimeAuditEvent extends AuditEventBase {
    * leave fifty hashed records; one run over the same fifty answers "who
    * closed invoice 7" as well. Its `record` is then `null`. Absent from
    * every other event, and from a run whose form binds no action of its
-   * name.
+   * name. `delete-chosen` too (0173): every record the request named, in
+   * the order sent, once its body is `{ records }` -- absent from one that
+   * is not -- with its `record` `null`.
    */
   records?: string[] | null
+  /**
+   * `delete-chosen` only (0173): what became of each record `records`
+   * names, in the same order -- `done`, the code a delete of it alone
+   * would have been refused with (`stale`, `not-found`, `referenced`,
+   * `declined` and the rest), `unknown-outcome`, or `not-sent` for one
+   * no statement was sent for. A code and never a message: a declined
+   * record is `declined`, never the deployment's words. `null` where the
+   * request was answered as a whole -- refused before any record was sent,
+   * a form drift stops refused at its first, or a sending answered again
+   * (0031), whose first event says them. Absent from every other event,
+   * and from one whose `records` is absent. The one event of the trail
+   * that says what became of many records, under a key of its own, since
+   * one outcome cannot say it.
+   */
+  outcomes?: string[] | null
 }
 
 /**

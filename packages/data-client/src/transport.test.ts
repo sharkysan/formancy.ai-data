@@ -142,6 +142,7 @@ describe('when the data server is not what answers', () => {
       opens: [],
       together: null,
       actions: [],
+      bulk: { delete: false },
     }
     let body: unknown = FORM
     const { base } = await serve((_request, response) => {
@@ -463,9 +464,20 @@ describe('across origins (0060)', () => {
       update: () => client.update('pg-order', CHANGE),
       supersede: () => client.supersede('pg-order', CHANGE),
       delete: () => client.delete('pg-order', { record: 'k1:7', version: '00000000000007d1' }),
+      deleteChosen: () => client.deleteChosen('pg-order', { records: [{ record: 'k1:7', version: '00000000000007d1' }] }),
       save: () => client.save('pg-order', { record: { create: { answers: { notes: 'a' } } }, rows: [] }),
       runAction: () => client.runAction('pg-order', 'close', { records: [{ record: 'k1:7', version: '00000000000007d1' }], answers: { note: 'a' } }),
       reconcile: () => client.reconcile('pg-order', lost),
+      reconcileChosen: () =>
+        client.reconcileChosen('pg-order', {
+          ok: false,
+          status: 0,
+          code: 'unknown-outcome',
+          message: TRANSPORT,
+          operation: 'delete-chosen',
+          records: [{ record: 'k1:7', version: '00000000000007d1' }],
+          origin: 'transport',
+        }),
       query: () => client.query('pg-order', 'order.customer', { operation: 'read', search: 'a' }),
       resolve: () => client.resolve('pg-order', 'order.customer', { operation: 'read', tokens: ['k1:1'] }),
       saveView: () => client.saveView('pg-order', { name: 'Mine', filter: [], sort: [{ field: 'id', direction: 'desc' }] }),
@@ -771,6 +783,7 @@ describe('a delete (0050)', () => {
       opens: [],
       together: null,
       actions: [],
+      bulk: { delete: false },
     }
     const DELETING = { cascades: false, clears: false, restricted: true }
     let body: unknown = FORM
@@ -814,6 +827,7 @@ describe('a delete (0050)', () => {
       opens: [],
       together: null,
       actions: [],
+      bulk: { delete: false },
     }
     const writes = (operations: readonly string[]) => ({ create: operations.includes('create') ? ['note'] : null, update: null })
     let body: unknown = FORM
@@ -861,6 +875,7 @@ describe('a delete (0050)', () => {
       opens: [],
       together: null,
       actions: [],
+      bulk: { delete: false },
     }
     const writes = (operations: readonly string[]) => ({
       create: operations.includes('create') ? ['valid_from'] : null,
@@ -910,6 +925,7 @@ describe('a delete (0050)', () => {
       opens: [],
       together: null,
       actions: [],
+      bulk: { delete: false },
     }
     let body: unknown = FORM
     const { base } = await serve((_request, response) => {
@@ -957,6 +973,7 @@ describe('a delete (0050)', () => {
       opens: [],
       together: null,
       actions: [],
+      bulk: { delete: false },
     }
     let body: unknown = FORM
     const { base } = await serve((_request, response) => {
@@ -1011,6 +1028,7 @@ describe('a delete (0050)', () => {
       moves: null,
       together: null,
       actions: [],
+      bulk: { delete: false },
     }
     let body: unknown = FORM
     const { base } = await serve((_request, response) => {
@@ -1288,6 +1306,7 @@ describe('a save of a record with its rows (0155)', () => {
       moves: null,
       opens: [],
       actions: [],
+      bulk: { delete: false },
     }
     let body: unknown = FORM
     const { base } = await serve((_request, response) => {
@@ -1502,6 +1521,7 @@ describe('a run of an action (0161)', () => {
       moves: null,
       opens: [],
       together: null,
+      bulk: { delete: false },
     }
     const CLOSE = {
       name: 'close',
@@ -1537,6 +1557,55 @@ describe('a run of an action (0161)', () => {
     ]) {
       body = { ...FORM, actions }
       expect(await client.form('pg-order')).toEqual({ ok: true, value: body })
+    }
+  })
+
+  // What a person may do to a page's chosen records together (0173) is a
+  // yes or no, and a yes only where the form offers them delete: a page
+  // drawing Delete the chosen… from a yes the form's own operations
+  // contradict would offer a request every record of which is refused. A
+  // reply without `bulk` is from a server older than 0173, which this
+  // client takes for no server it knows. Watched failing with `isBulk`
+  // left out of `isPublishedForm`: the reply without `bulk` was taken as
+  // a form.
+  test("a form's bulk delete is a yes or no, and a yes only where it offers delete", async () => {
+    const FORM = {
+      form: { model: {} },
+      operations: ['read', 'delete'],
+      readable: ['id'],
+      list: null,
+      deleting: { cascades: false, clears: false, restricted: false },
+      copied: null,
+      versions: null,
+      writable: { create: null, update: null },
+      moves: null,
+      opens: [],
+      together: null,
+      actions: [],
+    }
+    let body: unknown = FORM
+    const { base } = await serve((_request, response) => {
+      response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(body))
+    })
+    const client = createDataClient({ token: () => 't', base })
+    const reading = { ...FORM, operations: ['read'], deleting: null }
+    for (const malformed of [
+      FORM,
+      { ...FORM, bulk: null },
+      { ...FORM, bulk: { delete: 'yes' } },
+      { ...FORM, bulk: {} },
+      { ...reading, bulk: { delete: true } },
+    ]) {
+      body = malformed
+      expect(await client.form('pg-ticket'), JSON.stringify(malformed)).toMatchObject({ ok: false, code: 'unexpected' })
+    }
+    for (const taken of [
+      { ...FORM, bulk: { delete: true } },
+      { ...FORM, bulk: { delete: false } },
+      { ...reading, bulk: { delete: false } },
+    ]) {
+      body = taken
+      expect(await client.form('pg-ticket')).toEqual({ ok: true, value: body })
     }
   })
 })

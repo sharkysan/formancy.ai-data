@@ -25,6 +25,8 @@ export interface ServedConfiguration {
   saveDeadlineMs: number
   /** `FORMANCY_DATA_ACTION_DEADLINE_MS`, parsed: how long a run of an action may take before the database stops it (0161). */
   actionDeadlineMs: number
+  /** `FORMANCY_DATA_BULK_DEADLINE_MS`, parsed: how long a request that deletes chosen records may go on sending them (0173). */
+  bulkDeadlineMs: number
   /** The server's log, looked up when an event fires: the server does not exist yet while its options are built. */
   log: () => FastifyBaseLogger
 }
@@ -42,7 +44,8 @@ export interface ServedConfiguration {
  * documents say it is.
  */
 export function servedPlanes(found: ServedConfiguration): Pick<DataServerOptions, 'admin' | 'runtime'> {
-  const { registry, store, adminRoles, publisherRoles, browseRoles, auditKey, origins, lookupDeadlineMs, saveDeadlineMs, actionDeadlineMs } = found
+  const { registry, store, adminRoles, publisherRoles, browseRoles, auditKey, origins, lookupDeadlineMs, saveDeadlineMs, actionDeadlineMs, bulkDeadlineMs } =
+    found
   const sink: AuditSink = (event) => logAuditSink(found.log())(event)
   return {
     runtime: {
@@ -52,6 +55,7 @@ export function servedPlanes(found: ServedConfiguration): Pick<DataServerOptions
       lookupDeadlineMs,
       saveDeadlineMs,
       actionDeadlineMs,
+      bulkDeadlineMs,
       audit: { sink, ...(auditKey === undefined ? {} : { key: auditKey }) },
     },
     ...(adminRoles.length === 0
