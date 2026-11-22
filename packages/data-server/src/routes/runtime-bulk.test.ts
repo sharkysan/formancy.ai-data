@@ -124,6 +124,8 @@ let calls: string[]
 let outcomes: Map<string, DeleteOutcome>
 /** How long the fake delete takes, in milliseconds. */
 let lag: number
+/** The key whose fake delete throws rather than answering, as an adapter's programming error does; null for none. */
+let throwsAt: string | null
 /** What the fake catalog says to each `describe`, in turn; once used up, the published snapshot's. */
 let catalog: Described[]
 let events: RuntimeAuditEvent[]
@@ -153,6 +155,7 @@ function registry(): ConnectionRegistry {
       calls.push(`delete ${request.key[0]?.value ?? ''}`)
       if (lag > 0) await new Promise((resolve) => setTimeout(resolve, lag))
       const id = String(request.key[0]?.value ?? '')
+      if (id === throwsAt) throw new Error(`the fake adapter threw at ${id}, in words no answer may carry`)
       return outcomes.get(id) ?? { ok: true, deleted: { values: { id }, version: request.expectedVersion } }
     },
   }
@@ -198,6 +201,7 @@ beforeEach(async () => {
   calls = []
   outcomes = new Map()
   lag = 0
+  throwsAt = null
   catalog = []
   events = []
   lines = []
@@ -416,6 +420,66 @@ describe('deleting chosen records', () => {
     const later = await removeChosen('ticket', chosen([1, 2, 3]))
     expect(later.json<{ records: Array<{ status: number }> }>().records.map(({ status }) => status)).toEqual([200, 409, 200])
     expect(keysSent()).toEqual(['1', '3'])
+  })
+
+  // The table gone or changed under the form (`schema-changed`), and a
+  // connection the database will not let delete (`permission-denied`), are
+  // what the form and its connection are, not what a record is: the first
+  // record refused either way is the request's answer, once, with the
+  // delete's own status and sentence, nothing deleted -- not fifty
+  // descriptions and deletes each answered the same. Found at a later
+  // record they stay that record's ("answers each record exactly as the
+  // single delete answers it" sends both there). Watched failing with
+  // ABOUT_THE_FORM holding drift and the configuration codes alone: the
+  // vanished table's request answered 200, its first record a 409
+  // `schema-changed` inside it and the next two described and deleted.
+  test('answers a first record refused for what the table or the connection is once, with the delete’s own refusal', async () => {
+    catalog = [{ ok: false, code: 'schema-changed', message: 'the table is gone' }]
+    const vanished = await removeChosen('ticket', chosen([1, 2, 3]))
+    expect([vanished.statusCode, vanished.json()]).toEqual([409, { code: 'schema-changed', message: 'The database changed since this form was published.' }])
+    expect({ describes, deletes }).toEqual({ describes: 1, deletes: [] })
+    outcomes.set('4', { ok: false, code: 'permission-denied', message: 'm' })
+    const denied = await removeChosen('ticket', chosen([4, 5, 6]))
+    expect([denied.statusCode, denied.json()]).toEqual([403, { code: 'permission-denied', message: 'The database connection is not allowed to do this.' }])
+    expect(keysSent()).toEqual(['4'])
+  })
+
+  // A record whose delete throws -- an adapter's programming error, a
+  // refusal deleteFailure has no words for -- is that record's 500 in the
+  // server's own sentence, never the error's, and the request stops there,
+  // since nobody can say what the connection did; the records before it
+  // keep their outcomes in the answer and in the trail, and the error is
+  // the operator's, in the log. The client reads a record's 500 as its
+  // delete unknown. Watched failing with the loop uncaught: the request
+  // was a bare 500 carrying the error's own words, the first record's
+  // deletion in neither the answer nor the trail.
+  test('answers a record whose delete throws 500 in its own words, keeps what came before, and sends nothing after', async () => {
+    throwsAt = '2'
+    const response = await removeChosen('ticket', chosen([1, 2, 3]))
+    expect(keysSent()).toEqual(['1', '2'])
+    expect([response.statusCode, response.json()]).toEqual([
+      200,
+      {
+        records: [
+          { sent: true, status: 200, body: { record: 'k1:1', deleted: true } },
+          {
+            sent: true,
+            status: 500,
+            body: { code: 'internal', message: "This record's delete failed in the server, and it may have been deleted; the operator's log says why." },
+          },
+          { sent: false },
+        ],
+      },
+    ])
+    expect(events.map(({ status, outcomes: each }) => ({ status, outcomes: each }))).toEqual([{ status: 200, outcomes: ['done', 'internal', 'not-sent'] }])
+    expect(lines.filter((line) => line['msg'] === 'a delete of a chosen record failed in the server; the records after it were not sent')).toEqual([
+      expect.objectContaining({
+        level: 50,
+        form: 'ticket',
+        err: expect.objectContaining({ message: 'the fake adapter threw at 2, in words no answer may carry' }),
+      }),
+    ])
+    expect(response.body).not.toContain('no answer may carry')
   })
 
   // A sending that arrives again with its write id is answered with the

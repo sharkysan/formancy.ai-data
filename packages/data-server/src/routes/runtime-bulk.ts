@@ -32,11 +32,14 @@ import type { WriteAnswer } from './write-once.js'
  *    outcome. A refusal about the record -- stale, not found, referenced,
  *    declined -- and the request goes on; a lost answer or a database out
  *    of reach, and it stops, every record after it `{ sent: false }`,
- *    since the connection is then in doubt. A first record refused for
- *    what the form is rather than what the record is -- drift (409), or a
- *    configuration the server cannot apply (500) -- is the request's
- *    answer, once: every other would be refused the same way, and nothing
- *    was sent.
+ *    since the connection is then in doubt. A delete that throws stops it
+ *    too, that record answered 500 in the server's own words, which a
+ *    client reads as its delete unknown, and the error said in the log.
+ *    A first record refused for what the form or its connection is rather
+ *    than what the record is -- drift or the table changed (409), a
+ *    configuration the server cannot apply (500), a connection the
+ *    database will not let delete (403) -- is the request's answer, once:
+ *    every other would be refused the same way, and nothing was deleted.
  *
  * 4 to 6 run once per sending of the write id (0031), so a sending that
  * arrives again is answered with the first one's answer -- each record's
@@ -66,8 +69,20 @@ type Request = FastifyRequest<{ Params: { id: string } }>
 /** A record's outcome after which nothing more is sent: its answer lost, or the database out of reach -- the connection is then in doubt. */
 const STOPS: ReadonlySet<string> = new Set(['unknown-outcome', 'unavailable'])
 
-/** A refusal of the first record that is about the form, not the record, so every other would be refused the same way. */
-const ABOUT_THE_FORM: ReadonlySet<string> = new Set(['drift', 'invalid-policy', 'invalid-bindings'])
+/**
+ * A refusal of the first record that is about the form or its connection,
+ * not the record, so every other would be refused the same way: drift, a
+ * configuration the server cannot apply, the table gone or changed under
+ * the form, and a connection the database will not let delete. Nothing was
+ * deleted by any of them.
+ */
+const ABOUT_THE_FORM: ReadonlySet<string> = new Set(['drift', 'invalid-policy', 'invalid-bindings', 'schema-changed', 'permission-denied'])
+
+/** A record's delete that threw, in the server's own words: never the error's, which are the operator's. Read by a client as that record's delete unknown. */
+const THREW = {
+  status: 500,
+  body: { code: 'internal', message: "This record's delete failed in the server, and it may have been deleted; the operator's log says why." },
+} satisfies { status: number; body: RuntimeRefusal }
 
 function codeOf(body: unknown): string | undefined {
   if (typeof body !== 'object' || body === null) return undefined
@@ -107,7 +122,17 @@ async function deletedEach(
       outcomes.push({ sent: false })
       continue
     }
-    const answer = await deleteOne(steps, request, bundle, open, record, version)
+    let answer: WriteAnswer
+    try {
+      answer = await deleteOne(steps, request, bundle, open, record, version)
+    } catch (error) {
+      // Whatever it had sent, nobody here can say, so nothing more is; the
+      // records before it keep their outcomes, in the answer and the trail.
+      request.log.error({ form: request.params.id, err: error }, 'a delete of a chosen record failed in the server; the records after it were not sent')
+      outcomes.push({ sent: true, ...THREW })
+      stopped = 'doubt'
+      continue
+    }
     const code = codeOf(answer.body)
     if (index === 0 && code !== undefined && ABOUT_THE_FORM.has(code)) return answer
     steps.noted(request, answer)

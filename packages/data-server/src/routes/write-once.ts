@@ -65,10 +65,12 @@ export interface WriteAnswer {
  * as the JSON the route answers in the server's own sentences, 50 records
  * deleted are 3,663 bytes with seven-digit keys and 50 stale ones 7,713, so
  * the cap holds about 9,100 and 4,300 such pages and the count bounds
- * first; 50 declined in a deployment's own words of 2,048 characters, SQL
- * Server's longest THROW message, are about 106 KB, and 317 of them fill
- * it. bulk-sized.integration.test.ts reports a page's bytes through the
- * real server. Oldest dropped first,
+ * first; 50 declined in a deployment's own words at their longest -- a
+ * message of 2,046 UTF-16 code units, `REFUSAL_LONGEST`, prefix included,
+ * so 2,027 of reason -- are about 105 KB in ASCII and up to about 307 KB
+ * in a script of three UTF-8 bytes to a code unit, so between about 320
+ * and 109 of them fill it. bulk-sized.integration.test.ts reports a page
+ * of deletes' bytes through the real server. Oldest dropped first,
  * so a person sending large records under fresh ids cannot make this
  * server hold more: a resend that arrives after its answer was dropped is
  * applied again.
