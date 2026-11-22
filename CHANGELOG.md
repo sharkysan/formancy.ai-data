@@ -25,6 +25,12 @@ which are kept unchanged under a heading of their own below it (0171).
   an enum is how PostgreSQL says a column's states, and every form left
   such a column out as unsupported. A label renamed under a published form
   stops its writes, and one added is for review.
+- **The chosen records of a page are deleted in one request, each on its
+  own** ([0173](docs/decisions/0173-chosen-records-are-deleted-each-on-its-own-with-one-answer-per-record.md)):
+  `POST …/records/delete-chosen` and the client's `deleteChosen`, under the
+  policy's new `bulk.delete`, answer each record as its delete alone would,
+  so a refused one leaves the rest deleted; a server older than this
+  refuses such a policy.
 
 ### Changed
 

@@ -39,7 +39,7 @@ only for an abort the caller asked for, with the AbortError it raised.
 | Function | Route |
 |---|---|
 | `forms(signal?)` | `GET /v1/forms` → `{ forms: [{ id, title, operations, children }] }` |
-| `form(formId)` | `GET /v1/forms/:id` → `{ form, operations, readable, list, deleting, copied, versions, writable, moves, opens, together, actions }` |
+| `form(formId)` | `GET /v1/forms/:id` → `{ form, operations, readable, list, deleting, copied, versions, writable, moves, opens, together, actions, bulk }` |
 | `read(formId, record)` | `POST /v1/forms/:id/records/read` |
 | `list(formId, query?, signal?)` | `POST /v1/forms/:id/records/list` → `{ rows, hasMore }` |
 | `exportRecords(formId, query?, signal?)` | `POST /v1/forms/:id/records/export` → `{ file, name }`, a `Blob` of CSV and `<form id>.csv` |
@@ -47,9 +47,11 @@ only for an abort the caller asked for, with the AbortError it raised.
 | `update(formId, { record, version, answers })` | `POST /v1/forms/:id/records/update` |
 | `supersede(formId, { record, version, answers })` | `POST /v1/forms/:id/records/supersede` → the next version (0113) |
 | `delete(formId, { record, version })` | `POST /v1/forms/:id/records/delete` → `{ record, deleted: true }` |
+| `deleteChosen(formId, { records })` | `POST /v1/forms/:id/records/delete-chosen` → each record's outcome in the order sent, as `delete` would resolve to it, or `not-sent` (0173) |
 | `save(formId, { record, rows })` | `POST /v1/forms/:id/records/save` → `{ record, rows }`, the record and each change as stored (0155) |
 | `runAction(formId, name, { records, answers })` | `POST /v1/forms/:id/actions/:action/run` → `{ records }`, each record's token (0161) |
 | `reconcile(formId, unknown)` | `POST /v1/forms/:id/records/read`, or nothing when there is no token |
+| `reconcileChosen(formId, unknown)` | `POST /v1/forms/:id/records/read` for each record an `UnknownChosen` names, one at a time (0173) |
 | `query(formId, source, { operation, search, offset?, limit? }, signal?)` | `POST /v1/forms/:id/lookups/:source/query` |
 | `resolve(formId, source, { operation, tokens }, signal?)` | `POST /v1/forms/:id/lookups/:source/resolve` |
 | `saveView(formId, { name, filter, sort })` | `POST /v1/forms/:id/views/save` → `{ own }`, the person's views (0126) |

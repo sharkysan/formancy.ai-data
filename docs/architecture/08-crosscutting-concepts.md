@@ -528,6 +528,24 @@ costs.** A full pool refuses at once however soon a run would answer, each
 replica counts its own runs, and a routine changed since publication is
 offered until its run is refused, 409 `schema-changed` or `drift`.
 
+**Chosen records are deleted each on its own, one answer per record**
+([0173](../decisions/0173-chosen-records-are-deleted-each-on-its-own-with-one-answer-per-record.md)). A request deletes one to `LIST_PAGE_SIZE` chosen records, each by
+the single delete's own code (`deleteOne`) -- its policy, its reach, its
+one guarded statement in its own transaction -- one after another in the
+order sent, so no lock outlives one record's statement and the record
+port gains no bulk write (0015). A refusal about a record is that record's
+outcome and the request goes on; a lost answer or a database out of reach
+stops it, the records after it not sent, since the connection is then in
+doubt. The request is sent once per write id, its answer every record's
+outcome, which write-once keeps whole -- a page of deletes about 3.7 KB,
+of stale refusals about 7.7 KB, counted from the server's own sentences.
+`FORMANCY_DATA_BULK_DEADLINE_MS`, 20 s unset, chosen and not measured, is
+checked between records. **Held by** `packages/data-server/src/routes/runtime-bulk.test.ts`
+over fake ports and, on both engines, `e2e-bulk.integration.test.ts`
+and `e2e-lost-answer.integration.test.ts`, first run in CI. **What it
+costs.** A set can be left half deleted, each record named; the deadline
+bounds nothing inside one record; and a page is two statements a record.
+
 
 ## 8.7 Audit
 
@@ -554,6 +572,11 @@ over a selection it carries `records`, every record's keyed hash in the
 order sent, `null` without an audit key, and `rows` their count, its
 `record` `null`
 ([0165](../decisions/0165-an-action-runs-over-a-selection-of-up-to-a-page-of-records-in-one-transaction-locked-in-key-order-all-or-nothing.md)).
+A `delete-chosen` event carries `records` and `rows` the same way, and
+`outcomes`, each record's code in the same order -- `done`, the code its
+delete was refused with, `unknown-outcome`, `not-sent` -- never a
+message, and `null` where the request was answered as a whole or answered
+again ([0173](../decisions/0173-chosen-records-are-deleted-each-on-its-own-with-one-answer-per-record.md)).
 And `moved`: whether a create or an update moved its policy's state field,
 never from where or to where
 ([0112](../decisions/0112-a-policy-holds-a-state-field-to-the-moves-it-lists.md)).

@@ -235,7 +235,7 @@
       ]
     },
     "0015": {
-      "reviewed": "sha256:546925c0e0cd25aebeb61645fc36348fecc7da4982e09658f034e99ee77b1663",
+      "reviewed": "sha256:b5ca18c04942dfb07e23ff3ead0b426f43703399f8401ccaf50979557946cc5d",
       "limitations": [
         {
           "area": "databases",
@@ -417,7 +417,7 @@
       ]
     },
     "0023": {
-      "reviewed": "sha256:1885c36ad69d534c0da53464fd4e868341378c86f42932c65a481eae4ac27f0c",
+      "reviewed": "sha256:ac469d49cb67564f49a3cf6ce9e63a27c992b7e5f37d2986662bb9aa5ae9e8fe",
       "limitations": [
         {
           "area": "operations",
@@ -677,7 +677,7 @@
       ]
     },
     "0031": {
-      "reviewed": "sha256:512d107c1f7bd83087b49b74dcb0ed36a38381b51db8cda5abd0f173698ed9bb",
+      "reviewed": "sha256:ec3fab41664c15ae417941832529b6535617f6e1b3375ad3aa8a975076710823",
       "limitations": [
         {
           "area": "writes",
@@ -1409,7 +1409,7 @@
       ]
     },
     "0050": {
-      "reviewed": "sha256:b9759a7aaf25084233f4f5a79f31fd5c98089b9a499718f306d6f43b97204bd9",
+      "reviewed": "sha256:01f31b09f5ab476d2035c73afae1c520f77c96cb4897b24a402c29d37a82a27d",
       "limitations": [
         {
           "area": "writes",
@@ -5236,6 +5236,43 @@
     "0172": {
       "reviewed": "sha256:00f102b47f404731574ccdddb30426a0bbc80513aff6ed9c037411367d001912",
       "none": "Its costs fall on the documentation's readers and its maintainer: a reader of the README follows a link for a condition or a number it no longer states, and the README's sketch of the architecture is redrawn by hand when a block changes, its arrows held by review alone. Nothing a user, integrator or operator of the module installs, runs or configures changed."
+    },
+    "0173": {
+      "reviewed": "sha256:41b3848cf8135f89930404b03cdb8722282eb26d7201bc1825f82ad99a931c50",
+      "limitations": [
+        {
+          "area": "writes",
+          "says": "A delete of chosen records deletes each record on its own, so a refused or unsent record leaves the others deleted, each named in the answer, and nothing is undone.",
+          "heldBy": "packages/data-server/src/routes/runtime-bulk.test.ts"
+        },
+        {
+          "area": "writes",
+          "says": "A delete of chosen records stops at the first record whose answer was lost or whose database could not be reached, and answers every record after it not sent.",
+          "heldBy": "packages/data-server/src/routes/runtime-bulk.test.ts"
+        },
+        {
+          "area": "operations",
+          "says": "FORMANCY_DATA_BULK_DEADLINE_MS is 20 seconds unset, chosen and not measured, and is checked between records only: on PostgreSQL nothing bounds a record’s wait for a lock.",
+          "heldBy": "packages/data-server/src/bulk-deadline.test.ts"
+        },
+        {
+          "area": "access",
+          "says": "A server older than this release refuses a policy that names bulk, and this release’s client answers unexpected to a form from a server older than it."
+        },
+        {
+          "area": "operations",
+          "says": "A delete of chosen records is one audit event naming every record, with an outcomes key no other event has.",
+          "heldBy": "packages/data-server/src/routes/runtime-bulk.test.ts"
+        },
+        {
+          "area": "host",
+          "says": "The host page and the studio offer no delete of chosen records: it is sent through @formancy/data-client or a client of the deployment’s own, by a policy whose bulk grant an administrator writes by hand."
+        },
+        {
+          "area": "operations",
+          "says": "Behind Cloudflare the runtime door forwards a delete of chosen records only once tunnel-config has run again, and refuses it until then."
+        }
+      ]
     }
   }
 }

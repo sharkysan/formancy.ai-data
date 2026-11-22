@@ -1270,3 +1270,46 @@ selection is one page at most, on SQL Server two spellings a
 case-insensitive collation equates sort apart in the lock order and a
 procedure that ends the transaction commits a selection in part, and a
 through onto the form's own table can still deadlock (§11).
+
+## 6.17 Deleting the chosen records of a page
+
+The chosen records of a page, one to `LIST_PAGE_SIZE`, each deleted on its
+own, one after another in the order sent, each exactly as 6.7 deletes one
+([0173](../decisions/0173-chosen-records-are-deleted-each-on-its-own-with-one-answer-per-record.md)).
+
+1. `GET /v1/forms/:id` says `bulk: { delete: true }` where `operations`
+   holds `delete` and the policy's `bulk.delete` names a role of the
+   person's (`bulkOffered`). data-client's `deleteChosen` sends
+   `POST /v1/forms/:id/records/delete-chosen` with `{ records: [{ record,
+   version }] }` and a write id.
+2. `routes/runtime-bulk.ts` reads the shape (`readBulkBody`), 400 for none
+   or more than a page before the write id is read; then the write id, the
+   form and its connection; then, once per sending of the write id,
+   `authorizeBulk`, 403 before any statement, and `chosenTwice`, 400
+   `duplicate-record` naming the token.
+3. For each record: the deadline, `FORMANCY_DATA_BULK_DEADLINE_MS`, checked
+   first; then `deleteOne`, the body of 6.7's route -- the policy, the
+   root described, `planDelete`, one guarded statement. Its status and
+   body are the record's outcome. A refusal about the record and the
+   request goes on; `unknown-outcome` or `unavailable` and it stops. Past
+   the deadline, or after a stop, a record is `{ sent: false }`. A first
+   record refused for what the form is -- drift, a configuration the
+   server cannot apply -- is the request's answer, once.
+4. The answer is 200 `{ records }` in the order sent. The trail's one
+   event, `delete-chosen`, names every record by its keyed hash in
+   `records`, their count in `rows`, and each record's code in `outcomes`.
+5. data-client reads each record by `writeOutcome`, as a delete of it
+   alone; a request whose answer was lost is an `UnknownChosen` naming
+   every record with its version, and `reconcileChosen` reads each.
+
+Held by `packages/data-core/src/records/bulk.test.ts` and
+`policy/validate.test.ts`; by `packages/data-server/src/routes/runtime-bulk.test.ts`
+over fake ports and `bulk-deadline.test.ts`; on both engines by
+`e2e-bulk.integration.test.ts` through `BULK_PARITY`, the lost answer in
+`e2e-lost-answer.integration.test.ts`, and the time a page takes in
+`bulk-sized.integration.test.ts`; and by `packages/data-client/src/chosen.test.ts`
+and `deletes.integration.test.ts`. The container suites were written
+without a database, and CI is their first run. What it costs: a set left
+half deleted, named record by record; a deadline chosen and not measured
+until `bulk-sized` has run; two statements a record; and no control on the
+host page or in the studio (§11).
