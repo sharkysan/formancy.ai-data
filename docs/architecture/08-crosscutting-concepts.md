@@ -562,10 +562,11 @@ before any record is read, and what is each record's -- its version, its
 echoes, its state's move -- by its own read. No field a rule of the form
 reads together with another may be granted, since the page cannot run that
 rule over each record's other answers and the server runs none; the
-bundle's check refuses one. Write-once keeps each record's answer, the
+bundle's check refuses one, reading each expression as formancy's own
+parser does (`@formancy/expressions`), every field for one it refuses. Write-once keeps each record's answer, the
 record as stored: a page of 50 changed orders about 14.3 KB, so the byte
 cap fills before the count. One deadline for both requests, counted from
-the sending's start. **Held by** `packages/data-server/src/routes/runtime-bulk-update.test.ts`
+the sending's start, a change's checks counted in it and not cut by it. **Held by** `packages/data-server/src/routes/runtime-bulk-update.test.ts`
 over fake ports and, on both engines, `e2e-bulk.integration.test.ts` and
 `e2e-lost-answer.integration.test.ts`, first run in CI. **What it
 costs.** A set can be left half changed; one value for every record; and

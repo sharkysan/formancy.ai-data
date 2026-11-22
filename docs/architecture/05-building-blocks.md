@@ -23,11 +23,13 @@ identity     data-identity         jose and Node alone: the host's token,
 edges        data-postgres         data-sqlserver          data-client
              data-core, postgres   data-core, mssql        data-core, fetch
 ──────────────────────────────────────────────────────────────────────────
-core         data-core             @formancy/spec at run time and nothing
-                                   else: no driver, no HTTP, no Node
+core         data-core             @formancy/spec and expressions at run
+                                   time and nothing else: no driver, no
+                                   HTTP, no Node
 ──────────────────────────────────────────────────────────────────────────
-upstream     @formancy/spec · core · react · angular · themes · builder-core
-             released Apache-2.0 packages at exact versions, never copied
+upstream     @formancy/spec · expressions · core · react · angular · themes
+             · builder-core: released Apache-2.0 packages at exact
+             versions, never copied
 
 beside them, private, for tests and measurement:
              data-fixtures         data-core, both drivers, testcontainers
@@ -53,7 +55,7 @@ What each manifest lets it import:
 
 | Package | Published | At run time | Besides, in its tests and scripts |
 |---|---|---|---|
-| `@formancy/data-core` | yes | `@formancy/spec` | `@formancy/core` |
+| `@formancy/data-core` | yes | `@formancy/spec`, `@formancy/expressions` | `@formancy/core` |
 | `@formancy/data-postgres` | yes | data-core, `postgres` | data-fixtures |
 | `@formancy/data-sqlserver` | yes | data-core, `mssql`, `@types/mssql` | data-fixtures |
 | `@formancy/data-client` | yes | data-core, `@formancy/spec` | data-server, data-fixtures, both drivers, `jose`, `@formancy/core` |
@@ -506,7 +508,10 @@ for each role given delete, through `src/policy-model.ts`'s
 `withBulkDeleteRoles`, says why nothing is offered where data-core's
 `offers` and `offeredFor` find no delete of one record, and lists a grant
 there to remove, which `src/draft-policy.tsx` names to a draft's reviewer
-([0174](../decisions/0174-the-host-page-deletes-the-chosen-records-of-a-page-and-the-studio-grants-who-may.md));
+([0174](../decisions/0174-the-host-page-deletes-the-chosen-records-of-a-page-and-the-studio-grants-who-may.md)),
+keeping through every edit a change of chosen records written by hand,
+`bulk.update`, which it names to the reviewer with its fields
+([0175](../decisions/0175-chosen-records-are-changed-each-on-its-own-to-the-values-given-in-fields-a-policy-names.md));
 `src/versions.tsx` and `src/import.tsx` download and import a version's file
 (0062). Its tests run the real `createDataServer` behind a fake `fetch`
 (`src/test-server.ts`), and `src/journey.test.tsx` fails on any request

@@ -220,6 +220,14 @@ from a generation that offered delete, or imported, naming nobody or
 not -- is listed with a Remove. A reviewer sees who may delete chosen
 records together under the draft's policy
 ([0174](../decisions/0174-the-host-page-deletes-the-chosen-records-of-a-page-and-the-studio-grants-who-may.md)).
+Who may change chosen records together, `bulk.update`, has no control
+here: an administrator writes it into the policy by hand. Ticking or
+unticking a delete box, and the Remove of a delete grant, keep it as it
+is; a form that offers an update of one record but no delete -- rows
+saved with their record -- lists neither it nor a `bulk` that names no
+operation as a grant to remove; and a reviewer sees its roles and fields
+under the draft's policy
+([0175](../decisions/0175-chosen-records-are-changed-each-on-its-own-to-the-values-given-in-fields-a-policy-names.md)).
 
 Under each field's help text, the Presentation step says what a new record
 starts the field with, as the generator noted it -- "Generated: Starts with

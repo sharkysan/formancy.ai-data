@@ -42,6 +42,7 @@ which are kept unchanged under a heading of their own below it (0171).
   `update-chosen` and `updateChosen` set the fields `bulk.update` lists
   to one value for every record, checked once, each record answered as its
   update alone, so a refused one leaves the rest changed.
+  `@formancy/data-core` now depends on `@formancy/expressions` 0.13.0.
 
 ### Changed
 

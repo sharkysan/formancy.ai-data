@@ -1371,7 +1371,9 @@ as 6.6 updates one ([0175](../decisions/0175-chosen-records-are-changed-each-on-
    `over-posting` 403, every value through `planUpdate`'s own
    `decodeAnswers`, 422 with every error -- and each selection's
    membership check, 422 or 503. The deadline counts from the start of
-   this step's sending, so the checks are inside it.
+   this step's sending, so the checks are counted in it; they run one
+   after another without reading it, so checks that outlast it take as
+   long as they take, and leave every record not sent.
 4. For each record: the deadline first; then `updateOne`, the body of
    6.6's update route -- the policy, the read that carries the root's
    description, the echoes removed, `planUpdate` with the record's own

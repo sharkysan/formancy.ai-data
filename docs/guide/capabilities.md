@@ -540,7 +540,9 @@ get*](../../README.md#what-you-get) is the short version, and
   rule of the form reads together with another may be listed, and a set
   can be left half changed, each record named. It is the runtime plane's
   `POST /v1/forms/:id/records/update-chosen` and `@formancy/data-client`'s
-  `updateChosen`; the host page and the studio offer no control for it
+  `updateChosen`; the host page and the studio offer no control for it,
+  and the studio keeps a grant written by hand and shows it to a draft's
+  reviewer
   ([0175](../decisions/0175-chosen-records-are-changed-each-on-its-own-to-the-values-given-in-fields-a-policy-names.md)).
 - **A person is shown the forms they may read**, and nothing about any
   other, each with the forms whose rows a page may list below one of its

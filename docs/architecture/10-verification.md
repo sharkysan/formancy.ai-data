@@ -328,7 +328,9 @@ A change of chosen records ([0175](../decisions/0175-chosen-records-are-changed-
 change cases over the shared fixture's orders in
 `e2e-bulk.integration.test.ts` -- changed, stale, a move refused from the
 record's own state, a trigger's words, a stored spelling read back, not
-found, and a customer outside the lookup's filter refusing the request --
+found, and a selection refusing the request, another tenant's customer
+against the pinned tenant before any statement and a customer that names
+no row by the one membership check --
 the lost answer in `e2e-lost-answer.integration.test.ts`, its marker the
 note every record takes, counted afresh before the request that sends it
 again, and a page timed in `bulk-sized.integration.test.ts`, all written
@@ -339,7 +341,10 @@ fields a rule reads together and the answers read once
 `policy/read-together.test.ts`, `records/bulk-change.test.ts`), the
 route, its deadline and the trail over fake ports
 (`packages/data-server/src/routes/runtime-bulk-update.test.ts`,
-`bulk-deadline.test.ts`), and the client's reading
+`bulk-deadline.test.ts`), the single update's trail of a statement that
+throws (`runtime-transitions.test.ts`), the studio's keeping of a grant
+written by hand and its account to a draft's reviewer
+(`apps/studio/src/policy-bulk.test.tsx`), and the client's reading
 (`packages/data-client/src/chosen.test.ts`, `transport.test.ts`, run
 alone without the package's database setup).
 

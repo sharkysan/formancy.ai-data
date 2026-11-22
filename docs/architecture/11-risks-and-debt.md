@@ -183,9 +183,11 @@ and the live demo grants none, so its page never offers it
 ([0174](../decisions/0174-the-host-page-deletes-the-chosen-records-of-a-page-and-the-studio-grants-who-may.md)).
 A change of chosen records can leave a set half changed the same way, sets
 one value for every record, and refuses to grant a field any rule of the
-form reads together with another -- which fields a rule reads is this
-repository's scan of its expression's tokens, erring towards a field
-read, not formancy's own parser, which exports none; and on SQL Server a
+form reads together with another -- which fields a rule reads is
+formancy's own parser's answer, every field for an expression it
+refuses, so data-core moves with upstream's `@formancy/expressions`; the
+request's checks are counted in its deadline and not cut by it; and on
+SQL Server a
 record whose read failed is four statements, which no deadline keeps
 inside the proxy's 60 s ([0175](../decisions/0175-chosen-records-are-changed-each-on-its-own-to-the-values-given-in-fields-a-policy-names.md)).
 

@@ -5,8 +5,9 @@
 - **Deciders:** Daniel Bacher
 - **Verified by:** the server's half of changing chosen records -- the
   policy's grant, data-core's reading of a request, the bundle's check of
-  the form's rules, the route, its deadline, the audit and the client; the
-  host page's controls and the studio's are a later record's. Written on a
+  the form's rules, the route, its deadline, the audit and the client --
+  and the studio's keeping of a grant written by hand; the host page's
+  controls and the studio's are a later record's. Written on a
   machine without Docker on 2026-11-22: the cases that need no database
   ran there, each watched failing with its rule taken out and the file put
   back byte for byte; the container suites have never run, and CI is their
@@ -22,9 +23,13 @@
   fits a form that offers an update alone (watched failing with 0173's
   rule, which asked it of a delete); `bulk.update`'s own properties held
   (watched failing with them unchecked).
-  `packages/data-core/src/policy/read-together.test.ts` -- the names an
-  expression reads, and none in a literal or after a dot (watched failing
-  with literals scanned as code); a rule's target read with what its
+  `packages/data-core/src/policy/read-together.test.ts` -- an expression
+  read as formancy's own parser reads it, a raw string's escaped quote
+  ending no literal, a comprehension's local and a comment's text reading
+  no field (watched failing on this repository's former scan of its
+  tokens, which read `status` as text and granted it), and every field
+  for an expression that parser refuses (watched failing on that scan,
+  which read what it could); a rule's target read with what its
   expression names (watched failing with the target left out); a check,
   and a skip that names a field, read every field (watched failing with a
   check read by its target alone); the grant's fields refused in its order
@@ -37,8 +42,10 @@
   form's order (watched failing in the grant's); `bulkAnswers` refuses a
   field outside the grant (watched failing with the grant unasked),
   decodes every answer once with every error (watched failing with the
-  first error alone), returns one membership check per selection (watched
-  failing with the selections dropped), and checks no move, each record's
+  first error alone), refuses for the request a stamp the person cannot
+  fill (watched failing with the stamps left to each record's plan),
+  returns one membership check per selection (watched failing with the
+  selections dropped), and checks no move, each record's
   being `planUpdate`'s from its own state (watched failing with a move
   checked from nothing).
   `packages/data-server/src/routes/runtime-bulk-update.test.ts`, over fake
@@ -63,6 +70,21 @@
   failing with it read from the grant alone); and the bundle refused for a
   field a rule reads together with another (watched failing with
   `readTogetherProblems` left out of `validateBundle`).
+  `packages/data-server/src/routes/runtime-transitions.test.ts` -- an
+  update alone whose statement throws audited with the move it was sent
+  as (watched failing with `moved` set from `updateOne`'s answer, which a
+  throw never returns).
+  `apps/studio/src/policy-bulk.test.tsx`, against the real server behind
+  a fake `fetch` -- a hand-written `bulk.update` kept through a tick and
+  an untick of a delete box and published (watched failing with 0174's
+  `withBulkDeleteRoles`, which wrote `bulk` whole); on a delivery saved
+  with its order, which offers an update alone, neither the change nor a
+  `bulk: {}` listed as a stray grant, and the Remove of a stray delete
+  keeping the change (watched failing with 0174's notice and Remove);
+  `bulk: {}` on a form that offers neither write listed with the check's
+  own refusal (watched failing with 0174's words for it); and the Review
+  step naming who may change chosen records and in which fields (watched
+  failing with the line left out).
   `packages/data-server/src/bulk-deadline.test.ts` -- four of mssql's
   timeouts reach nginx's 60 s by themselves (watched failing with the
   timeout at 14 s). `packages/data-client/src/chosen.test.ts` and
@@ -129,10 +151,13 @@ records cannot run over each, and which the server runs none of.
 2. **What the form's rules read.** `validateBundle` refuses, on publish and
    on every read, a listed field a rule of the form reads together with
    another (`policy/read-together.ts`): a rule reads its target's field and
-   every field key its expression names as a variable, read by a scan of
-   its tokens that skips literals and members after a dot; a `check`,
-   whose validator the deployment answers with the whole submission, and a
-   `skip` that names a field, read every field. The code says more than the
+   every field its expression reads, as formancy's own parser answers it
+   -- `@formancy/expressions`' `referencedPaths` over `parse`, the reading
+   the engine builds a form's dependencies from, each path's first key a
+   field, on which data-core now depends at the exact version of its other
+   upstream packages (0002); an expression that parser refuses, a
+   `check`, whose validator the deployment answers with the whole
+   submission, and a `skip` that reads a field, read every field. The code says more than the
    design did here: a generated form carries only `disabled` rules over
    `true` and a presentation adds none (0030), so the check refuses
    something only in a bundle whose form was written otherwise, format 1.
@@ -149,8 +174,10 @@ records cannot run over each, and which the server runs none of.
    neither depends on the record, the answers (`bulkAnswers`) -- none sent
    `nothing-to-update` 400, a field outside the grant `over-posting` 403,
    every value through its column's codec by `planUpdate`'s own
-   `decodeAnswers`, 422 with every error -- and each selection's
-   membership check, 422 or 503. Then each record in the order sent, the
+   `decodeAnswers`, 422 with every error, and what the change stamps
+   (0153), which is the person's whatever the record, `unstampable` 403
+   -- and each selection's membership check, 422 or 503. Then each record
+   in the order sent, the
    deadline first, then **the code a single update runs**: `updateOne`, the
    body of `POST …/records/update` taken out into a function both routes
    call, its read, its echoes, its plan and its one guarded statement, a
@@ -164,11 +191,16 @@ records cannot run over each, and which the server runs none of.
    not be read -- deleted since, another tenant's -- while the change moves
    the state field is refused `transition-denied`, as its update alone is,
    since no move can be checked from where nobody read; a change that
-   leaves the state field alone answers it `not-found`.
+   leaves the state field alone answers it `not-found`. The update route's
+   trail still names its move once it is planned, before any statement
+   (`updateOne`'s `planned`), so an update alone whose statement throws is
+   named as the move it was sent as.
 5. **The deadline.** `FORMANCY_DATA_BULK_DEADLINE_MS` covers a change too:
    one setting for a request over chosen records, counted from when its
-   sending starts, so the request's membership checks are inside it, each
-   bounded by the lookup deadline. 14 s still holds: a change's record on
+   sending starts, so the request's membership checks are counted in it;
+   they run one after another without reading it, each bounded by the
+   lookup deadline alone, so a request whose checks outlast it takes as
+   long as they do and sends no record. 14 s still holds: a change's record on
    SQL Server is three statements, as a delete's is -- the read that
    carries the root's description, the update, and where it changed
    nothing the read that says why -- and 14 s and three of mssql's 15 s end
@@ -216,11 +248,12 @@ when no record could take them. No lock outlives one record's statement.
   the answer, record by record, and nothing is undone.
 - **One value for every record.** No value per record, no expression ("add
   10%"), and no preview of what a change does.
-- **No field a rule reads with another can be granted.** A check, or a
-  skip that names a field, makes every field of the form ungrantable; the
-  scan errs towards a field read, so a function named like a field counts
-  as one. It is this repository's reading of CEL's tokens, not upstream's
-  parser: an expression upstream reads otherwise would be judged by this.
+- **No field a rule reads with another can be granted.** A check, a
+  skip that reads a field, or an expression formancy's parser refuses
+  makes every field of the form ungrantable. What an expression reads is
+  upstream's answer, so data-core installs `@formancy/expressions` beside
+  `@formancy/spec`, at the exact version `@formancy/core` installs, and
+  moves with every upstream release.
 - **The state field's moves are each record's.** A change to a state some
   chosen records cannot reach refuses those, and a record deleted since is
   refused `transition-denied` rather than `not-found` where the change
@@ -228,11 +261,14 @@ when no record could take them. No lock outlives one record's statement.
 - **A record whose read fails is four statements on SQL Server**, past
   what any deadline can keep inside nginx's 60 s; and on PostgreSQL nothing
   bounds a record's wait for a lock, as for an update alone.
-- **The request's checks are inside the deadline**, so lookups slow
-  enough to use it up leave every record not sent.
+- **The request's checks are counted in the deadline and not cut by
+  it**: lookups slow enough to use it up leave every record not sent,
+  after as long as every check takes, each bounded by the lookup
+  deadline, which can be longer than the deadline and one record.
 - **A page of changes is two statements a record, three for one not
-  changed**, up to a hundred and fifty, timed by bulk-sized in CI and not
-  yet on this record's date.
+  changed** and four on SQL Server for one whose read failed -- up to two
+  hundred for a page -- and one membership check per selection, timed by
+  bulk-sized in CI and not yet on this record's date.
 - **Write-once keeps fewer of them**: a page of changes is about four times
   a page of deletes, and a record's answer grows with what it holds.
 - **An older server refuses the policy**, as a server before 0175 refuses
@@ -245,7 +281,12 @@ when no record could take them. No lock outlives one record's statement.
 - **Only a client of the deployment's own sends one**: the host page and
   the studio offer no change of chosen records, so an administrator writes
   `bulk.update` by hand, and `apps/host/src/plane.test.tsx` holds the route
-  unsent on every door until the page has a control that sends it.
+  unsent on every door until the page has a control that sends it. The
+  studio's Policy step keeps such a grant through every edit of who may
+  delete chosen records (0174), lists it as no stray grant where the form
+  offers an update alone, and names its roles and fields to the publisher
+  reviewing a draft (0065); a grant the form cannot offer is the policy
+  check's to name, with no Remove of its own.
 - **The shared expectation is held on the default images alone**, as
   0173's: `BULK_PARITY` is no family of shared cases, so the suite declares
   no `covers()`; each record's update is held on every image by the
@@ -270,6 +311,15 @@ checks once only because the answers are one.
 **Every field the role may update, no list.** Less to set up. Lost: no way
 to keep a field out that should change one record at a time -- a price, an
 assignee -- and no place to refuse the fields a rule reads together.
+
+**This repository's own reading of CEL.** Which fields a rule reads, by a
+scan of the expression's tokens that skips literals and members after a
+dot, as this record was first built. Lost: it and the engine's parser
+disagreed on what an expression reads -- a raw string's escaped quote
+ended the scan's literal and not the parser's, so a field the rule reads
+went unseen and was granted -- and upstream exports that answer, which
+its engine builds a form's dependencies from, so a second reading here
+was a copy of a decision upstream already makes (0002).
 
 **Run the form's rules over each record on the server.** Lost: the server
 runs no rule, the engine is the page's, and a second engine here would be

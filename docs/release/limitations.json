@@ -5238,7 +5238,7 @@
       "none": "Its costs fall on the documentation's readers and its maintainer: a reader of the README follows a link for a condition or a number it no longer states, and the README's sketch of the architecture is redrawn by hand when a block changes, its arrows held by review alone. Nothing a user, integrator or operator of the module installs, runs or configures changed."
     },
     "0173": {
-      "reviewed": "sha256:fadcd69f3587b61631e1119093f67ce7afefd395ae6bbf08703d97c0096bfea6",
+      "reviewed": "sha256:04a542dbbb160a6f0021c3aef9cd82484407981fbdf7d9cab436b34b2c2d0ed4",
       "limitations": [
         {
           "area": "writes",
@@ -5330,7 +5330,7 @@
       ]
     },
     "0175": {
-      "reviewed": "sha256:c22ba7206554a742d856d3708f33f350de750cb874e692efd721924eae936071",
+      "reviewed": "sha256:06ce5bf1ca0149091c5d625b8a24670bb9c94f50dfecc6a3af1166894b24d665",
       "limitations": [
         {
           "area": "writes",
@@ -5344,7 +5344,7 @@
         },
         {
           "area": "access",
-          "says": "A field a rule of the form reads together with another field cannot be granted to a change of chosen records, and a check, or a skip that names a field, makes every field of its form ungrantable.",
+          "says": "A field a rule of the form reads together with another field cannot be granted to a change of chosen records, and a check, a skip that reads a field, or an expression formancy’s parser refuses, makes every field of its form ungrantable.",
           "heldBy": "packages/data-core/src/policy/read-together.test.ts"
         },
         {
@@ -5354,7 +5354,7 @@
         },
         {
           "area": "operations",
-          "says": "FORMANCY_DATA_BULK_DEADLINE_MS bounds a change of chosen records too, its lookups’ checks included; on SQL Server a record whose read failed is four statements, which no deadline keeps inside a proxy’s 60 seconds.",
+          "says": "FORMANCY_DATA_BULK_DEADLINE_MS bounds a change of chosen records too and counts its lookups’ checks, but does not cut them: checks that outlast it leave every record not sent, after as long as they take; on SQL Server a record whose read failed is four statements, which no deadline keeps inside a proxy’s 60 seconds.",
           "heldBy": "packages/data-server/src/bulk-deadline.test.ts"
         },
         {
@@ -5368,7 +5368,12 @@
         },
         {
           "area": "host",
-          "says": "The host page and the studio offer no change of chosen records: it is sent through @formancy/data-client or a client of the deployment’s own, by a policy whose bulk.update an administrator writes by hand."
+          "says": "The host page and the studio offer no change of chosen records: it is sent through @formancy/data-client or a client of the deployment’s own, by a policy whose bulk.update an administrator writes by hand, which the studio keeps and shows a draft’s publisher."
+        },
+        {
+          "area": "forms",
+          "says": "@formancy/data-core installs @formancy/expressions, at the exact version of its other upstream packages, to read which fields a rule of the form reads as formancy’s engine reads them.",
+          "heldBy": "packages/data-core/src/policy/read-together.test.ts"
         },
         {
           "area": "operations",

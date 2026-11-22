@@ -491,9 +491,10 @@ one, a version chain's and the together field, each by name; the state
 field may be listed, each record's move checked from its own state by its
 own `planUpdate`. `readTogetherProblems` (`policy/read-together.ts`) is
 what the bundle's check asks of the form: a listed field a rule reads
-together with another, by the rule's target and the field keys its
-expression names. `readChangeBody` reads a request, the `ChosenChangeBody`;
-`bulkAnswers` reads its answers once -- held to the grant and to
+together with another, by the rule's target and the fields its expression
+reads as `@formancy/expressions`' own parser answers it, every field for
+an expression that parser refuses. `readChangeBody` reads a request, the
+`ChosenChangeBody`; `bulkAnswers` reads its answers once -- held to the grant and to
 `checkSubmittedFields`, decoded by `planUpdate`'s own `decodeAnswers` --
 and returns each selection's membership check, which the caller runs once;
 each record is then `planUpdate`'s over its own read, answered as a
