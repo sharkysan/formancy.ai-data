@@ -41,6 +41,12 @@ interface GrantProps {
  * ticked and described by why the server refuses it, as `validatePolicy`'s
  * check says in its words; on a form that offers none, the grant is listed
  * to be removed (`StrayGrant`).
+ *
+ * Who may change them (0175), `bulk.update`, has no control here: an
+ * administrator writes it by hand, and every edit here keeps it
+ * (`withBulkDeleteRoles`). It is no stray grant where the form offers an
+ * update alone, nor is a `bulk` that names no operation; one the form
+ * cannot offer is the policy check's to name.
  */
 export function BulkGrants({ bindings, policy, onPolicy, check }: GrantProps): ReactElement {
   // Here, not in the notice: the notice goes with the grant, before the keyboard is moved.
@@ -50,6 +56,16 @@ export function BulkGrants({ bindings, policy, onPolicy, check }: GrantProps): R
     onPolicy(withBulkDeleteRoles(policy, []))
     focusAfter(check)
   }
+  const bulk = policy.bulk
+  // What the server refuses here and no box can untick: a delete grant, or a `bulk` naming neither operation on a form that offers neither write alone.
+  const stray: Stray | null =
+    why === null || bulk === undefined
+      ? null
+      : bulk.delete !== undefined
+        ? 'deleting'
+        : bulk.update === undefined && !offeredFor(bindings, 'update', null)
+          ? 'changing or deleting'
+          : null
   return (
     <fieldset>
       <legend>Who may delete chosen records together</legend>
@@ -57,7 +73,7 @@ export function BulkGrants({ bindings, policy, onPolicy, check }: GrantProps): R
         {TOGETHER_NOTE}
       </p>
       {why !== null ? <p className="none">{why}</p> : <RoleBoxes policy={policy} onPolicy={onPolicy} />}
-      {why === null || policy.bulk === undefined ? null : <StrayGrant granted={policy.bulk.delete?.roles ?? []} onRemove={remove} />}
+      {stray === null ? null : <StrayGrant what={stray} granted={bulk?.delete?.roles ?? []} onRemove={remove} />}
     </fieldset>
   )
 }
@@ -102,22 +118,27 @@ function RoleBoxes({ policy, onPolicy }: Pick<GrantProps, 'policy' | 'onPolicy'>
   )
 }
 
+/** What a stray grant grants, as its notice says it: a delete of chosen records, or a `bulk` that names no operation (0175). */
+type Stray = 'deleting' | 'changing or deleting'
+
 /**
  * A grant on a form that cannot offer one -- left from a generation that
  * offered delete, or imported -- which the server refuses whatever roles
- * it names, `bulk: {}` among them: listed with a Remove, since no box is
- * drawn to untick.
+ * it names: a delete grant, naming nobody among them, or a `bulk: {}` on
+ * a form that offers neither write alone. Listed with a Remove, since no
+ * box is drawn to untick, which takes the delete grant alone and keeps a
+ * change of chosen records beside it.
  */
-function StrayGrant({ granted, onRemove }: { granted: readonly string[]; onRemove: () => void }): ReactElement {
+function StrayGrant({ what, granted, onRemove }: { what: Stray; granted: readonly string[]; onRemove: () => void }): ReactElement {
   return (
     <div className="notice" role="note" aria-labelledby="bulk-stray">
       <p id="bulk-stray">
         {granted.length === 0
-          ? 'The policy holds a grant of deleting chosen records together that names nobody, which this form cannot offer.'
+          ? `The policy holds a grant of ${what} chosen records together that names nobody, which this form cannot offer.`
           : `The policy grants ${granted.join(', ')} the deletion of chosen records together, which this form cannot offer.`}
       </p>
       <button type="button" className="button" onClick={onRemove}>
-        Remove <span className="visually-hidden">the grant of deleting chosen records together</span>
+        Remove <span className="visually-hidden">the grant of {what} chosen records together</span>
       </button>
     </div>
   )
