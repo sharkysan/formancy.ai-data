@@ -1313,7 +1313,8 @@ over fake ports and `bulk-deadline.test.ts`; on both engines by
 `bulk-sized.integration.test.ts`; and by `packages/data-client/src/chosen.test.ts`
 and `deletes.integration.test.ts`. The container suites were written
 without a database, and CI is their first run. What it costs: a set left
-half deleted, named record by record; a deadline chosen and not measured
-until the timings `bulk-sized` prints have been read; two statements a
-record, three for one not deleted; and no control on the host page or in
+half deleted, named record by record; a deadline chosen by the proxy in
+front, about thirteen times the slowest page `bulk-sized` measured on
+CI's runner (1,088 ms for 50 records on PostgreSQL, 2026-11-22); two
+statements a record, three for one not deleted; and no control on the host page or in
 the studio (§11).

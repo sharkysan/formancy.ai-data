@@ -166,7 +166,7 @@ said nothing of who may do it.
 4. **A deadline.** `FORMANCY_DATA_BULK_DEADLINE_MS`, read in `main.ts` and
    parsed by the lookup deadline's rule (`bulk-deadline.ts`), held to it as
    `runtime.bulkDeadlineMs`, checked before each record and never during
-   one. **The default is 14,000 ms, chosen and not measured**: a request
+   one. **The default is 14,000 ms, chosen by what bounds it**: a request
    answers within it and one record more, a record on SQL Server up to
    three statements -- the root's description, the delete, and where it
    deleted nothing the read that says why -- each bounded by mssql's 15 s
@@ -177,9 +177,14 @@ said nothing of who may do it.
    `bulk-sized.integration.test.ts` measures a page on the default images
    -- 20 runs at 1, 10 and 50 records, as `save-limits.ts` was measured --
    and prints its timings to the log, one line per engine starting
-   `bulk-sized`, which is what a CI run keeps of them: the figure the
-   default is to be set from, read from the data-server test job's log.
-   It holds a page done within the default.
+   `bulk-sized`, which is what a CI run keeps of them, and holds a page
+   done within the default. Its first run, CI run 45017277480 on
+   2026-11-22 on GitHub's runner, deleted a page of 50 records in at most
+   1,088 ms on PostgreSQL (p50 830 ms) and 296 ms on SQL Server (p50
+   252 ms), and 10 in at most 220 and 75 ms: the default is about
+   thirteen times the slowest page measured, so it is left where the
+   proxy bounds it rather than set from those figures, and a slower
+   deployment's page has that room.
 5. **The trail.** One event per request, operation `delete-chosen`:
    `records`, each record by its keyed hash in the order sent, `rows` their
    count, `record` `null`, and `outcomes`, each record's code -- `done`, the
@@ -214,8 +219,8 @@ is checked by a read of each. Nothing new is asked of either engine.
   others deleted, and a stop leaves the rest undone; each is named in the
   answer, record by record, and nothing is undone. A set that must go
   whole is an action's (0165).
-- **A deadline chosen, not measured,** until `bulk-sized` has run in CI on
-  the default images and the lines it prints have been read. It bounds
+- **A deadline chosen by the proxy, not by the timings**, which describe
+  CI's runner and the default images and no deployment's. It bounds
   the request only between records: on PostgreSQL nothing bounds a
   record's wait for another's lock, as for a delete alone, so the proxy
   in front can still cut an answer there, and on SQL Server mssql's 15 s
@@ -226,8 +231,9 @@ is checked by a read of each. Nothing new is asked of either engine.
   deleted**: the root's description, the delete, and the read that says
   why nothing was deleted, one after another -- and on PostgreSQL a
   delete past its root is a locked transaction of several round trips.
-  Up to a hundred and fifty statements for a page, none measured until
-  `bulk-sized` has run.
+  Up to a hundred and fifty statements for a page, which took at most
+  1,088 ms on PostgreSQL and 296 ms on SQL Server on CI's runner
+  (2026-11-22).
 - **An older server refuses the policy.** A server before 0173 refuses a
   policy naming `bulk`, as it refuses every property it does not read, so
   a version published with the grant cannot be imported to one, and a

@@ -163,8 +163,9 @@ by another application can leave a gap or an overlap
 A delete of chosen records can leave a set half deleted, by design, each
 record named in the answer, and stops at the first record whose answer
 was lost, the rest not sent; `FORMANCY_DATA_BULK_DEADLINE_MS`'s 14 s is
-chosen, not measured, until the timings `bulk-sized.integration.test.ts`
-prints to a CI run's log have been read, and bounds nothing inside one
+chosen by the proxy in front, not set from the timings
+`bulk-sized.integration.test.ts` prints (at most 1,088 ms for 50 records
+on CI's runner, 2026-11-22), and bounds nothing inside one
 record -- on PostgreSQL a record's wait for another's lock is unbounded,
 as a delete alone's is, so the proxy in front can cut that answer; a
 first record refused `schema-changed` or `permission-denied` refuses the

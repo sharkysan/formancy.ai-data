@@ -5238,7 +5238,7 @@
       "none": "Its costs fall on the documentation's readers and its maintainer: a reader of the README follows a link for a condition or a number it no longer states, and the README's sketch of the architecture is redrawn by hand when a block changes, its arrows held by review alone. Nothing a user, integrator or operator of the module installs, runs or configures changed."
     },
     "0173": {
-      "reviewed": "sha256:14abba276290dc5922425615c0747cb57c6fcd4306fb139e7869735d76eaaae8",
+      "reviewed": "sha256:3687f9b22d8870dda7d5cbd24d7624f5034a5075db5d5f9c546639d8b7e472a4",
       "limitations": [
         {
           "area": "writes",

@@ -320,8 +320,9 @@ and the form's `bulk` as the client takes it
 package's database setup, which it does not use).
 `bulk-sized.integration.test.ts` measures a page on the default images,
 prints its timings to the log, which is what a CI run keeps of them, and
-holds a page done within the default deadline, which is chosen until
-those lines are read.
+holds a page done within the default deadline; its first run on
+2026-11-22 deleted 50 records in at most 1,088 ms on PostgreSQL and
+296 ms on SQL Server.
 
 The studio's offer of the scope and the host page's choice of rows
 ([0166](../decisions/0166-a-person-chooses-a-pages-records-by-a-column-of-boxes-and-runs-an-action-over-them-from-a-bar-above-the-grid.md)) were

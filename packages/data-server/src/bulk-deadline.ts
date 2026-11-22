@@ -19,8 +19,8 @@ import { lookupDeadlineProblem } from './lookup-deadline.js'
 export type BulkDeadlineSetting = { ok: true; ms: number } | { ok: false; problem: string }
 
 /**
- * The deadline where the deployment names none: 14 s. Chosen, not
- * measured (0173, 2026-11-22): a request answers within the deadline and
+ * The deadline where the deployment names none: 14 s, chosen by what
+ * bounds it (0173, 2026-11-22): a request answers within the deadline and
  * one record more, and a record on SQL Server is up to three statements --
  * the root's description, the delete, and, where it deleted nothing, the
  * read that says why -- each bounded by mssql's request timeout of 15 s
@@ -34,8 +34,10 @@ export type BulkDeadlineSetting = { ok: true; ms: number } | { ok: false; proble
  * deletes takes is measured by `bulk-sized.integration.test.ts` on the
  * default images, which holds a page done within this default and prints
  * its timings to the data-server test job's log in CI, one line per engine
- * starting `bulk-sized`; they are where the figure is to come from, and
- * this number is set again from them.
+ * starting `bulk-sized`. Its first run (CI run 45017277480, 2026-11-22)
+ * deleted 50 records in at most 1,088 ms on PostgreSQL and 296 ms on SQL
+ * Server, so 14 s is left where the proxy bounds it, about thirteen times
+ * the slowest page measured, rather than set from those figures.
  */
 export const DEFAULT_BULK_DEADLINE_MS = 14_000
 
