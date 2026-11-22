@@ -146,6 +146,38 @@ export function authorizeAction(policy: FormPolicy, context: PolicyContext, bind
 }
 
 /**
+ * Whether the actor may delete the chosen records of a page in one request
+ * (0173): a role of theirs is in the policy's `bulk.delete`, and the delete
+ * is theirs and can be scoped -- `operations.delete`, the root's row filter
+ * and every through, as `authorizeOperation` asks of a delete. Asked before
+ * any statement. The policy is fitted to the form, so a grant on a form
+ * that offers no delete, or to a role `operations.delete` does not name, is
+ * refused as the policy that holds it is. Each record is then authorised
+ * again as a delete of it alone, which this answers the same for.
+ */
+export function authorizeBulk(policy: FormPolicy, context: PolicyContext, bindings: FormBindings): PolicyDecision {
+  const prepared = prepare(policy, context, bindings)
+  if (!prepared.ok) return prepared
+  const roles = prepared.policy.bulk?.delete
+  if (roles === undefined || !holds(roles, prepared.actor))
+    return refuse('operation-denied', 'no role of this actor may delete chosen records together with this form')
+  const scoped = authorise(prepared.policy, prepared.actor, 'delete')
+  if (!scoped.ok) return scoped
+  const through = resolveThrough(prepared.policy, prepared.actor)
+  return through.ok ? { ok: true } : through
+}
+
+/**
+ * What this actor may do to the chosen records of a page together (0173),
+ * as `GET /v1/forms/:id` says it before the database's own narrowing:
+ * `delete` exactly where `authorizeBulk` lets them through, so what a page
+ * offers is that check's answer and not a second list of it (0117).
+ */
+export function bulkOffered(policy: FormPolicy, context: PolicyContext, bindings: FormBindings): { delete: boolean } {
+  return { delete: authorizeBulk(policy, context, bindings).ok }
+}
+
+/**
  * The actions this actor may run, in the bindings' order: each one
  * `authorizeAction` lets through alone, so what a page offers is that
  * check's answer and not a second list of it (0117).

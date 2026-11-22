@@ -263,6 +263,50 @@ describe('validatePolicy', () => {
     expect(problems({ ...ORDER_POLICY, cascades: [] }, DELETABLE_ORDER)).toEqual([])
   })
 
+  // Deleting chosen records together is a delete of each (0173): a role
+  // the bulk grant names that `operations.delete` does not would be
+  // offered a request every record of which is refused, and a grant on a
+  // form that offers no delete says something nothing could honour, as
+  // `operations.delete`'s does. Named one by one in codepoint order.
+  // Watched failing with `bulkFitProblems` left out of `fitProblems`:
+  // every grant below was accepted.
+  test('refuses a bulk delete granted to a role that may not delete, or on a form that offers no delete', () => {
+    const deleting = { ...ORDER_POLICY, operations: { ...ORDER_POLICY.operations, delete: ['manager'] } }
+    expect(problems({ ...deleting, bulk: { delete: { roles: ['manager'] } } }, DELETABLE_ORDER)).toEqual([])
+    const sentence = (role: string) => `bulk.delete grants ${role}, who may not delete with this form: each chosen record is a delete of its own`
+    expect(problems({ ...deleting, bulk: { delete: { roles: ['manager', 'clerk', 'Archivist'] } } }, DELETABLE_ORDER)).toEqual([
+      sentence('Archivist'),
+      sentence('clerk'),
+    ])
+    const offersNone = ['bulk names who may delete chosen records together, and this form does not offer delete']
+    expect(problems({ ...ORDER_POLICY, bulk: { delete: { roles: [] } } })).toEqual(offersNone)
+    expect(problems({ ...ORDER_POLICY, bulk: {} })).toEqual(offersNone)
+    // Absent, or naming nobody on a form that offers delete, it grants nobody and fits.
+    expect(problems({ ...deleting, bulk: {} }, DELETABLE_ORDER)).toEqual([])
+    expect(problems(deleting, DELETABLE_ORDER)).toEqual([])
+  })
+
+  // Delete is the one operation `bulk` names: a change of chosen records
+  // to values (`update`) is not read by this release, and a grant nothing
+  // enforces is refused as every unread property is -- which is also why
+  // a server older than 0173 refuses a policy naming `bulk` at all. The
+  // shape is held too. Watched failing with `bulk` read as known and its
+  // properties not checked: `update` and `purge` were accepted.
+  test('refuses a bulk grant this release does not read, and one of the wrong shape', () => {
+    const deleting = { ...ORDER_POLICY, operations: { ...ORDER_POLICY.operations, delete: ['manager'] } }
+    const bulk = (value: unknown) => problems({ ...deleting, bulk: value }, DELETABLE_ORDER)
+    expect(bulk({ delete: { roles: ['manager'] }, update: { roles: ['manager'], fields: ['notes'] } })).toEqual([
+      'bulk.update is not something this release reads, so nothing would enforce it',
+    ])
+    expect(bulk({ delete: { roles: ['manager'], purge: true } })).toEqual([
+      'bulk.delete.purge is not something this release reads, so nothing would enforce it',
+    ])
+    expect(bulk([])).toEqual(['bulk is not { delete: { roles } }'])
+    expect(bulk({ delete: ['manager'] })).toEqual(['bulk.delete is not { roles }'])
+    expect(bulk({ delete: { roles: 'manager' } })).toEqual(['bulk.delete.roles is not a list of roles'])
+    expect(bulk({ delete: { roles: [''] } })).toEqual(['bulk.delete.roles[0] is not a role name'])
+  })
+
   // The tenant column's value comes from the context, on create and on
   // update. A grant to write it is a grant nobody can use, and says otherwise.
   test('refuses write on a column a row filter pins', () => {
