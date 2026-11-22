@@ -13,7 +13,9 @@ import { RegionHeading } from './words.js'
  * A change of the records chosen, before its confirmation (0176), in the
  * region under the bar, as an action's dialog is drawn under what asked
  * (0162): focused, headed by how many records it is over; a box for each
- * field the form serves this person such a change in, none ticked; and
+ * field the form serves this person such a change in, none ticked -- one
+ * that cannot be ticked over these records `aria-disabled` and described
+ * by why, after the boxes, so the row of them keeps its layout; and
  * each field ticked drawn on white paper in Blueprint by the renderer the
  * person chose -- React where both are shown -- with the lookups' own
  * typeahead, its submit Continue, which runs the engine's submit. No rule
@@ -46,7 +48,8 @@ export function ChangeAsk({ flow, idBase }: { flow: ChosenFlow; idBase: string }
               type="checkbox"
               id={`${idBase}-field-${String(index)}`}
               checked={ticked.includes(key)}
-              aria-disabled={reading ? 'true' : undefined}
+              aria-disabled={reading || flow.untickable.has(key) ? 'true' : undefined}
+              aria-describedby={flow.untickable.has(key) ? `${idBase}-field-${String(index)}-why` : undefined}
               onChange={(event) => flow.tick(key, event.target.checked)}
             />
             <label htmlFor={`${idBase}-field-${String(index)}`}>{label}</label>
@@ -56,6 +59,14 @@ export function ChangeAsk({ flow, idBase }: { flow: ChosenFlow; idBase: string }
       <p id={`${idBase}-tick`} className="hint">
         {TICK_FIELDS}
       </p>
+      {flow.changes.map(({ key }, index) => {
+        const why = flow.untickable.get(key)
+        return why === undefined ? null : (
+          <p key={key} id={`${idBase}-field-${String(index)}-why`} className="hint">
+            {why}
+          </p>
+        )
+      })}
       {engine === null ? null : (
         <form
           className="sheet"

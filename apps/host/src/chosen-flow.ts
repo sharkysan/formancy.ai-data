@@ -3,9 +3,9 @@ import type { RefObject } from 'react'
 import { lookupSources } from '@formancy/data-client'
 import type { DeleteChosenOutcome, Deleting, UpdateChosenOutcome } from '@formancy/data-client'
 import { useRegionFocus } from './action-flow.js'
-import { changeFields, CHANGE_READING } from './chosen-change.js'
+import { changeFields, CHANGE_READING, untickable } from './chosen-change.js'
 import type { ChangeField } from './chosen-change.js'
-import { continueChange, tickField } from './chosen-change-flow.js'
+import { continueChange, statesOf, tickField } from './chosen-change-flow.js'
 import { atStake, back, dropped, openAtRisk, openRecord, overOpen, release } from './chosen-flow-state.js'
 import type { ChosenOptions, FlowState } from './chosen-flow-state.js'
 import {
@@ -22,6 +22,7 @@ import {
   keepOpen,
   leftOf,
   marksOf,
+  readRefused,
   recordClosed,
   send,
   settledText,
@@ -89,6 +90,8 @@ export interface ChosenFlow {
   deleting: Deleting | null
   /** The fields the form serves this person a change of chosen records in (`bulk.update`, 0175): Change the chosen…, and the column, only where there is one. */
   changes: readonly ChangeField[]
+  /** Those of them whose box cannot be ticked over the records a change asks over, each by its key and why (`untickable`): none but while it asks. */
+  untickable: ReadonlyMap<string, string>
   request: ChosenRequest
   /** The renderer a change's fields are drawn by: the one the person chose to show, React where both are shown, as an action's dialog (0162). */
   renderer: Renderer
@@ -159,6 +162,8 @@ export function useChosen(options: ChosenOptions): ChosenFlow {
     () => guard.waiting(),
   )
   const changes = useMemo(() => changeFields(definition), [definition])
+  const froms = request.state === 'asking' ? request.asked.froms : null
+  const boxes = useMemo(() => (froms === null ? new Map<string, string>() : untickable(definition, froms)), [definition, froms])
   // Read through the policy's filter for an update: a change is an update of each record (0175).
   const sources = useMemo(() => lookupSources(client, formId, definition.form, 'update'), [client, formId, definition])
   const left = request.state === 'answered' ? request.open : null
@@ -167,6 +172,7 @@ export function useChosen(options: ChosenOptions): ChosenFlow {
     deletes: definition.bulk.delete && definition.deleting !== null,
     deleting: definition.deleting,
     changes,
+    untickable: boxes,
     request,
     renderer: options.renderer === 'angular' ? 'angular' : 'react',
     sources,
@@ -194,7 +200,7 @@ function askOver(flow: FlowState, entry: PaneEntry, kind: ChosenKind): void {
   for (const other of flow.registry.entries()) if (other !== entry) other.close?.()
   const target: ChosenTarget = { noun: flow.latest.current.entry.title, records }
   const now = flow.current.current
-  flow.set(kind === 'delete' ? askDelete(now, target, atStake(flow, 'delete', target)) : askChange(now, target))
+  flow.set(kind === 'delete' ? askDelete(now, target, atStake(flow, 'delete', target)) : askChange(now, target, statesOf(flow, target)))
 }
 
 /** The answers that end what the region shows, each only in the state it is drawn in. */
@@ -335,9 +341,9 @@ function closeGone(flow: FlowState, left: ReadonlySet<string>, by: 'answer' | 'c
  * before would make the next Save stale against a change the person
  * made. The forms its confirmation listed (`discards`) drop without asking
  * again -- none after a check, since the lost answer gave their Save back
- * -- and one typed into since is asked about. Until the read has opened,
- * been refused, been kept from or had its question replaced, its Save
- * sends nothing.
+ * -- and one typed into since is asked about; a read refused is said in
+ * the region (`readRefused`). Until the read has opened, been refused,
+ * been kept from or had its question replaced, its Save sends nothing.
  */
 function readChanged(flow: FlowState, open: string, discards: readonly PaneWork[]): void {
   const { opening, sessions } = flow.latest.current
@@ -354,7 +360,11 @@ function readChanged(flow: FlowState, open: string, discards: readonly PaneWork[
       const [session] = flow.latest.current.sessions
       if (session !== undefined) flow.latest.current.onReread(session)
     },
-    refused: read,
+    refused: (message) => {
+      read()
+      // Its forms keep the version from before the change: said in the region, unless another request is the page's since.
+      if (flow.sent.current === mine) flow.set(readRefused(flow.current.current, open, message))
+    },
     // Kept editing: the forms keep what was typed since, at the version before the change, and the region the keyboard.
     back: () => {
       read()

@@ -4,7 +4,7 @@ import { fieldHeading } from '@formancy/data-client'
 import type { PublishedForm } from '@formancy/data-client'
 import type { FieldDef, FormSchema } from '@formancy/spec'
 import type { Said } from './leave.js'
-import { withMovesOver } from './moves.js'
+import { reachedFrom, withMovesOver } from './moves.js'
 import { words } from './running.js'
 import { CAPABILITIES } from './session.js'
 import type { Renderer } from './session.js'
@@ -20,10 +20,11 @@ import { onlyFields } from './widgets.js'
  * ticked and left empty, which clears it -- and how the confirmation says
  * them; and the change's words. Every field offered is one
  * `writable.update` holds and no rule of the form reads together with
- * another (0175), so nothing on the paper is disabled for this person and
- * no rule there reads a field the paper leaves out. The state field is
- * drawn as the states some chosen record may move to; the server checks
- * each record's move from its own state.
+ * another (0175), so no rule on the paper reads a field it leaves out. The
+ * state field is drawn as the states some chosen record may move to, and
+ * required; the server checks each record's move from its own state. Where
+ * none may move, its box cannot be ticked, so nothing on the paper is
+ * disabled for this person. A checkbox starts at no.
  *
  * Everything a change decides the way a deletion of them does is
  * chosen-request.ts's: its states, what became of each record, what leaves
@@ -59,11 +60,20 @@ export const CHANGE_HELD = 'A change of this record with the chosen records has 
 /** A press of Save once the change is answered and before the record is read again: it would name the version from before. */
 export const CHANGE_READING = 'The record is being read again after it was changed with the chosen records; nothing was sent.'
 
+/** After the open record's name, where it was changed and its read again was refused, before the server's sentence (0162). */
+export const READ_AGAIN_REFUSED = 'could not be read again after the change, so its forms were left at the version from before it:'
+
 /** What the state field does where the change sets it: each record moves from its own state, or is named (0127, 0175). */
 export const movesEach = (label: string, n: number): string =>
   n === 1
     ? `${label} moves from the state the record is in: if it may not move there, the record is named, and left as it was.`
     : `${label} moves from each record’s own state: one that may not move there is named, and left as it was.`
+
+/** Under the state field's box, where no chosen record may move from the state the page read it in: it cannot be ticked (0127). */
+export const stuck = (label: string, n: number): string =>
+  n === 1
+    ? `${label} cannot be changed here: the chosen record may not move from the state it is in.`
+    : `${label} cannot be changed here: none of the chosen records may move from the state it is in.`
 
 /** A field a change may set, by its key, and what the page calls it. */
 export interface ChangeField {
@@ -78,17 +88,50 @@ export function changeFields(definition: PublishedForm): ChangeField[] {
 }
 
 /**
+ * The fields offered whose box cannot be ticked over the records whose
+ * states the page read as `froms`, each by its key and why: the state
+ * field, where none of them may move from the state it is in
+ * (`reachedFrom`, 0127). Every move ends at a state, so the only value
+ * left to give it, none, would be refused for every record -- or the whole
+ * request, where its column may not be NULL. Empty where every box may be
+ * ticked.
+ */
+export function untickable(definition: PublishedForm, froms: ReadonlyArray<string | null | undefined>): ReadonlyMap<string, string> {
+  const { moves } = definition
+  const state = changeFields(definition).find((field) => field.key === moves?.field)
+  if (moves === null || state === undefined || reachedFrom(moves, froms).length > 0) return new Map()
+  return new Map([[state.key, stuck(state.label, froms.length)]])
+}
+
+/**
  * The form a change's values are drawn with: the published form narrowed
  * to the fields ticked (`onlyFields`), its state field, where ticked, the
  * states the records chosen may move to from `froms`, theirs as the page
- * read them (`withMovesOver`); and no field's default, a create's alone
- * (0149), since a change starts empty.
+ * read them (`withMovesOver`); and each field as a change draws it
+ * (`asChanged`).
  */
 export function changeForm(definition: PublishedForm, ticked: readonly string[], froms: ReadonlyArray<string | null | undefined>): FormSchema {
   const narrowed = onlyFields(definition.form, ticked)
   const { moves } = definition
   const moved = moves !== null && ticked.includes(moves.field) ? withMovesOver(narrowed, moves, froms) : narrowed
-  return { ...moved, model: { ...moved.model, fields: moved.model.fields.map(({ default: _, ...field }) => field) } }
+  return { ...moved, model: { ...moved.model, fields: moved.model.fields.map((field) => asChanged(field, moves?.field)) } }
+}
+
+/**
+ * A field as a change's paper draws it: with no default, a create's alone
+ * (0149), since a change starts empty; required as generated -- a column
+ * a create must give, which may not be NULL -- but the state field,
+ * required wherever it is ticked, since every move ends at a state
+ * (0127); and a checkbox, never required, which formancy reads as ticked
+ * (0159), since no is a value a change sets in every record
+ * (`changeEngine` starts it there).
+ */
+function asChanged({ default: _, ...field }: FieldDef, state: string | undefined): FieldDef {
+  if (field.type === 'checkbox') {
+    const { required: __, ...box } = field
+    return box
+  }
+  return field.key === state ? { ...field, required: true } : field
 }
 
 /**
@@ -109,8 +152,14 @@ export function changeEngine(
 ): FormEngine | null {
   if (ticked.length === 0) return null
   const held = (before?.value() ?? {}) as Record<string, unknown>
-  const initialValue = Object.fromEntries(ticked.filter((key) => held[key] !== undefined).map((key) => [key, held[key]]))
-  return createFormEngine({ schema: changeForm(definition, ticked, froms), formId: `${formId}-change-${renderer}`, initialValue, capabilities: CAPABILITIES })
+  const schema = changeForm(definition, ticked, froms)
+  // A checkbox starts unticked, which is no, as an action's dialog's does (0159): a NOT NULL boolean's -- a nullable one is a select of three (0095) -- refuses none.
+  const initialValue = Object.fromEntries(
+    schema.model.fields.flatMap((field) =>
+      held[field.key] !== undefined ? [[field.key, held[field.key]]] : field.type === 'checkbox' ? [[field.key, false]] : [],
+    ),
+  )
+  return createFormEngine({ schema, formId: `${formId}-change-${renderer}`, initialValue, capabilities: CAPABILITIES })
 }
 
 /** Whether an answer is none: a field ticked and left empty. */

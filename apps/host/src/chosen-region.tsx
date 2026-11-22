@@ -3,7 +3,7 @@ import { READ_AGAIN_CHANGED } from './chosen-change.js'
 import { ChangeAsk } from './chosen-change-region.js'
 import { DISCARDED_WITH_THEM, lead as deleteLead } from './chosen-deletion.js'
 import type { ChosenFlow } from './chosen-flow.js'
-import { frameOf, heading, lines, notSent, saysDone, stillOpenText, summary, wordsOf } from './chosen-request.js'
+import { frameOf, heading, lines, notSent, readRefusedText, saysDone, stillOpenText, summary, wordsOf } from './chosen-request.js'
 import type { ChosenRequest } from './chosen-request.js'
 import { SAVE_OUT } from './deletion.js'
 import { RENDERER_NAMES, WORK } from './leave.js'
@@ -36,7 +36,9 @@ import { DECLINED_BY, RegionHeading, Words } from './words.js'
  *   fate is not known offers Check them, framed as a save that may have
  *   been stored is, and Close only once every fate is: the guard counts it
  *   until then. The open record a check of a deletion found gone and left
- *   open, its forms holding work, is named, with Close the record.
+ *   open, its forms holding work, is named, with Close the record; and the
+ *   open record a change changed whose read again was refused, in the
+ *   server's words.
  * - **refused**: the server's sentence verbatim, a reason the deployment
  *   worded said as its own (0156), and that none was done.
  *
@@ -199,18 +201,19 @@ function ChosenRefused({ flow, now, idBase }: Answered<'refused'>): ReactElement
   )
 }
 
-/** What became of each record: how many were done, each not done, those never sent, and the open record a check left open. */
+/** What became of each record: how many were done, each not done, those never sent, the open record a check left open, and the one not read again. */
 function ChosenAnswered({ flow, now, idBase }: Answered<'answered'>): ReactElement {
   const named = lines(now)
   const stopped = notSent(now)
   const frame = frameOf(now)
   const open = flow.stillOpen
-  // Every sentence it says, in order: how many it did, each record it did not, those it never sent, and the record left open.
+  // Every sentence it says, in order: how many it did, each record it did not, those it never sent, the record left open, and the one not read again.
   const described = [
     `${idBase}-summary`,
     ...(named.length === 0 ? [] : [`${idBase}-each`]),
     ...(stopped === null ? [] : [`${idBase}-stopped`]),
     ...(open === null ? [] : [`${idBase}-open`]),
+    ...(now.unread === null ? [] : [`${idBase}-unread`]),
   ].join(' ')
   return (
     <div {...regionOf(flow, idBase)} className="notice" data-kind={frame} aria-describedby={described}>
@@ -237,6 +240,11 @@ function ChosenAnswered({ flow, now, idBase }: Answered<'answered'>): ReactEleme
       {open === null ? null : (
         <p id={`${idBase}-open`} className="notice-text">
           <Words said={stillOpenText(now.target.noun, open)} />
+        </p>
+      )}
+      {now.unread === null ? null : (
+        <p id={`${idBase}-unread`} className="notice-text">
+          <Words said={readRefusedText(now.target.noun, now.unread)} />
         </p>
       )}
       <div className="notice-actions">

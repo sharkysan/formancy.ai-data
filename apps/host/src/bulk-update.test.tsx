@@ -1,7 +1,18 @@
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import { computeAccessibleDescription, computeAccessibleName } from 'dom-accessibility-api'
-import { CHANGE_HELD, CLEARS, EACH_CHANGED, FIELDS_LEGEND, movesEach, NONE_CHANGED, READ_AGAIN_CHANGED, TICK_FIELDS } from './chosen-change.js'
+import {
+  CHANGE_HELD,
+  CLEARS,
+  EACH_CHANGED,
+  FIELDS_LEGEND,
+  movesEach,
+  NONE_CHANGED,
+  READ_AGAIN_CHANGED,
+  READ_AGAIN_REFUSED,
+  stuck,
+  TICK_FIELDS,
+} from './chosen-change.js'
 import { NONE_CHOSEN } from './chosen-rows.js'
 import { WORK } from './leave.js'
 import { CHOOSE_FIRST } from './selection-bar.js'
@@ -39,9 +50,11 @@ import type { Engine, Plane } from './test-plane.js'
  * of its status refused from its own state, or not known until Check
  * them reads it -- the page read again, the records changed gone from the
  * choice and those not changed still chosen, each box saying why; the open
- * record read again into its forms where it was changed, and its Save held
- * while the change is out; a question closed by a change of the choice, a
- * second press sending nothing, and the guard counting a change not known.
+ * record read again into its forms where it was changed, said where that
+ * read is refused, and its Save held while the change is out; the state
+ * field's box refused where no chosen record may leave its state; a
+ * question closed by a change of the choice, a second press sending
+ * nothing, and the guard counting a change not known.
  * Over the order form whose status the clerk moves from draft to placed to
  * shipped (`moves` of ENGINES) and the removable records, whose note may be
  * NULL (test-plane.ts's CHANGES). What the database holds is asked beside
@@ -330,6 +343,71 @@ describe.each(ENGINES)('changing the chosen records on $engine', (engine) => {
     await said('React', /^Saved\./)
     expect(await storedAnswers(engine.formId, open)).toMatchObject({ notes: `${notes} saved after` })
     expect(await storedAnswers(engine.formId, other)).toMatchObject({ notes: `${notes} together` })
+  })
+
+  // The open order chosen and changed, whose read again is refused: the
+  // region the keyboard is taken to says so, naming it, in the client's
+  // words, and is described by it; its forms keep the version from before
+  // the change (to be watched failing in CI with the refusal only lifting
+  // the hold: the region described by its count alone).
+  test('says the open record it changed could not be read again', async () => {
+    const notes = stamp('unread')
+    const orders = [await order(engine, 'draft', notes), await order(engine, 'draft', notes)]
+    const [open, other] = orders as [string, string]
+    let armed = false
+    const reads = holdingRequests(
+      plane.fetch,
+      ({ method, path, body }) => armed && method === 'POST' && path.endsWith('/records/read') && (body?.includes(open) ?? false),
+    )
+    const user = await chosenPage(reads.fetch, engine.moves, notes, orders)
+    await load(user, open)
+    await loaded(open)
+    await user.click(box(open))
+    await user.click(box(other))
+    const asking = await askChange(user, 2, 'Order')
+    await user.click(fieldBox(asking, 'Notes'))
+    await user.type(within(await valuesPaper(asking)).getByLabelText('Notes', { exact: true }), `${notes} together`)
+    const confirming = await continueChange(user, asking, 2, 'Order')
+    armed = true
+    await user.click(within(confirming).getByRole('button', { name: 'Change them' }))
+    await waitFor(() => expect(reads.held).toHaveLength(1), ARRIVES)
+    armed = false
+    await reads.fail()
+    const answered = await outcome(2, 'Order')
+    const unread = await waitFor(() => {
+      const said = paragraphs(answered).find((text) => text.startsWith(`Order ${open} ${READ_AGAIN_REFUSED} `))
+      expect(said).toBeDefined()
+      return said ?? ''
+    }, ARRIVES)
+    expect(computeAccessibleDescription(answered)).toBe(`Changed 2 of 2 records. ${unread}`)
+    await waitFor(() => expect(focusedName()).toBe(changing(2, 'Order')))
+    expect(control('React', 'Notes').value).toBe(notes)
+    expect([...(await audit()), ...unnamed()]).toEqual([])
+  })
+
+  // Status where no chosen order may move from the state it is in -- two
+  // shipped orders, which go nowhere -- cannot be ticked: its box is
+  // `aria-disabled` and described by why, a press draws no paper, and
+  // another field's box still ticks (to be watched failing in CI with the
+  // box offered: a paper drawn, its Status disabled and empty, which
+  // Continue would send as `null`).
+  test('refuses the state field’s box where no chosen record may leave its state, saying why', async () => {
+    const notes = stamp('stuck')
+    const orders = [await order(engine, 'shipped', notes), await order(engine, 'shipped', notes)]
+    const [first, second] = orders as [string, string]
+    const user = await chosenPage(plane.fetch, engine.moves, notes, orders)
+    await user.click(box(first))
+    await user.click(box(second))
+    const asking = await askChange(user, 2, 'Order')
+    const status = fieldBox(asking, 'Status')
+    expect([status.getAttribute('aria-disabled'), computeAccessibleDescription(status)]).toEqual(['true', stuck('Status', 2)])
+    await user.click(status)
+    expect(fieldBox(asking, 'Status').checked).toBe(false)
+    expect(within(asking).queryByRole('form')).toBeNull()
+    expect([...(await audit()), ...unnamed()]).toEqual([])
+    await user.click(fieldBox(asking, 'Notes'))
+    expect(fieldBox(asking, 'Notes').checked).toBe(true)
+    await valuesPaper(asking)
   })
 
   // An answer lost after the server changed them: every record may have

@@ -1,7 +1,7 @@
 import type { FormEngine } from '@formancy/core'
 import { isUnknownChosen, isUnknownWrite } from '@formancy/data-client'
 import type { ChangedRecordOutcome, ChosenRecordOutcome, DeleteChosenOutcome, Reconciliation, UnknownChosen, UpdateChosenOutcome } from '@formancy/data-client'
-import { CHANGE_WORDS } from './chosen-change.js'
+import { CHANGE_WORDS, READ_AGAIN_REFUSED } from './chosen-change.js'
 import { DELETE_WORDS, STILL_OPEN } from './chosen-deletion.js'
 import { chosenText, holdsAsked } from './chosen-rows.js'
 import { checkedOf, NOT_FOUND } from './deletion.js'
@@ -60,12 +60,16 @@ export interface ChosenTarget {
  * fields ticked, in the order offered, and the engine their values are
  * drawn on paper with, none while nothing is ticked. `reading`: Continue
  * pressed, and the labels of the lookups it sets being read, so a second
- * press sends nothing.
+ * press sends nothing. `froms`: each record's state as the page read it
+ * when the change was asked, in the order of the records, where the form
+ * holds a field to moves (0127) -- what its state field offers moves from,
+ * and whether its box may be ticked at all.
  */
 export interface ChangeAsked {
   ticked: readonly string[]
   engine: FormEngine | null
   reading: boolean
+  froms: ReadonlyArray<string | null | undefined>
 }
 
 /** A change's values: each field ticked and its answer as sent, `null` clearing it, each as the confirmation says it, and what the confirmation says the change does. */
@@ -108,8 +112,9 @@ export type ChosenRequest =
   /**
    * `unknown`: what a check reads the records of whose fate is not known -- the request's, where its answer was lost; `checking`, while it
    * reads. `open`: the open record a check of a deletion found gone, left open since its forms hold work, until Close the record
-   * (`keepOpen`). `said`: the number of the state the server's answer made, which a check and a record closed leave as it was: what the
-   * count's teal is said by (0146), once for the answer.
+   * (`keepOpen`). `unread`: the open record a change changed, or a check found moved on, whose read again was refused, and the server's
+   * sentence (`readRefused`). `said`: the number of the state the server's answer made, which a check, a record closed and a read refused
+   * leave as it was: what the count's teal is said by (0146), once for the answer.
    */
   | {
       state: 'answered'
@@ -120,6 +125,7 @@ export type ChosenRequest =
       unknown: UnknownChosen | null
       checking: boolean
       open: string | null
+      unread: { record: string; message: string } | null
       said: number
       n: number
     }
@@ -184,10 +190,10 @@ export function askDelete(now: ChosenRequest, target: ChosenTarget, discards: re
  * asked again keeps what was ticked and typed, as an action's dialog does
  * (0162).
  */
-export function askChange(now: ChosenRequest, target: ChosenTarget): ChosenRequest {
+export function askChange(now: ChosenRequest, target: ChosenTarget, froms: ReadonlyArray<string | null | undefined>): ChosenRequest {
   if (chosenWork(now) !== null) return again(now)
   if (now.state === 'asking' && holdsAsked(target.records, now.target.records)) return again(now)
-  return { state: 'asking', kind: 'change', target, asked: { ticked: [], engine: null, reading: false }, n: numbered(now) }
+  return { state: 'asking', kind: 'change', target, asked: { ticked: [], engine: null, reading: false, froms }, n: numbered(now) }
 }
 
 /** A box ticked or unticked, or Continue pressed: the change's question as it is now, the keyboard where it is -- no new state. */
@@ -225,7 +231,7 @@ export function answer(now: ChosenRequest, outcome: DeleteChosenOutcome | Update
   if (now.state !== 'sending') return now
   const { kind, target } = now
   const n = numbered(now)
-  const shown = { state: 'answered', kind, target, checking: false, open: null, said: n, n } as const
+  const shown = { state: 'answered', kind, target, checking: false, open: null, unread: null, said: n, n } as const
   if (outcome.ok) {
     // The client takes a 200 only with an entry for every record sent, in the order sent (0173).
     const value: ReadonlyArray<ChosenRecordOutcome | ChangedRecordOutcome> = outcome.value
@@ -344,6 +350,21 @@ export function recordClosed(now: ChosenRequest): ChosenRequest {
   return now.state === 'answered' && now.open !== null ? { ...now, open: null, n: numbered(now) } : now
 }
 
+/**
+ * The open record a change changed, or a check found moved on, could not
+ * be read again: its forms keep the version from before the change, which
+ * the region says, taking the keyboard to say it, as a run's region says
+ * it (0162). Nothing else changes.
+ */
+export function readRefused(now: ChosenRequest, record: string, message: string): ChosenRequest {
+  return now.state === 'answered' ? { ...now, unread: { record, message }, n: numbered(now) } : now
+}
+
+/** "Order `k1:3` could not be read again after the change, so its forms were left at the version from before it: …": the server's sentence last. */
+export function readRefusedText(noun: string, unread: { record: string; message: string }): Said {
+  return [`${noun} `, { code: unread.record }, ` ${READ_AGAIN_REFUSED} ${unread.message}`]
+}
+
 /** "Order `k1:3` is still open in the detail, …": what the region says of the open record a check found gone, left open. */
 export function stillOpenText(noun: string, record: string): Said {
   return [`${noun} `, { code: record }, ` ${STILL_OPEN}`]
@@ -418,12 +439,16 @@ export function settledText(now: ChosenRequest, left: readonly string[], name: (
   return kept.length === 0 ? chosenText(left.length) : `${chosenText(left.length)} Still chosen after the ${WORDS[now.kind].request}: ${listed(kept)}.`
 }
 
+/** After "1 of 2 records ", or after "; 1 ": those a change's check could not find, its record gone or no longer one the person may see. */
+const GONE_COUNT = 'cannot be found any more'
+
 /**
  * What the answered region says first: how many of the records this
  * request did; where its answer was lost, the client's sentence until a
  * check has read the records, and then only what it read -- how many are
  * found done, by whoever's request; none found so, how many are still as
- * they were, the rest still unknown; or none done, every one found so.
+ * they were and how many a change's check could not find, the rest still
+ * unknown; or none done, every one found so.
  */
 export function summary(now: ChosenRequest & { state: 'answered' }): string {
   const said = WORDS[now.kind]
@@ -435,10 +460,15 @@ export function summary(now: ChosenRequest & { state: 'answered' }): string {
   if (found > 0) return `${String(found)} of ${counted(n)} ${said.foundCount(found)}`
   const kept = counting('kept')
   if (kept === n) return said.none
-  // Nothing read yet: every record still may have been done, as the client said.
-  if (kept === 0) return now.unknown.message
-  const others = n - kept === 1 ? 'the other was' : 'the others were'
-  return `${String(kept)} of ${counted(n)} ${said.keptCount(kept)}; whether ${others} ${said.past} is still unknown.`
+  // A change's check answers a record it cannot find as not found: a fate known, never one still unknown.
+  const gone = counting('not-found')
+  // Nothing read yet, or no read answered: every record still may have been done, as the client said.
+  if (kept + gone === 0) return now.unknown.message
+  const known = [...(kept === 0 ? [] : [[kept, said.keptCount(kept)] as const]), ...(gone === 0 ? [] : [[gone, GONE_COUNT] as const])]
+  const clauses = known.map(([count, what], index) => `${index === 0 ? `${String(count)} of ${counted(n)}` : String(count)} ${what}`)
+  const rest = n - kept - gone
+  const others = rest === 1 ? 'the other was' : 'the others were'
+  return `${[...clauses, ...(rest === 0 ? [] : [`whether ${others} ${said.past} is still unknown`])].join('; ')}.`
 }
 
 /** Whether the count is said in the room's teal, as what the server did (0146): only where this request's answer says it did some. */

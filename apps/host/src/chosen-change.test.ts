@@ -15,6 +15,9 @@ import {
   MOVED,
   NONE_CHANGED,
   ONE_CHANGED,
+  READ_AGAIN_REFUSED,
+  stuck,
+  untickable,
   valuesSaid,
 } from './chosen-change.js'
 import {
@@ -28,12 +31,15 @@ import {
   chosenWork,
   close,
   foundNow,
+  frameOf,
   heading,
   IDLE,
   leftOf,
   lines,
   marksOf,
   notSent,
+  readRefused,
+  readRefusedText,
   send,
   settledText,
   summary,
@@ -66,7 +72,8 @@ const FORM: FormSchema = {
       { key: 'customer', type: 'select', label: 'Customer', optionsSource: 'pg-order.customer' },
       { key: 'status', type: 'select', label: 'Status', default: 'draft', options: ['draft', 'placed', 'shipped'].map((value) => ({ value, label: value })) },
       { key: 'notes', type: 'text', label: 'Notes', default: 'none yet' },
-      { key: 'rush', type: 'checkbox', label: 'Rush' },
+      // As the generator draws a NOT NULL boolean with no default on a form that creates: a checkbox, required.
+      { key: 'rush', type: 'checkbox', label: 'Rush', required: true },
     ],
   },
   layouts: [
@@ -192,6 +199,50 @@ describe('the fields a change offers, and its paper', () => {
     expect(second?.schema().model.fields.map((field) => field.key)).toEqual(['status', 'notes'])
     expect(changeEngine(ORDERS, 'pg-order', 'react', [], [], second ?? null)).toBeNull()
   })
+
+  // The state field ticked is required: every move ends at a state (0127),
+  // so one left empty is refused for every record -- or the whole request,
+  // where its column may not be NULL -- and Continue sends nothing until it
+  // is given. Where no chosen record may move from the state the page read
+  // it in, its box cannot be ticked, and says why; a record whose state the
+  // page did not read may be in any, so it keeps the box; and a paper drawn
+  // over such records all the same still sends nothing, never `null`
+  // (watched failing with the field's `required` kept as generated:
+  // "expected { key: 'status', type: 'select', …(2) } to match object {
+  // required: true }").
+  test('requires the state field ticked, and refuses its box where no chosen record may move', () => {
+    const paper = changeEngine(ORDERS, 'pg-order', 'react', ['status', 'notes'], ['draft'], null)
+    expect(paper?.schema().model.fields.find((field) => field.key === 'status')).toMatchObject({ required: true })
+    expect(paper?.submit().ok).toBe(false)
+    paper?.setValue(['status'], 'placed')
+    expect(paper?.submit().ok).toBe(true)
+    expect(changeEngine(ORDERS, 'pg-order', 'react', ['status'], ['shipped'], null)?.submit().ok).toBe(false)
+    expect(untickable(ORDERS, ['draft', 'shipped'])).toEqual(new Map())
+    expect(untickable(ORDERS, [undefined])).toEqual(new Map())
+    expect(untickable(ORDERS, ['shipped'])).toEqual(new Map([['status', stuck('Status', 1)]]))
+    expect(untickable(ORDERS, ['shipped', 'shipped'])).toEqual(new Map([['status', stuck('Status', 2)]]))
+    expect([untickable(served(['notes']), ['shipped']), untickable(served(['status'], null), ['shipped'])]).toEqual([new Map(), new Map()])
+  })
+
+  // A checkbox ticked for the change starts unticked, which is "no", and is
+  // sent and said so: its column is a NOT NULL boolean -- a nullable one
+  // is a select of three (0095) -- which refuses `null`, and with it the
+  // whole request. Never required on the paper either, which formancy
+  // reads as ticked (0159), so "no" can be set for every record; ticked,
+  // it is kept from paper to paper (watched failing with the paper started
+  // empty: "expected {} to deeply equal { rush: false }").
+  test('starts a checkbox at no, and sends and says it so', () => {
+    const rushes = served(['rush'])
+    const paper = changeEngine(rushes, 'pg-order', 'react', ['rush'], [], null)
+    expect(paper?.value()).toEqual({ rush: false })
+    expect(paper?.submit().ok).toBe(true)
+    const answers = changeAnswers(['rush'], (paper?.value() ?? {}) as Record<string, unknown>)
+    expect(answers).toEqual({ rush: false })
+    expect(valuesSaid(changeForm(rushes, ['rush'], []), answers, new Map()).map(text)).toEqual(['Rush: no'])
+    expect(lead(rushes, answers, 2)).toEqual([EACH_CHANGED])
+    paper?.setValue(['rush'], true)
+    expect(changeEngine(rushes, 'pg-order', 'react', ['rush', 'notes'], [], paper ?? null)?.value()).toEqual({ rush: true })
+  })
 })
 
 describe('what a change sends, and how its confirmation says it', () => {
@@ -243,16 +294,16 @@ describe('the question', () => {
   // replacing the change out: "expected { state: 'confirming', …(5) } to
   // match object { state: 'sending', kind: 'change' }").
   test('asks for fields, keeps them when asked again, and never replaces a request out', () => {
-    const fields = askChange(IDLE, target('k1:1', 'k1:2'))
-    expect(fields).toMatchObject({ state: 'asking', kind: 'change', asked: { ticked: [], engine: null, reading: false } })
-    const ticked = asking(fields, { ticked: ['notes'], engine: null, reading: false })
-    expect(askChange(ticked, target('k1:2', 'k1:1'))).toMatchObject({ state: 'asking', asked: { ticked: ['notes'] } })
+    const fields = askChange(IDLE, target('k1:1', 'k1:2'), ['draft', 'shipped'])
+    expect(fields).toMatchObject({ state: 'asking', kind: 'change', asked: { ticked: [], engine: null, reading: false, froms: ['draft', 'shipped'] } })
+    const ticked = asking(fields, { ticked: ['notes'], engine: null, reading: false, froms: ['draft', 'shipped'] })
+    expect(askChange(ticked, target('k1:2', 'k1:1'), ['shipped', 'draft'])).toMatchObject({ state: 'asking', asked: { ticked: ['notes'] } })
     const confirming = answered(ticked, { answers: { notes: 'x' }, said: [['Notes: x']], lead: [EACH_CHANGED] }, [])
     const out = send(confirming, [at('k1:1', '4'), at('k1:2')])
     expect(out).toMatchObject({ state: 'sending', kind: 'change', change: { answers: { notes: 'x' } }, target: { records: [at('k1:1', '4'), at('k1:2')] } })
     expect(chosenWork(out)).toBe('changing')
     expect(askDelete(out, target('k1:3'), [])).toMatchObject({ state: 'sending', kind: 'change' })
-    expect(askChange(askDelete(IDLE, target('k1:1'), []), target('k1:1'))).toMatchObject({ state: 'asking', kind: 'change' })
+    expect(askChange(askDelete(IDLE, target('k1:1'), []), target('k1:1'), [])).toMatchObject({ state: 'asking', kind: 'change' })
     expect(close(ticked)).toBe(IDLE)
   })
 })
@@ -275,7 +326,7 @@ describe('what the server answered a change', () => {
   const notSentOne = (record: string): ChangedRecordOutcome => ({ ok: false, status: 0, code: 'not-sent', message: 'not sent', record, version: '1' })
   const out = (records: readonly string[]): ChosenRequest =>
     send(
-      answered(askChange(IDLE, target(...records)), { answers: { status: 'shipped' }, said: [], lead: [] }, []),
+      answered(askChange(IDLE, target(...records), []), { answers: { status: 'shipped' }, said: [], lead: [] }, []),
       records.map((record) => at(record)),
     )
   const shown = (now: ChosenRequest): ChosenRequest & { state: 'answered' } => {
@@ -386,6 +437,71 @@ describe('what the server answered a change', () => {
     )
     expect([summary(none), chosenWork(none)]).toEqual([NONE_CHANGED, null])
     expect(MOVED).toBe(CHANGE_WORDS.found)
+  })
+
+  // A record a check reads 404 has a fate the page knows -- not found, its
+  // own line says so, the guard no longer counts it -- so the first
+  // sentence counts it rather than calling it still unknown, and a check
+  // that finds every record so never repeats the client's "Any of them may
+  // have been changed." (watched failing with not found counted as
+  // neither: the first sentence "1 of 2 records is still at the version
+  // this page read, not changed; whether the other was changed is still
+  // unknown.").
+  test('a check that cannot find a record counts it as known', () => {
+    const stored = { record: 'k1:1', version: '1', answers: {}, labels: {} } as never
+    const kept = (record: string) => ({ record, reconciliation: { ok: true, state: 'unchanged', current: stored } as const })
+    const gone = (record: string) => ({ record, reconciliation: { ok: false, status: 404, code: 'not-found', message: 'No such record.' } as const })
+    const unread = (record: string) => ({
+      record,
+      reconciliation: { ok: false, status: 503, code: 'unavailable', message: 'The database is not answering.' } as const,
+    })
+    const lost = (records: readonly string[]) =>
+      checking(
+        answer(out(records), {
+          ok: false,
+          status: 0,
+          code: 'unknown-outcome',
+          message: 'The answer to this change of chosen records was lost between this page and the data server. Any of them may have been changed.',
+          operation: 'update-chosen',
+          records: records.map((record) => at(record)),
+          origin: 'transport',
+        }),
+      )
+    const some = shown(checked(lost(['k1:1', 'k1:2']), [kept('k1:1'), gone('k1:2')]))
+    expect([summary(some), chosenWork(some), frameOf(some)]).toEqual([
+      '1 of 2 records is still at the version this page read, not changed; 1 cannot be found any more.',
+      null,
+      'refused',
+    ])
+    const every = shown(checked(lost(['k1:1', 'k1:2']), [gone('k1:1'), gone('k1:2')]))
+    expect([summary(every), lines(every).map(({ said }) => text(said))]).toEqual([
+      '2 of 2 records cannot be found any more.',
+      [`Order k1:1: ${NOT_FOUND}`, `Order k1:2: ${NOT_FOUND}`],
+    ])
+    const three = shown(checked(lost(['k1:1', 'k1:2', 'k1:3']), [kept('k1:1'), gone('k1:2'), unread('k1:3')]))
+    expect(summary(three)).toBe(
+      '1 of 3 records is still at the version this page read, not changed; 1 cannot be found any more; whether the other was changed is still unknown.',
+    )
+    const unreadOnly = shown(checked(lost(['k1:1', 'k1:2']), [gone('k1:1'), unread('k1:2')]))
+    expect(summary(unreadOnly)).toBe('1 of 2 records cannot be found any more; whether the other was changed is still unknown.')
+  })
+
+  // The open record a change changed, or a check found moved on, whose
+  // read again is refused keeps its forms at the version from before:
+  // the region says so, naming it, in the server's words, and takes the
+  // keyboard to say it, the count's teal left as the answer said it -- as
+  // a run's region says it (0162); a request not answered is left as it
+  // is (watched failing with the refusal only lifting the hold: "expected
+  // [ null, 3, 3 ] to deeply equal [ { record: 'k1:1', …(1) }, 4, 3 ]").
+  test('says the open record it changed could not be read again', () => {
+    const done = shown(answer(out(['k1:1', 'k1:2']), { ok: true, value: [updated('k1:1'), updated('k1:2')] }))
+    expect(done.unread).toBeNull()
+    const refused = shown(readRefused(done, 'k1:1', 'The data server could not be reached.'))
+    expect([refused.unread, refused.n, refused.said]).toEqual([{ record: 'k1:1', message: 'The data server could not be reached.' }, done.n + 1, done.said])
+    expect(text(readRefusedText('Order', { record: 'k1:1', message: 'The data server could not be reached.' }))).toBe(
+      `Order k1:1 ${READ_AGAIN_REFUSED} The data server could not be reached.`,
+    )
+    expect(readRefused(IDLE, 'k1:1', 'x')).toBe(IDLE)
   })
 
   // The open record is read again once for each finding that it changed:

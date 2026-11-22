@@ -1,4 +1,4 @@
-import { changeAnswers, changeEngine, changeFields, chosenLookups, lead, valuesSaid } from './chosen-change.js'
+import { changeAnswers, changeEngine, changeFields, chosenLookups, lead, untickable, valuesSaid } from './chosen-change.js'
 import { atStake, dropped } from './chosen-flow-state.js'
 import type { FlowState } from './chosen-flow-state.js'
 import { answered, asking } from './chosen-request.js'
@@ -16,8 +16,8 @@ import type { Submitted } from './session.js'
  * changes when a change's question does.
  */
 
-/** Each chosen record's state as the page read it, where the form holds one to moves (0127): what the change's state field offers moves from. */
-function statesOf(flow: FlowState, target: ChosenTarget): Array<string | null | undefined> {
+/** Each chosen record's state as the page read it, where the form holds one to moves (0127): what the change's state field offers moves from, read once as the change is asked. */
+export function statesOf(flow: FlowState, target: ChosenTarget): Array<string | null | undefined> {
   const { definition, chosen } = flow.latest.current
   const { moves } = definition
   if (moves === null) return []
@@ -30,17 +30,21 @@ function statesOf(flow: FlowState, target: ChosenTarget): Array<string | null | 
 /**
  * A field's box ticked or unticked: the fields ticked, in the order
  * offered, drawn on a paper of their own that keeps what was typed into
- * those still ticked; nothing while Continue reads its lookups' labels.
+ * those still ticked; nothing while Continue reads its lookups' labels,
+ * and nothing for a box that cannot be ticked (`untickable`), which says
+ * why.
  */
 export function tickField(flow: FlowState, field: string, on: boolean): void {
   const now = flow.current.current
   if (now.state !== 'asking' || now.asked.reading) return
   const { definition, entry, renderer } = flow.latest.current
+  const { froms } = now.asked
+  if (on && untickable(definition, froms).has(field)) return
   const ticked = changeFields(definition)
     .map(({ key }) => key)
     .filter((key) => (key === field ? on : now.asked.ticked.includes(key)))
-  const engine = changeEngine(definition, entry.id, renderer === 'angular' ? 'angular' : 'react', ticked, statesOf(flow, now.target), now.asked.engine)
-  flow.set(asking(now, { ticked, engine, reading: false }))
+  const engine = changeEngine(definition, entry.id, renderer === 'angular' ? 'angular' : 'react', ticked, froms, now.asked.engine)
+  flow.set(asking(now, { ...now.asked, ticked, engine, reading: false }))
 }
 
 /** Whether what a renderer submitted is a form's answers. */

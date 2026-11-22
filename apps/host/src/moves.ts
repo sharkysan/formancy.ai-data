@@ -45,10 +45,15 @@ export function withMoves(form: FormSchema, moves: PublishedForm['moves'], from:
  */
 export function withMovesOver(form: FormSchema, moves: PublishedForm['moves'], froms: ReadonlyArray<string | null | undefined>): FormSchema {
   if (moves === null) return form
+  const to = reachedFrom(moves, froms)
+  return drawnAs(form, moves, to, to.length > 0, false)
+}
+
+/** Every state a move `moves` names reaches from one of `froms`, once each, in the order first reached; `undefined`, a state the page did not read, from any state. */
+export function reachedFrom(moves: NonNullable<PublishedForm['moves']>, froms: ReadonlyArray<string | null | undefined>): string[] {
   const reaches = (from: string | null | undefined): string[] =>
     moves.moves.filter((move) => (from === undefined ? move.from !== null : move.from === from)).map((move) => move.to)
-  const to = [...new Set(froms.flatMap(reaches))]
-  return drawnAs(form, moves, to, to.length > 0, false)
+  return [...new Set(froms.flatMap(reaches))]
 }
 
 /** The state field drawn as a choice of `states` by `moves`' labels, or disabled where it `goes` nowhere; `defaults`, a new record's, keeps the field's default. */
