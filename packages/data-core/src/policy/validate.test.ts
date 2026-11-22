@@ -451,7 +451,7 @@ describe('validatePolicy', () => {
     expect(policy(['order'], together)).toEqual([
       "bulk.update.fields: order names the record this form's rows are saved with, which a row keeps from its create (0155)",
     ])
-    // The studio offers a field by \`unsettableField\` (0176): each reason it
+    // The studio offers a field by `unsettableField` (0176): each reason it
     // shows beside a box is the one this check refuses the grant for, one
     // function the check asks too, and a field it offers is one the check
     // accepts (watched failing with the pinned column left out of

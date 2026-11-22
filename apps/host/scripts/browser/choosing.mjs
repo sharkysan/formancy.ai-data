@@ -182,7 +182,7 @@ export function choosingJourney(plane, { check }, run) {
         await valuesPaper(page).getByRole('button', { name: 'Continue', exact: true }).click()
         const confirming = changingTwo(page, true)
         await confirming.waitFor(WITHIN)
-        check('its confirmation: the keyboard is on it', await landsOn(page, confirming))
+        check('Change the chosen…: the keyboard is on its confirmation', await landsOn(page, confirming))
         await page.keyboard.press('Tab')
         check(
           'the next Tab reaches Keep them, never the button that changes',
