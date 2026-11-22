@@ -4,7 +4,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { EMPTY_PRESENTATION, LIST_PAGE_SIZE, recordToken } from '@formancy/data-core'
-import type { ChosenAnswer, FormBindings, FormPolicy, GenerationRequest, MetadataSnapshot } from '@formancy/data-core'
+import type { ChangedAnswer, ChosenAnswer, FormBindings, FormPolicy, GenerationRequest, MetadataSnapshot } from '@formancy/data-core'
 import { percentiles, POSTGRES_IMAGE, SQLSERVER_IMAGE, startPostgresFixture, startSqlServerFixture } from '@formancy/data-fixtures'
 import type { PostgresFixture, SqlServerFixture } from '@formancy/data-fixtures'
 import { createIdentityVerifier } from '@formancy/data-identity'
@@ -24,13 +24,15 @@ import { createConnectionRegistry } from './connections.js'
 import { DRIVER_FACTORIES } from './drivers.js'
 
 /*
- * What deleting a page of chosen records costs (0173), through the real
- * server and its drivers on the default images, both engines: `n` rows of
- * parity.removable the owner inserts, deleted in one request, at each of
- * BULK_SIZES, 20 runs at each, timed from the server being asked to its
- * answer -- the request's authorisation, then each record's description
- * and delete, one after another. Held without a clock where a fact has
- * none -- every record of every run is deleted -- and timed, and reported,
+ * What deleting (0173) and changing (0175) a page of chosen records costs,
+ * through the real server and its drivers on the default images, both
+ * engines: `n` rows of parity.removable the owner inserts, deleted -- or
+ * changed, each to the same note -- in one request, at each of BULK_SIZES,
+ * 20 runs at each, timed from the server being asked to its answer -- the
+ * request's authorisation, then each record's description and delete, or
+ * each record's read and update, one after another. Held without a clock
+ * where a fact has none -- every record of every run is deleted, or
+ * changed -- and timed, and reported,
  * where it has, with the answer's bytes, what write-once.ts keeps of a
  * page: in test-results/bulk-sized-postgres.json and
  * bulk-sized-sqlserver.json, one per engine, and in the log, one line per
@@ -40,7 +42,8 @@ import { DRIVER_FACTORIES } from './drivers.js'
  * The timings are what DEFAULT_BULK_DEADLINE_MS is to be set from
  * (bulk-deadline.ts: chosen until these lines are read). The one clock
  * this suite holds is that a page of LIST_PAGE_SIZE records, sent to a
- * server with the default deadline, is deleted whole within it: a runner
+ * server with the default deadline, is deleted whole within it, and
+ * changed whole within it: a runner
  * on which it is not has outgrown the default, and the deadline is
  * measured again there. In this file's own containers, so no other suite's
  * load is timed.
@@ -180,7 +183,7 @@ const post = (on: FastifyInstance, url: string, bearer: string, payload: unknown
 describe.each([
   { engine: 'PostgreSQL', connection: 'pg-parity', db: 'pg' as const },
   { engine: 'SQL Server', connection: 'ms-parity', db: 'ms' as const },
-])('deleting a page of chosen records on $engine (0173)', ({ connection, db }) => {
+])('deleting and changing a page of chosen records on $engine (0173, 0175)', ({ connection, db }) => {
   const formId = `${connection}-removable-sized`
   const report: Array<Record<string, number | string>> = []
 
@@ -196,13 +199,14 @@ describe.each([
     })
     expect(proposal.statusCode, proposal.body).toBe(200)
     const { form, bindings, snapshot, generation } = proposal.json<Proposal>()
+    // Clerks delete the chosen records of a page together, and change their note together (0175).
     const policy: FormPolicy = {
       version: 1,
-      operations: { read: ['clerk'], create: [], update: [], delete: ['clerk'] },
-      fields: Object.fromEntries(bindings.fields.map((binding) => [binding.field, { read: ['clerk'], write: [] }])),
+      operations: { read: ['clerk'], create: [], update: ['clerk'], delete: ['clerk'] },
+      fields: Object.fromEntries(bindings.fields.map((binding) => [binding.field, { read: ['clerk'], write: binding.field === 'note' ? ['clerk'] : [] }])),
       rowFilters: [{ column: 'tenant_id', attribute: 'tenant' }],
       lookups: {},
-      bulk: { delete: { roles: ['clerk'] } },
+      bulk: { delete: { roles: ['clerk'] }, update: { roles: ['clerk'], fields: ['note'] } },
     }
     const published = await post(measuring, `/v1/forms/${formId}/versions`, admin, {
       expectedBase: null,
@@ -234,6 +238,17 @@ describe.each([
     expect(body.records).toEqual(records.map(({ record }) => ({ sent: true, status: 200, body: { record, deleted: true } })))
   }
 
+  /** Every record of a request changed to `note`, in the order sent, each at the version after the one sent. */
+  function allChanged(body: ChangedAnswer, records: ReadonlyArray<{ record: string }>, note: string): void {
+    expect(body.records).toEqual(
+      records.map(({ record }) => ({
+        sent: true,
+        status: 200,
+        body: expect.objectContaining({ record, version: '2', answers: expect.objectContaining({ note }) }),
+      })),
+    )
+  }
+
   // Every run deletes every record it names, and is timed: the first of
   // each size apart, since SQL Server compiles a batch it has not seen
   // before it runs it, and PostgreSQL's pool may open its connection then.
@@ -261,6 +276,50 @@ describe.each([
       const { p50, p95, p99, max } = percentiles(times)
       report.push({
         engine: db === 'pg' ? 'postgres' : 'sqlserver',
+        operation: 'delete',
+        records: n,
+        first: Math.round(firstMs),
+        runs: RUNS,
+        p50: Math.round(p50),
+        p95: Math.round(p95),
+        p99: Math.round(p99),
+        max: Math.round(max),
+        bytes,
+      })
+    },
+    600_000,
+  )
+
+  // A change of each run's records to one note, timed as the deletes are:
+  // each record its read and its update, one after another, and the
+  // answer each record's as stored -- whose bytes are what write-once.ts
+  // keeps of a page of changes.
+  test.each(BULK_SIZES)(
+    'of %i records changes each, and is timed',
+    async (n) => {
+      const firstRecords = await fresh(n)
+      const sending = performance.now()
+      const first = await post(measuring, `/v1/forms/${formId}/records/update-chosen`, clerk, { records: firstRecords, answers: { note: 'first' } })
+      const firstMs = performance.now() - sending
+      expect(first.statusCode, first.body).toBe(200)
+      allChanged(first.json<ChangedAnswer>(), firstRecords, 'first')
+
+      const times: number[] = []
+      let bytes = 0
+      for (let run = 0; run < RUNS; run += 1) {
+        const records = await fresh(n)
+        const note = `run ${String(run)}`
+        const start = performance.now()
+        const response = await post(measuring, `/v1/forms/${formId}/records/update-chosen`, clerk, { records, answers: { note } })
+        times.push(performance.now() - start)
+        expect(response.statusCode, response.body).toBe(200)
+        allChanged(response.json<ChangedAnswer>(), records, note)
+        bytes = Buffer.byteLength(response.body, 'utf8')
+      }
+      const { p50, p95, p99, max } = percentiles(times)
+      report.push({
+        engine: db === 'pg' ? 'postgres' : 'sqlserver',
+        operation: 'update',
         records: n,
         first: Math.round(firstMs),
         runs: RUNS,
@@ -276,14 +335,23 @@ describe.each([
 
   // The default deadline admits a page: a server that reads no setting
   // deletes every one of LIST_PAGE_SIZE chosen records, none answered not
-  // sent. A runner on which it does not is one the default is to be
-  // measured on again.
+  // sent, and changes every one. A runner on which it does not is one the
+  // default is to be measured on again.
   test('of a page, is deleted whole within the default deadline', async () => {
     const records = await fresh(LIST_PAGE_SIZE)
     const start = performance.now()
     const response = await post(defaulted, `/v1/forms/${formId}/records/delete-chosen`, clerk, { records })
     expect(response.statusCode, response.body).toBe(200)
     allDone(response.json<ChosenAnswer>(), records)
+    expect(performance.now() - start).toBeLessThan(DEFAULT_BULK_DEADLINE_MS)
+  })
+
+  test('of a page, is changed whole within the default deadline', async () => {
+    const records = await fresh(LIST_PAGE_SIZE)
+    const start = performance.now()
+    const response = await post(defaulted, `/v1/forms/${formId}/records/update-chosen`, clerk, { records, answers: { note: 'within the default' } })
+    expect(response.statusCode, response.body).toBe(200)
+    allChanged(response.json<ChangedAnswer>(), records, 'within the default')
     expect(performance.now() - start).toBeLessThan(DEFAULT_BULK_DEADLINE_MS)
   })
 })
