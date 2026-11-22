@@ -249,8 +249,10 @@ describe.each(JOURNEYS)('what the page sends on $engine, through $door', ({ conn
     // origin, the tenant a column the page sends in no body since 0117
     // (watched failing with every answer sent: the tenant in the price's
     // update and in its change from a date). Through the demo's door it is
-    // the one exception: the demo publishes no form over versions.
-    const UNSENT: ReadonlySet<string> = new Set(door === undefined ? [] : ['supersede'])
+    // the one exception: the demo publishes no form over versions. A delete
+    // of chosen records (0173) is unsent on every door until the page has a
+    // control that sends it: the runtime plane and the client offer it first.
+    const UNSENT: ReadonlySet<string> = new Set(door === undefined ? ['delete-chosen'] : ['supersede', 'delete-chosen'])
     expect(
       ROUTES.filter(({ matches, operation }) => !UNSENT.has(operation) && !sent.some((request) => matches.test(line(request)))).map(
         ({ operation }) => operation,

@@ -265,7 +265,9 @@ is checked by a read of each. Nothing new is asked of either engine.
 - **Only a client of the deployment's own sends one**, through
   `@formancy/data-client` or requests of its own: the host page offers no
   delete of chosen records, and the studio grants none, so an
-  administrator writes `bulk` into a policy by hand.
+  administrator writes `bulk` into a policy by hand. The host page's
+  `apps/host/src/plane.test.tsx` holds the route unsent on every door
+  until the page has a control that sends it.
 
 **What it forecloses.** Nothing: an all-or-nothing delete of a set stays
 open as an action over a selection, and a change of chosen records to
