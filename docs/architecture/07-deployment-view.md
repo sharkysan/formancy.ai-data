@@ -132,7 +132,12 @@ runtime door's server, which serves no file
 ([0083](../decisions/0083-the-studio-and-the-host-page-are-served-under-a-content-security-policy-each.md)).
 `scripts/web-policies.test.mjs` holds the file to the module, the browser
 gates hold the pages to the policies, and the getting-started gate holds
-nginx to sending them.
+nginx to sending them. Both pages ask search engines to leave them out, by
+the `noindex` meta of each page's source, which their builds carry; no
+header says it. `scripts/indexed-page.test.mjs` fails when a source or a
+build the stack serves stops saying it, the host page's above all, since
+the live demo's copy of it asks to be indexed
+([0177](../decisions/0177-the-examples-page-and-the-live-demo-ask-to-be-indexed-each-at-its-own-address-and-only-the-deploy-that-puts-it-there-says-so.md)).
 
 **Secrets in a volume, generated.** `deploy/secrets.sh`, run by the one-shot
 `secrets` service, writes each password and key once, keeps what is there
@@ -314,7 +319,12 @@ styles and fonts from the page's own origin alone, where its faces are
 (0072). `scripts/demo.test.mjs` holds the config, the refusals and the
 headers; the examples page's browser gate serves the build under the same
 path and headers through `scripts/demo-serve.mjs`, and fails on anything
-the policy refuses.
+the policy refuses. The staged page asks to be indexed at the demo's
+address: `stageDemo` writes it through `scripts/indexed-page.mjs`, which
+drops the `noindex` the page's source carries and names the address the
+Worker is routed at as canonical, and `scripts/indexed-page.test.mjs`
+holds the staging
+([0177](../decisions/0177-the-examples-page-and-the-live-demo-ask-to-be-indexed-each-at-its-own-address-and-only-the-deploy-that-puts-it-there-says-so.md)).
 
 **What it costs.** The demo is `main`'s page, not the latest release's, and
 Workers Builds deploys a push without waiting for that commit's CI. The
@@ -384,7 +394,11 @@ the refusals and the headers; `pnpm test:live-demo`
 (`scripts/live-demo-gate.mjs`), in the `live-demo` job, builds the image
 and runs the Worker's own module in front of it over a stand-in for
 Cloudflare's runtime (`scripts/live-demo-gate/cloudflare.mjs`), and walks a
-visitor's journey over HTTP and in Chromium.
+visitor's journey over HTTP and in Chromium. `stageLiveDemo` stages the
+page asking to be indexed at formancy.ai/data/demo/, its canonical
+address, with `LIVE_DESCRIPTION` in place of the host page's description;
+the build it stages from, like the composed stack's host page, still asks
+to be left out (0177).
 
 **What it costs.** The Workers Paid plan, and money for each container
 while it runs, bounded by the cap; anybody can start one, and one visitor

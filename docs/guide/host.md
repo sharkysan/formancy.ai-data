@@ -595,3 +595,7 @@ served from for the demo's people and signs a visitor in as one of them
 where this build asks for a token, and reaches the runtime plane under that
 path through data-client's `base`. This build leaves that branch out
 ([0070](../decisions/0070-the-live-demo-runs-the-real-server-and-postgresql-in-a-cloudflare-container-of-each-visitors-own.md)).
+Both builds ask search engines to leave the page out, as the page's
+source does; only the live demo's deploy drops that from the copy it
+serves
+([0177](../decisions/0177-the-examples-page-and-the-live-demo-ask-to-be-indexed-each-at-its-own-address-and-only-the-deploy-that-puts-it-there-says-so.md)).

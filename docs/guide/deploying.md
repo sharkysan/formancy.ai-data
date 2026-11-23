@@ -34,6 +34,16 @@ writes a script element into a page is refused, and a host page moved to
 an origin of its own (0060) needs a `connect-src` that names the server's
 ([0083](../decisions/0083-the-studio-and-the-host-page-are-served-under-a-content-security-policy-each.md)).
 
+Both pages ask search engines to leave them out, by a
+`<meta name="robots" content="noindex">` in each page, and `pnpm test:repo`
+fails when either page's source or build stops saying it. Nothing sends an
+`X-Robots-Tag`, so the pages' other files are not asked and a crawler
+that ignores the meta is not stopped; a deployment's own proxy can send
+the header beside each page's policy. The live demo on formancy.ai is the host page's demo build, and
+asks to be indexed there because its deploy drops the meta from the copy
+it serves, never from the build the stack serves
+([0177](../decisions/0177-the-examples-page-and-the-live-demo-ask-to-be-indexed-each-at-its-own-address-and-only-the-deploy-that-puts-it-there-says-so.md)).
+
 [`docs/deploy/cloudflare.md`](../deploy/cloudflare.md) puts that stack
 behind a locally-managed Cloudflare Tunnel, with Access in front of the
 studio and a second hostname on which nothing but the runtime plane's routes

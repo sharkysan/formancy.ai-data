@@ -27,7 +27,9 @@
 // formancy.ai would answer from its own site. Static assets are found
 // by the request's whole path, so the build is staged under that path in
 // apps/examples/.cloudflare, the directory the config names, with the
-// `_headers` file at its root, and the staging is removed afterwards.
+// `_headers` file at its root and the page asking to be indexed at the
+// demo's address, where its source asks to be left out
+// (scripts/indexed-page.mjs, 0177), and the staging is removed afterwards.
 //
 // Cloudflare's Workers Builds runs this on every push to main, as the
 // deploy command after `pnpm build` (.github/REPO-METADATA.md), with the API
@@ -45,6 +47,7 @@ import { dirname, join, relative } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { references, resolved } from './addresses.mjs'
 import { HASHED, headerRules, headersFile, POLICY, policyProblems } from './demo-headers.mjs'
+import { indexedPage } from './indexed-page.mjs'
 import { NOTICES_FILE } from './third-party-notices.mjs'
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -315,6 +318,28 @@ export async function buildProblems(dist, address, page = {}) {
   return problems
 }
 
+/**
+ * The build in `dist` laid out in `stage` as Workers Static Assets serve it
+ * at `address`, the one place it is served: every file under the address's
+ * path, the `_headers` file `headers` at the root, and the page as
+ * indexedPage writes it for that address, with `description` in place of
+ * its own where one is given (0177). The page is made before anything is
+ * copied, so a head the deploy cannot read stages nothing. The live
+ * demo's deploy stages its build through this too (0070).
+ */
+export function stageBuild(dist, stage, { address, headers, description }) {
+  const html = indexedPage(readFileSync(join(dist, 'index.html'), 'utf8'), { address, description })
+  const page = join(stage, new URL(address).pathname)
+  cpSync(dist, page, { recursive: true })
+  writeFileSync(join(page, 'index.html'), html)
+  writeFileSync(join(stage, '_headers'), headers)
+}
+
+/** The examples page's build in `dist`, staged in `stage` for the Worker `config` names, at its address with its headers and its own description. */
+export function stageDemo(dist, stage, config) {
+  stageBuild(dist, stage, { address: demoUrl(config), headers: headersFile(headerRules(demoBase(config))) })
+}
+
 async function main(args) {
   const unknown = args.filter((arg) => arg !== '--dry-run')
   if (unknown.length > 0) throw new Error(`unknown argument ${unknown.join(' ')}; usage: node scripts/demo.mjs [--dry-run]`)
@@ -332,11 +357,9 @@ async function main(args) {
   if (built.length > 0) throw new Error(`the build is not the demo's:\n  ${built.join('\n  ')}`)
   const commit = run('git', ['rev-parse', 'HEAD'])
   const stage = join(app, STAGE)
-  const base = demoBase(config)
   rmSync(stage, { recursive: true, force: true })
   try {
-    cpSync(dist, join(stage, base), { recursive: true })
-    writeFileSync(join(stage, '_headers'), headersFile(headerRules(base)))
+    stageDemo(dist, stage, config)
     const deploy = [
       '--yes',
       WRANGLER,
