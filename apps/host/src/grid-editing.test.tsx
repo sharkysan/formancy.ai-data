@@ -1,14 +1,32 @@
+import { encodeKeyToken } from '@formancy/data-core'
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import { computeAccessibleDescription } from 'dom-accessibility-api'
 import { CHECK_IT, SAVE_WAITED, STALE_KEPT } from './grid-edit.js'
 import { focusedName, paragraphs } from './test-accessible.js'
-import { answer, chooseForm, chooseRenderer, control, gridSection, gridStatus, mount, notice, paper, searchRecords, signIn, stamp } from './test-host.js'
+import {
+  answer,
+  chooseCustomer,
+  chooseForm,
+  chooseRenderer,
+  control,
+  gridSection,
+  gridStatus,
+  mount,
+  notice,
+  paper,
+  RENDERERS,
+  save,
+  searchRecords,
+  signIn,
+  stamp,
+  unsavedNotice,
+} from './test-host.js'
 import type { RendererName, User } from './test-host.js'
 import { holdingWrites, losingWrites } from './test-network.js'
 import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
 import type { Engine, Plane } from './test-plane.js'
-import { DECLINING } from './test-values.js'
+import { DECLINING, SECOND_CUSTOMER } from './test-values.js'
 import { DECLINED_BY } from './words.js'
 
 /*
@@ -102,10 +120,11 @@ async function stored(formId: string, token: string): Promise<Record<string, unk
 
 /**
  * The page through `fetch`, signed in as tenant 1's clerk, the order form
- * chosen in `renderer`, the Records grid searched for `tokens` by their
- * notes, and the first of them opened by a press on its row.
+ * chosen in `renderer` -- or in both -- the Records grid searched for
+ * `tokens` by their notes, and the first of them opened by a press on its
+ * row.
  */
-async function openedIn(renderer: RendererName, formId: string, notes: string, tokens: readonly string[], fetch = plane.fetch): Promise<User> {
+async function openedIn(renderer: RendererName | 'Both', formId: string, notes: string, tokens: readonly string[], fetch = plane.fetch): Promise<User> {
   const user = mount(fetch)
   await signIn(user, TOKENS.clerk)
   await chooseForm(user, formId)
@@ -113,7 +132,7 @@ async function openedIn(renderer: RendererName, formId: string, notes: string, t
   await searchRecords(user, notes, tokens.map(keyOf))
   await user.click(cellOf(tokens[0] as string, 'id'))
   await screen.findByRole('heading', { level: 3, name: `Order ${tokens[0] as string}` }, ARRIVES)
-  await within(paper(renderer)).findByRole('combobox', { name: 'Customer' }, ARRIVES)
+  for (const each of renderer === 'Both' ? RENDERERS : [renderer]) await within(paper(each)).findByRole('combobox', { name: 'Customer' }, ARRIVES)
   return user
 }
 
@@ -130,6 +149,7 @@ async function retype(user: User, text: string): Promise<void> {
 }
 
 const listed = (from: number): number => plane.sent.slice(from).filter((request) => request.path.endsWith('/records/list')).length
+const updates = (from: number): number => plane.sent.slice(from).filter((request) => request.path.endsWith('/records/update')).length
 
 describe.each(ENGINES)('the open record edited in its row on $engine', (engine: Engine) => {
   const { formId, connection } = engine
@@ -348,5 +368,146 @@ describe.each(ENGINES)('the open record edited in its row on $engine', (engine: 
     expect(update).toBeGreaterThanOrEqual(0)
     expect(read).toBeGreaterThan(update)
     expect((await stored(formId, first))['group']).toBe('Spaced')
+  })
+
+  // A save touches every field, and each renderer's error summary focuses
+  // itself when its first problem appears: Amount cleared after the row
+  // was saved -- required, then not a number -- would hand the keyboard to
+  // the summary and end the edit under the person typing, the rest of what
+  // they typed lost. The keyboard stays in the editor, which says the
+  // problem.
+  test.each(RENDERERS)('in %s, a cell retyped after the row was saved keeps the keyboard in its editor, its problem said there', async (renderer) => {
+    const notes = stamp('cleared')
+    const [token] = (await freshOrders(formId, notes)) as [string]
+    const user = await openedIn(renderer, formId, notes, [token])
+    await edit(user, token, 'group', 'Group')
+    await retype(user, 'Saved once')
+    await user.keyboard('{Enter}')
+    await waitFor(() => expect(line()).toBe(`Saved Order ${token}.`), ARRIVES)
+    await edit(user, token, 'amount', 'Amount')
+    await retype(user, 'abc')
+    await within(paper(renderer)).findByRole('heading', { name: 'There is 1 problem to fix' }, ARRIVES)
+    await waitFor(() => expect(focusedName()).toBe(`Amount, Order ${token}`), ARRIVES)
+    const editor = document.activeElement as HTMLInputElement
+    expect(editor.value).toBe('abc')
+    expect(editor.getAttribute('aria-invalid')).toBe('true')
+    expect(computeAccessibleDescription(editor)).not.toBe('')
+  })
+
+  // The form's Save of a row the grid edited is the row's save: Space on
+  // another row while it is out waits for its answer -- a save sent beside
+  // it would be refused as busy, the row said Not saved while the first
+  // stores, and the press lost -- and opens that row once it stored.
+  test('the form’s Save of a row the grid edited holds another row until its answer', async () => {
+    const notes = stamp('form-held')
+    const [first, second] = (await freshOrders(formId, notes, 2)) as [string, string]
+    const holding = holdingWrites(plane.fetch)
+    const user = await openedIn('React', formId, notes, [first, second], holding.fetch)
+    await edit(user, first, 'group', 'Group')
+    await retype(user, 'Held by the form')
+    await save(user, 'React')
+    await waitFor(() => expect(holding.held).toHaveLength(1), ARRIVES)
+    cellOf(second, 'group').focus()
+    await user.keyboard(' ')
+    expect(screen.queryByRole('heading', { level: 3, name: `Order ${second}` })).toBeNull()
+    expect(markOf(first)).not.toBe('Not saved')
+    expect(holding.held).toHaveLength(1)
+    holding.answer()
+    await screen.findByRole('heading', { level: 3, name: `Order ${second}` }, ARRIVES)
+    expect((await stored(formId, first))['group']).toBe('Held by the form')
+  })
+
+  // A cell typed in and given up with Escape leaves the row as the grid
+  // had it: not edited, so leaving it sends nothing, and what was typed in
+  // the record's form alone is asked about by the guard, as it always is.
+  test('a cell given up with Escape leaves the form’s own typing to the guard, nothing sent', async () => {
+    const notes = stamp('escaped')
+    const [first, second] = (await freshOrders(formId, notes, 2)) as [string, string]
+    const user = await openedIn('React', formId, notes, [first, second])
+    await answer(user, 'React', 'Notes', `${notes} typed in the form`)
+    await edit(user, first, 'group', 'Group')
+    await user.keyboard('x{Escape}')
+    await waitFor(() => expect(document.activeElement).toBe(cellOf(first, 'group')), ARRIVES)
+    const before = plane.sent.length
+    cellOf(second, 'group').focus()
+    await user.keyboard(' ')
+    await waitFor(() => expect(unsavedNotice()).not.toBeNull(), ARRIVES)
+    expect(updates(before)).toBe(0)
+    expect(screen.queryByRole('heading', { level: 3, name: `Order ${second}` })).toBeNull()
+  })
+
+  // Only the open row holds a draft: a row whose save did not store is
+  // never left by sending it again, nor silently -- leaving it asks the
+  // unsaved-changes question, whose discard opens the other record.
+  test('a row whose save did not store is left through the unsaved-changes question, nothing sent again', async () => {
+    const notes = stamp('not-stored')
+    const [first, second] = (await freshOrders(formId, notes, 2)) as [string, string]
+    const user = await openedIn('React', formId, notes, [first, second])
+    await edit(user, first, 'group', 'Group')
+    await retype(user, 'Kept')
+    const read = await plane.clerk.read(formId, first)
+    if (!read.ok) throw new Error(read.message)
+    await plane.clerk.update(formId, { record: first, version: read.value.version ?? '', answers: { notes: `${notes} changed` } })
+    await user.keyboard('{Enter}')
+    await waitFor(() => expect(markOf(first)).toBe('Not saved'), ARRIVES)
+    const before = plane.sent.length
+    cellOf(second, 'group').focus()
+    await user.keyboard(' ')
+    await waitFor(() => expect(unsavedNotice()).not.toBeNull(), ARRIVES)
+    expect(updates(before)).toBe(0)
+    await user.click(within(unsavedNotice() as HTMLElement).getByRole('button', { name: 'Discard and continue' }))
+    await screen.findByRole('heading', { level: 3, name: `Order ${second}` }, ARRIVES)
+    expect(updates(before)).toBe(0)
+    expect((await stored(formId, first))['group']).not.toBe('Kept')
+  })
+
+  // A double click is F2's: on another row's cell it opens that record --
+  // its two clicks asking for the row as a press does -- and edits the cell
+  // once it is read; on the open row it edits at once.
+  test('a double click edits a cell as F2 does, on another row once it is open and on the open row', async () => {
+    const notes = stamp('double')
+    const [first, second] = (await freshOrders(formId, notes, 2)) as [string, string]
+    const user = await openedIn('React', formId, notes, [first, second])
+    await user.dblClick(cellOf(second, 'group'))
+    await screen.findByRole('heading', { level: 3, name: `Order ${second}` }, ARRIVES)
+    await waitFor(() => expect(focusedName()).toBe(`Group, Order ${second}`), ARRIVES)
+    await user.keyboard('{Escape}')
+    await user.dblClick(cellOf(second, 'amount'))
+    await waitFor(() => expect(focusedName()).toBe(`Amount, Order ${second}`), ARRIVES)
+  })
+
+  // Under Both the row is the React form's draft: what a cell types is in
+  // the React pane, and the Angular pane stays a draft of its own, as two
+  // panes always are (0029); the save is the React pane's.
+  test('under Both, the row is the React form’s draft, and the Angular form keeps its own', async () => {
+    const notes = stamp('both')
+    const [token] = (await freshOrders(formId, notes)) as [string]
+    const user = await openedIn('Both', formId, notes, [token])
+    await edit(user, token, 'group', 'Group')
+    await retype(user, 'Both')
+    await waitFor(() => expect(control('React', 'Group').value).toBe('Both'), ARRIVES)
+    await user.keyboard('{Enter}')
+    await waitFor(() => expect(line()).toBe(`Saved Order ${token}.`), ARRIVES)
+    expect((await stored(formId, token))['group']).toBe('Both')
+    expect(control('Angular', 'Group').value).toBe('')
+  })
+
+  // A lookup changed in the record's form is the row's answer at once,
+  // shown by its token: its label is the page's, of the answer listed.
+  // Once the row's save stored, the label is asked for and drawn.
+  test('a lookup changed in the form shows its token in the row, and its label once the row’s save stored', async () => {
+    const notes = stamp('label')
+    const [token] = (await freshOrders(formId, notes)) as [string]
+    const user = await openedIn('React', formId, notes, [token])
+    expect(cellOf(token, 'customer').textContent).toBe('Muster AG')
+    await chooseCustomer(user, 'React', 'Zweite', SECOND_CUSTOMER.name)
+    const chosen = encodeKeyToken(['1', String(SECOND_CUSTOMER.no)])
+    if (!chosen.ok) throw new Error(chosen.message)
+    await waitFor(() => expect(cellOf(token, 'customer').textContent).toBe(chosen.token), ARRIVES)
+    await edit(user, token, 'group', 'Group')
+    await retype(user, 'Relabelled')
+    await user.keyboard('{Enter}')
+    await waitFor(() => expect(line()).toBe(`Saved Order ${token}.`), ARRIVES)
+    await waitFor(() => expect(cellOf(token, 'customer').textContent).toBe(SECOND_CUSTOMER.name), ARRIVES)
   })
 })

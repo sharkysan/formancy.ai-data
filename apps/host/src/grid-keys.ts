@@ -29,7 +29,9 @@ import type { GridRow } from './grid-datasource.js'
  *   -- an editor takes every key typed in it (cell-editors.tsx). Typing a
  *   character starts nothing, since `=` is the filter's (0133) and a screen
  *   reader's quick keys would edit by accident; Delete and Backspace clear
- *   nothing; and no key sends anything.
+ *   nothing; and no key sends anything but one that leaves a row the grid
+ *   edited -- an arrow to another row, Space or Enter there -- which saves
+ *   that row as the form's Save does first (use-grid-edit.ts).
  * - **A row's Delete and its box take their own keys.** Space and Enter on
  *   a row's Delete press it (delete-column.tsx, 0053), in every layout,
  *   never the row's. Space on a row's box ticks it (choose-column.tsx, 0166),

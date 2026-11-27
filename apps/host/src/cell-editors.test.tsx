@@ -5,11 +5,14 @@ import { userEvent } from '@testing-library/user-event'
 import { AgGridReact } from 'ag-grid-react'
 import { useMemo, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
+import { parsePath } from '@formancy/core'
 import { createDataClient } from '@formancy/data-client'
 import type { FormRecord, PublishedForm } from '@formancy/data-client'
+import { ErrorSummary, FormancyProvider } from '@formancy/react'
 import type { FormSchema } from '@formancy/spec'
 import { useAfterRender } from './after-render.js'
 import type { ArrangedColumn } from './columns.js'
+import { DELETE_COLUMN } from './delete-column.js'
 import type { MasterOpen } from './detail.js'
 import { CHECK_IT } from './grid-edit.js'
 import type { GridRow } from './grid-datasource.js'
@@ -100,14 +103,22 @@ const ROWS: GridRow[] = RECORDS.map((each) => ({ id: each.record ?? '', record: 
 
 const words = (said: Said): string => said.map((part) => (typeof part === 'string' ? part : part.code)).join('')
 
-/** What the page around the grid was told: each sentence on the grid's line, and each time the record was shown. */
+/** What the page around the grid was told: each sentence on the grid's line, each time the record was shown, and each row a Delete was pressed on. */
 interface Told {
   line: string[]
   shown: number
+  deletes: (string | null)[]
+}
+
+/** What a case adds to the page: Drill down, each row's Delete, and the record's form's error summary over its engine. */
+interface Page {
+  drilling?: boolean
+  remove?: boolean
+  summary?: boolean
 }
 
 /** The grid of the two rows, the first record open in a real session, the page's edit over it. */
-function Grid({ told, session }: { told: Told; session: ReturnType<typeof createSession> }): ReactElement {
+function Grid({ told, session, page }: { told: Told; session: ReturnType<typeof createSession>; page: Page }): ReactElement {
   const openRef = useRef<MasterOpen>({ kind: 'record', token: 'k1:1' })
   const handle = useRef<RecordGridHandle | null>({ tell: (said: Said) => void told.line.push(words(said)) } as unknown as RecordGridHandle)
   const after = useAfterRender()
@@ -118,7 +129,7 @@ function Grid({ told, session }: { told: Told; session: ReturnType<typeof create
     title: 'Order',
     columns: COLUMNS,
     renderer: 'react',
-    drilling: false,
+    drilling: page.drilling === true,
     sessions: [session],
     openRef,
     openToken: 'k1:1',
@@ -141,7 +152,7 @@ function Grid({ told, session }: { told: Told; session: ReturnType<typeof create
         },
         resized: () => {},
         asked: () => {},
-        drilling: () => false,
+        drilling: () => page.drilling === true,
         sorted: () => {},
         widthsSet: () => {},
         example: () => {},
@@ -155,7 +166,19 @@ function Grid({ told, session }: { told: Told; session: ReturnType<typeof create
     }),
   )
   // Made once, as record-grid.tsx makes them: a new datasource would list the rows again.
-  const columnDefs = useMemo(() => columnDefsOf(COLUMNS, undefined, new Set(), [], new Map(), undefined, edit), [edit])
+  const columnDefs = useMemo(
+    () =>
+      columnDefsOf(
+        COLUMNS,
+        page.remove === true ? { noun: 'Order', press: (row) => void told.deletes.push(row.record) } : undefined,
+        new Set(),
+        [],
+        new Map(),
+        undefined,
+        edit,
+      ),
+    [edit, page.remove, told],
+  )
   const [datasource] = useState(() => ({
     getRows: (params: { successCallback: (rows: GridRow[], last: number) => void }) => params.successCallback(ROWS, ROWS.length),
   }))
@@ -165,17 +188,22 @@ function Grid({ told, session }: { told: Told; session: ReturnType<typeof create
       <div style={{ width: 900, height: 300 }}>
         <AgGridReact<GridRow> gridOptions={options} columnDefs={columnDefs} datasource={datasource} />
       </div>
+      {page.summary === true ? (
+        <FormancyProvider engine={session.opened().engine}>
+          <ErrorSummary />
+        </FormancyProvider>
+      ) : null}
     </main>
   )
 }
 
-function mount(): { told: Told; session: ReturnType<typeof createSession> } {
+function mount(page: Page = {}): { told: Told; session: ReturnType<typeof createSession> } {
   document.title = 'Records'
   document.documentElement.lang = 'en'
-  const told: Told = { line: [], shown: 0 }
+  const told: Told = { line: [], shown: 0, deletes: [] }
   const session = createSession({ client, formId: 'orders', definition: DEFINITION, renderer: 'react' })
   session.open(RECORDS[0])
-  render(<Grid told={told} session={session} />)
+  render(<Grid told={told} session={session} page={page} />)
   return { told, session }
 }
 
@@ -346,5 +374,92 @@ describe('an editor in the open row, without a server (0179)', () => {
     expect(editor.getAttribute('aria-invalid')).toBe('true')
     expect(computeAccessibleDescription(editor)).not.toBe('')
     expect(await audit()).toEqual([])
+  })
+
+  // A save -- the row's, or the form's Save -- touches every field, and the
+  // form's error summary focuses itself when its first problem appears; so
+  // after one, a keystroke that makes a field wrong would hand the keyboard
+  // to the summary, and AG Grid would end the edit under the person typing.
+  // The keyboard stays in the editor, which says the problem.
+  test('a problem a keystroke makes after a save keeps the keyboard in the editor, described', async () => {
+    const { session } = mount({ summary: true })
+    const user = userEvent.setup()
+    // Every field touched, as a save leaves them: the summary is empty, every answer being right.
+    expect(session.opened().engine.submit().ok).toBe(true)
+    ;(await cellOf('1', 'amount')).focus()
+    await user.keyboard('{F2}')
+    await waitFor(() => expect(focusedName()).toBe('Amount, Order k1:1'))
+    await user.keyboard('x')
+    await screen.findByRole('heading', { name: 'There is 1 problem to fix' })
+    await waitFor(() => expect(focusedName()).toBe('Amount, Order k1:1'))
+    const editor = document.activeElement as HTMLInputElement
+    expect(editor.value).toBe('12.5000x')
+    expect(editor.getAttribute('aria-invalid')).toBe('true')
+    expect(computeAccessibleDescription(editor)).not.toBe('')
+    await user.keyboard('{Backspace}')
+    expect(answersOf(session)['amount']).toBe('12.5000')
+  })
+
+  // Escape gives a cell's typing up, and the row's state with it: a row the
+  // grid had not edited is not edited, so leaving it sends nothing -- the
+  // typing made in the form alone is the form's Save's, through the guard --
+  // and a row whose save did not store still says so.
+  test('Escape gives the row back as it was: leaving it saves nothing, and its mark stays', async () => {
+    const { told, session } = mount()
+    const user = userEvent.setup()
+    // Typed in the record's form, which is the same engine.
+    session.opened().engine.setValue(parsePath('notes'), 'typed in the form')
+    ;(await cellOf('1', 'group')).focus()
+    await user.keyboard('{F2}')
+    await waitFor(() => expect(focusedName()).toBe('Group, Order k1:1'))
+    await user.keyboard('x{Escape}')
+    await waitFor(async () => expect(document.activeElement).toBe(await cellOf('1', 'group')))
+    await user.keyboard('{ArrowDown}')
+    await waitFor(async () => expect(document.activeElement).toBe(await cellOf('2', 'group')))
+    expect(told.line).not.toContain('Saving Order k1:1…')
+    expect(answersOf(session)['notes']).toBe('typed in the form')
+
+    // Saved -- lost by the network -- it may have been saved; a cell typed in and given up leaves it saying so.
+    ;(await cellOf('1', 'group')).focus()
+    await user.keyboard('{F2}')
+    await waitFor(() => expect(focusedName()).toBe('Group, Order k1:1'))
+    await user.keyboard('y{Enter}')
+    await waitFor(async () => expect((await cellOf('1', 'id')).textContent).toBe('1May have been saved'))
+    await user.keyboard('{F2}')
+    await waitFor(() => expect(focusedName()).toBe('Group, Order k1:1'))
+    await user.keyboard('z{Escape}')
+    await waitFor(async () => expect(document.activeElement).toBe(await cellOf('1', 'group')))
+    expect((await cellOf('1', 'id')).textContent).toBe('1May have been saved')
+  })
+
+  // A double click is F2's: on a cell the row edits, its editor; on one
+  // never edited, why. On a row's Delete it is the button's two presses
+  // and no edit, as on a row's box: a column of the page's own holds no
+  // field.
+  test('a double click starts an edit as F2 does, and on a row’s Delete edits nothing', async () => {
+    const { told } = mount({ remove: true })
+    const user = userEvent.setup()
+    await user.dblClick(await cellOf('1', 'group'))
+    await waitFor(() => expect(focusedName()).toBe('Group, Order k1:1'))
+    await user.keyboard('{Escape}')
+    await user.dblClick(await cellOf('1', 'id'))
+    await waitFor(() => expect(told.line).toContain('Id is not written from this form.'))
+    const said = told.line.length
+    await user.dblClick(within(await cellOf('1', DELETE_COLUMN)).getByRole('button', { name: 'Delete Order k1:1' }))
+    expect(told.deletes).toEqual(['k1:1', 'k1:1'])
+    expect(screen.queryByRole('textbox', { name: /, Order k1:1$/ })).toBeNull()
+    expect(told.line).toHaveLength(said)
+  })
+
+  // In Drill down a record opened goes down a level and the grid is
+  // hidden, so a cell edited in the grid would be edited where nobody sees
+  // it: every cell is the record's form's there, F2 showing the record.
+  test('in Drill down F2 edits every cell in the record’s form', async () => {
+    const { told } = mount({ drilling: true })
+    const user = userEvent.setup()
+    ;(await cellOf('1', 'group')).focus()
+    await user.keyboard('{F2}')
+    await waitFor(() => expect(told.shown).toBe(1))
+    expect(screen.queryByRole('textbox', { name: 'Group, Order k1:1' })).toBeNull()
   })
 })

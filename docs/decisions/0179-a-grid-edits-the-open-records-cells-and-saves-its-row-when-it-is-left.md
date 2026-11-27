@@ -36,7 +36,19 @@
   keyboard back in the invalid cell's editor, `aria-invalid` and described
   (watched failing without `CustomEditorModule` -- "error #200", no editor
   -- and again with F2 handed to no one, AG Grid's own keys let through
-  and the row's words left as they were: every case failed).
+  and the row's words left as they were: every case failed). Added there
+  after review, each watched failing before its fix or with its rule
+  taken out: a keystroke that makes a problem once a save has touched
+  every field keeps the keyboard in its editor, described, the form's
+  error summary drawn beside the grid (failing: the keyboard on the
+  summary, the editor gone); Escape gives the row's state back, so
+  leaving the row sends nothing the form alone typed and a lost save's
+  mark stays (failing: "Saving Order k1:1…" sent); a double click edits a
+  cell as F2 does, and on a row's Delete presses it and edits nothing
+  (failing with the double click handed to no one); in Drill down F2
+  shows the record (failing with that rule taken out); and, in
+  `grid-edit.test.ts`, leaving waits for the form's Save of a row the
+  grid edited (failing: "save" where "wait" was wanted).
   `apps/host/src/session-work.test.ts`, `widgets.test.ts`,
   `grid-theme.test.ts`, `choose-column.test.tsx` and `grid-widths.test.tsx`
   ran and pass, the copies taken out of `session.ts` into
@@ -52,8 +64,16 @@
   a declined save in the deployment's words, record-wide and on a field
   the form edits; a refused save in the server's sentence; a lost one
   saying it may have been saved; a save out holding F2 and another row
-  until its answer; and Space on another row saving the edited row first,
-  the update sent before the other record's read.
+  until its answer; Space on another row saving the edited row first,
+  the update sent before the other record's read; a cell retyped after
+  the row was saved keeping the keyboard in its editor, in both
+  renderers; the form's Save of a row the grid edited holding Space on
+  another row until it stored; a cell given up with Escape leaving what
+  the form alone typed to the guard, nothing sent; a row not stored left
+  through the unsaved-changes question, nothing sent again; a double
+  click on another row opening it to edit; under Both, the React form's
+  draft alone; and a lookup changed in the form shown by its token in the
+  row, and by its label once the row's save stored.
   `apps/host/src/in-flight.test.tsx` -- a save the grid sent is the form's:
   its Save is busy while it is out, F2 waits, the floor holds, and it is
   stored once. `apps/host/src/grid-keys.test.tsx` -- F2 says why on Id,
@@ -64,7 +84,8 @@
   `apps/host/scripts/browser/editing.mjs`, in Chromium, Firefox and WebKit
   -- the editor in the well, axe passing it while it is open, Shift+Tab
   and Tab, Enter saving with the keyboard on the cell, Escape, and a stale
-  save marked on its row.
+  save marked on its row, axe passing the page with the mark drawn and
+  its contrast decided.
 
 ## Context
 
@@ -101,13 +122,20 @@ in the row in place with no page read again.
 - **One draft, one truth.** The row and the form are the same answers, so
   nothing merges and the guard counts the row's typing as the form's. A
   save from either is the same create and update plan, route and outcomes
-  (0015, 0029); the form's Save and the row's are each other's busy.
+  (0015, 0029); the form's Save and the row's are each other's busy, and
+  while the form's Save of a row the grid edited is out, another row asked
+  for waits for its answer as it waits for the row's own.
 - **The keyboard path is as before** -- arrows, Space, Enter, `=`, one Tab
   stop -- with F2 added. Typing a character starts nothing, since `=` is
   the filter's (0133) and a screen reader's quick keys would edit by
   accident; Delete and Backspace clear nothing. AG Grid's live region says
   "F2 edits it", or "F2 edits it in the record's form", after what Space
-  and Enter do.
+  and Enter do. Escape gives a cell's typing up and the row's state with
+  it, so a row whose only typing in its cells was given up is not saved
+  by leaving it. An editor keeps the keyboard while it is open: the
+  renderer's error summary, which focuses itself when a first problem
+  appears -- as a keystroke can make one once a save has touched every
+  field -- gives it back, and the editor's description says the problem.
 - **What it costs.** Every row entered by F2 is a read of the record before
   its editor opens, so an edit starts a beat after the key. Only the open
   row holds a draft: a row a save did not store is left only by mending it,
@@ -123,7 +151,12 @@ in the row in place with no page read again.
   edited in the form, the grid being hidden once a record opens there.
   Child sections' grids, Drill down levels and the together tab are not
   edited in cells, a new record is not a row (a later record's), and there
-  is no copy and paste, fill or undo past Escape.
+  is no copy and paste, fill or undo past Escape. While a cell is in edit
+  the form's error summary holds the keyboard for a moment only, so a
+  screen reader may begin to say it before the editor is said again; and
+  a press on the summary's own region, not on one of its links, gives the
+  keyboard back to the editor too. While the form's Save of a row the
+  grid edited is out, the row does not say Saving…: the pane does.
 - **What it forecloses.** A grid holding drafts of several records at once,
   each saved on its own: the guard would have to count rows, and a form
   open on one of them would be a second draft of it to keep apart.

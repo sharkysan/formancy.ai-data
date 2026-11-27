@@ -22,6 +22,11 @@ import type { CellEditor } from './grid-edit.js'
  *   Enter are handed to the page, which saves the row where they leave it
  *   (use-grid-edit.ts), and Escape puts back what the field held when the
  *   edit began and ends the edit, the row's other changes kept.
+ * - **Its keyboard is its own** while it is open: the record's form's
+ *   error summary, which focuses itself when a first problem appears --
+ *   as a keystroke here can make one, after a save touched every field --
+ *   gives it back, and AG Grid never hears it leave. A press on the
+ *   summary's region itself, not one of its links, gives it back too.
  * - **Named for its field and record**: "Status, Order k1:9". Invalid --
  *   by the engine or by the server, once a save has said so -- it is
  *   `aria-invalid`, described by the form's own sentence for each problem,
@@ -71,6 +76,9 @@ function look(invalid: boolean): CSSProperties {
     borderRadius: '4px',
   }
 }
+
+/** The region a renderer's error summary focuses, in both renderers: the part a theme dresses it by. */
+const SUMMARY = '[data-formancy-part="error-summary"]'
 
 /** A checkbox: 24 pixels square, the least target WCAG 2.5.8 asks, in the violet a person acts with -- a row's box's look. */
 const BOX_LOOK: CSSProperties = { width: '24px', height: '24px', margin: '6px 0 0', accentColor: 'var(--client)', cursor: 'pointer' }
@@ -123,10 +131,22 @@ function Editor({ edit, field, engine, editor }: { edit: CellEditing; field: str
       if (key === 'cancel') edit.put(field, start.current)
       edit.key(field, key)
     }
+    const onLeave = (event: FocusEvent): void => {
+      // The record's form's error summary focuses itself when its first problem appears, and a keystroke here can be what makes it --
+      // after a save, which touches every field. AG Grid, which ends an edit whose cell loses the keyboard, never hears it go, and the
+      // keyboard comes back here once the summary has taken it: this editor's description says the problem.
+      if (!(event.relatedTarget instanceof Element) || !event.relatedTarget.matches(SUMMARY)) return
+      event.stopPropagation()
+      queueMicrotask(() => {
+        if (element.isConnected) element.focus()
+      })
+    }
     element.addEventListener('keydown', onKey)
+    element.addEventListener('focusout', onLeave)
     element.focus()
     return () => {
       element.removeEventListener('keydown', onKey)
+      element.removeEventListener('focusout', onLeave)
       edit.closed(field)
     }
   }, [edit, field])

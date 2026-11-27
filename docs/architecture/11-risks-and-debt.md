@@ -609,8 +609,10 @@ Load the saved record or the unsaved-changes question; a textarea, a
 time, a timestamp and a lookup edited in the record's form, a date typed
 as text, and a lookup changed there shown by its token in the row until
 the row's save asks for its label; under Both the React form's draft
-alone, in Drill down every cell the form's, and no child section's grid,
-Drill down level or together tab edited in cells
+alone, in Drill down every cell the form's, no child section's grid,
+Drill down level or together tab edited in cells, and, while a cell is in
+edit, the form's error summary holding the keyboard for a moment only,
+which a screen reader may begin to say before the editor again
 ([0179](../decisions/0179-a-grid-edits-the-open-records-cells-and-saves-its-row-when-it-is-left.md)).
 An action over the open record is offered in its detail alone, never a
 child row's or a Drill down level's; every run asks a

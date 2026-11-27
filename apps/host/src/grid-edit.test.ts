@@ -23,7 +23,7 @@ import type { DrawnField } from './grid-edit.js'
 
 /*
  * Which of a grid's cells a person edits there, which in the record's form
- * and which never, and why (0179, the rules of its 2.2) -- read from the
+ * and which never, and why (0179) -- read from the
  * very copy a pane draws the record with (drawn-copies.ts), so a grid and
  * a form can never disagree about what a person may write; a row's states
  * and its mark; when leaving a row saves it; and where Tab goes in an
@@ -191,7 +191,7 @@ describe('which cells are edited in the grid, which in the form, and which never
     expect(how('status', {}, { ...SAVED, answers: { status: 'shipped' } })).toEqual({ kind: 'never', why: 'Status cannot move from Shipped.' })
   })
 
-  // A computed field's value is the form's rule's (0181): a cell that took it would be overwritten.
+  // A computed field's value is the form's rule's (formancy.ai 0181): a cell that took it would be overwritten.
   test('a computed field is never edited', () => {
     expect(how('total')).toEqual({ kind: 'never', why: "Total is worked out by the record's form." })
   })
@@ -233,14 +233,20 @@ describe("a row's states, its mark and when leaving it saves (0179)", () => {
   })
 
   // Leaving saves only what the grid edited and still differs; a save out
-  // holds the move until its answer; a refused row is left through the
-  // guard, as today, never by saving it again unchanged.
+  // holds the move until its answer -- the form's Save of a row the grid
+  // edited among them, which is the row's save, so a second sent beside it
+  // would be refused as busy and the move lost; a refused row is left
+  // through the guard, as today, never by saving it again unchanged, and a
+  // row the grid did not edit goes to the guard whatever the form's Save is
+  // doing.
   test('leaving a row saves what the grid edited, waits for a save out, and otherwise goes', () => {
     expect(leaving({ kind: 'edited' }, true)).toBe('save')
     expect(leaving({ kind: 'edited' }, false)).toBe('go')
     expect(leaving({ kind: 'clean' }, true)).toBe('go')
     expect(leaving({ kind: 'saving' }, true)).toBe('wait')
     expect(leaving({ kind: 'refused', outcome: 'stale', message: '' }, true)).toBe('go')
+    expect(leaving({ kind: 'edited' }, true, true)).toBe('wait')
+    expect(leaving({ kind: 'clean' }, true, true)).toBe('go')
   })
 
   // Tab and Shift+Tab move among the row's editable cells shown, in their

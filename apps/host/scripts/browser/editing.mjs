@@ -1,8 +1,11 @@
 // The open record edited in its row of the Records grid (0179), in the
 // browser, on the order form: a cell of the open row in edit, its row saved
 // from the keyboard and its row not saved -- each measured by the gate's
-// `measured` on the way, axe's colour contrast and target size over the
-// editor and the row's mark among it -- and what only a real browser shows:
+// `measured` on the way, and axe, colour contrast and target size among
+// it, run inside two of them over what the measure after would no longer
+// see: the editor while it is open, and the row's Not saved mark while it
+// is drawn, its contrast decided as the measure decides a grid's text --
+// and what only a real browser shows:
 // F2 putting the keyboard in an editor of the page's own, named for its
 // field and record, inside the grid's well; Shift+Tab and Tab moving it
 // among the row's editable cells, past the one the record's form edits;
@@ -27,7 +30,7 @@
 // scripts/browsers.mjs's FACTS and held by one check in every browser
 // (0058).
 
-import { audit, describeFocus, focusedOn, until, WITHIN } from './measure.mjs'
+import { audit, decide, describeFocus, focusedOn, until, WITHIN } from './measure.mjs'
 import { FORM } from './plane.mjs'
 import { carryOn } from './workspace.mjs'
 
@@ -132,6 +135,17 @@ export function editingJourney(plane, gate, run) {
           said.endsWith('Load the saved record in its notice discards them.') ? null : `it says "${said}"`,
         )
         check('and the keyboard stays on the cell, the record’s notice taking none of it', await focusedOn(page, cellOf(page, at.record, 'group')))
+        // Audited while the row says Not saved: the measure after this state comes once Load the saved record has taken the mark away.
+        const marked = await audit(page)
+        gate.axe(marked.axe)
+        check('a row not saved, its mark drawn: axe finds nothing at WCAG 2.2 AA', marked.violations.length === 0 ? null : marked.violations.join('; '))
+        const decided = await decide(page, marked.undecided)
+        const short = [
+          ...decided.left.slice(0, 4).map((each) => `undecided: ${each}`),
+          ...decided.failing.map((entry) => `${entry.name} ${String(entry.ratio)}:1`),
+          ...decided.selectsFailing.slice(0, 4),
+        ]
+        check('and the contrast of every text decided, the grids’ on the pixels at 4.5:1 or more', short.length === 0 ? null : short.join('; '))
         // The draft discarded, as the notice offers: the next states begin from the orders' Records with nothing unsaved.
         const notice = page.getByRole('region', { name: /^(React|Angular) Not saved$/ }).first()
         await notice.getByRole('button', { name: 'Load the saved record', exact: true }).click()

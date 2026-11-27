@@ -144,7 +144,8 @@
 //     on its cell, the line saying so and the database holding it; Escape
 //     gives the cell's edit up; and a stale save says Not saved in the
 //     row's first cell and on the line that its changes are kept, the
-//     keyboard still on the cell;
+//     keyboard still on the cell, axe passing the page with that mark
+//     drawn and its contrast decided;
 //   - a grid's Columns (0106): Enter on Columns opens its panel and keeps
 //     the keyboard there, the next Tab on the first column's Show; Space on
 //     a Show hides its column and asks the server nothing, and a column

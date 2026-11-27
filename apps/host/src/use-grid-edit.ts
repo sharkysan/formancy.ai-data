@@ -44,7 +44,9 @@ import { DECLINED_BY } from './words.js'
  *   the next row on the page is edited in its first; before the first, and
  *   on Enter, the row is saved and the edit ends, the keyboard on the cell.
  *   Escape puts the cell back and ends the edit, the row's other changes
- *   kept.
+ *   kept and its state as the editor began: a row the grid had not edited
+ *   is not edited, so leaving it saves nothing the form alone typed, and a
+ *   row not saved still says so.
  * - **A row is saved when it is left**, where the grid edited it since it
  *   was opened or saved and its answers still differ: the keyboard or a
  *   press moving to another row, Tab past its last cell, Enter. Focus
@@ -52,7 +54,9 @@ import { DECLINED_BY } from './words.js'
  * - **While its save is out** the row says Saving…, its cells take no
  *   edit, F2 says the save is waited for, and the next row -- a press, F2
  *   or Space on another -- waits for the answer, and goes on only where the
- *   row saved. The rest of the grid moves and pages.
+ *   row saved. The form's Save of a row the grid edited is the row's save:
+ *   while it is out the next row waits for it the same way, and nothing is
+ *   sent beside it. The rest of the grid moves and pages.
  * - **Saved**, the row takes what is stored and its version in place, and
  *   no page is read, so no row moves under the keyboard: its sort places it
  *   once the page is read again. A lookup's label is asked for where the
@@ -151,6 +155,8 @@ function createGridEdit(
   let row: { token: string; generation: number; state: RowState } | null = null
   /** The field whose editor is open. */
   let editing: string | null = null
+  /** The open row's state as the editor open now began: what Escape, which gives that cell's typing up, gives back. */
+  let began: { token: string; generation: number; state: RowState } | null = null
   /** What waits for the open row's save to store: another row, opened. */
   let pending: (() => void) | null = null
   /** The record last drawn from its engine: drawn as listed again once another is open. */
@@ -251,10 +257,11 @@ function createGridEdit(
     const grid = live()
     const open = opened()
     const node = open === null ? undefined : nodeOf(open.token)
-    if (grid === null || node === undefined || !editable(node.data, field)) return
+    if (open === null || grid === null || node === undefined || !editable(node.data, field)) return
     grid.ensureIndexVisible(rowIndex)
     grid.setFocusedCell(rowIndex, field)
     editing = field
+    began = { token: open.token, generation: open.generation, state: stateNow() }
     grid.startEditingCell({ rowIndex, colKey: field })
   }
 
@@ -326,7 +333,11 @@ function createGridEdit(
     if (open === null) return
     setState(settled(result))
     if (result?.kind === 'saved' || result?.kind === 'created') {
-      if (from === 'form') return
+      // Stored by the form's Save, for which the page is read again: a row asked for while it was out goes on now.
+      if (from === 'form') {
+        go?.()
+        return
+      }
       stored(open)
       tell(outcomeSaid(result, { noun: now().title, token: open.token, declinedBy: DECLINED_BY }).said, 'stored')
       go?.()
@@ -375,7 +386,7 @@ function createGridEdit(
       go()
       return
     }
-    const decision = leaving(stateNow(), open.session.changed())
+    const decision = leaving(stateNow(), open.session.changed(), open.session.isSaving())
     if (decision === 'go') go()
     else if (decision === 'wait') pending = go
     else void save(go)
@@ -424,8 +435,12 @@ function createGridEdit(
     const node = open === null ? undefined : nodeOf(open.token)
     const rowIndex = node?.rowIndex
     if (open === null || node === undefined || rowIndex === null || rowIndex === undefined) return
-    const leaves = (): boolean => leaving(stateNow(), open.session.changed()) === 'save'
-    if (pressed === 'cancel') return end(rowIndex, field, true)
+    const leaves = (): boolean => leaving(stateNow(), open.session.changed(), open.session.isSaving()) === 'save'
+    if (pressed === 'cancel') {
+      // The cell's typing given up, and the row's state with it: a row the grid had not edited is not, and one not saved still says so.
+      if (began?.token === open.token && began.generation === open.generation && stateNow().kind !== 'saving') setState(began.state)
+      return end(rowIndex, field, true)
+    }
     if (pressed === 'end') {
       end(rowIndex, field, false)
       if (leaves()) void save()
@@ -466,7 +481,8 @@ function createGridEdit(
       const open = opened()
       const node = open === null ? undefined : nodeOf(open.token)
       if (open === null || node === undefined || rowIndex === null || node.rowIndex === rowIndex) return
-      if (leaving(stateNow(), open.session.changed()) === 'save') void save()
+      // The form's Save out is the row's save: its answer is the row's, and nothing is sent beside it.
+      if (leaving(stateNow(), open.session.changed(), open.session.isSaving()) === 'save') void save()
     },
     attach(made) {
       api = made

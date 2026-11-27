@@ -1462,13 +1462,19 @@ request over the choice at a time (§11).
 3. An editor of the page's own (`cell-editors.tsx`) writes each change into
    the engine, so the record's form shows it as it is typed; AG Grid holds
    no value, and with `readOnlyEdit` writes none. Tab and Shift+Tab go to
-   the row's next and previous editable cell; Escape puts the cell back.
+   the row's next and previous editable cell; Escape puts the cell back,
+   and the row's state as the editor began. The editor keeps the keyboard
+   while it is open: the renderer's error summary, which focuses itself
+   when a first problem appears, gives it back, and AG Grid never hears it
+   leave.
 4. The row is saved when it is left -- the keyboard or a press on another
    row, Tab past its last editable cell, Enter -- where the grid edited it
    and its answers still differ: the pane's own Save, sent as its Save sends
    it, the same `records/update` and outcomes, said in the pane, whose
    notice opens without taking the keyboard. While it is out the row says
-   Saving…, its cells take no edit and the next row waits for its answer.
+   Saving…, its cells take no edit and the next row waits for its answer;
+   while the form's own Save of a row the grid edited is out, the next row
+   waits for that answer the same way.
 5. Stored, the row takes what is stored and its version in place
    (`rowNode.setData`) and no page is read again; a lookup it changed is
    asked for its label. Not stored, the row's first cell says so, the line

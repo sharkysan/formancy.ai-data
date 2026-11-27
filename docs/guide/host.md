@@ -294,11 +294,16 @@ is edited in, and whether it is, is what the form draws: a field written
 on create only, one you may only read, one the database writes or a state
 with nowhere to move is never edited, and F2 there says why. In an editor
 Tab and Shift+Tab go to the row's next and previous editable cell, and
-Escape gives that cell's typing up, the row's other changes kept. The row
+Escape gives that cell's typing up, the row's other changes kept; a
+problem your typing makes is said on the editor, which keeps the
+keyboard though the form's list of problems appears. The row
 is saved when you leave it -- the keyboard or a press on another row, Tab
 past its last editable cell, Enter -- by the form's own Save, which its
 pane says; while it is out the row says Saving…, and the next row waits
-for its answer. Saved, the row shows what is stored where it is, and the
+for its answer, as it does while you have pressed the form's Save
+yourself. A row whose typing in its cells you gave up with Escape is not
+saved by leaving it: what you typed in the form alone is asked about, as
+it always is. Saved, the row shows what is stored where it is, and the
 grid says "Saved Order `k1:9`." without reading the page again, so the
 row keeps its place until the page is read. Not saved, its first cell
 says so and the grid's line why: a stale save keeps its changes, which

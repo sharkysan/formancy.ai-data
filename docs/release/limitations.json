@@ -5505,12 +5505,17 @@
       ]
     },
     "0179": {
-      "reviewed": "sha256:7f9cf3fac4644f7f3a6672dc4801f585fe64cfe3ad06047be4ab2d1c0b1eace9",
+      "reviewed": "sha256:40351131ff8b0ec6ebe766ae477a5e60ab9e920c16c8599a1b627fcd0f93a804",
       "limitations": [
         {
           "area": "host",
-          "says": "The host page's Records grid edits the open record's cells alone: F2 or a double click on another row opens that record first, a read of it before its editor opens, and typing a character starts no edit.",
+          "says": "The host page's Records grid edits the open record's cells alone: F2 or a double click on another row opens that record first, a read of it before its editor opens.",
           "heldBy": "apps/host/src/grid-editing.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "Typing a character on a cell of the Records grid starts no edit, and Delete and Backspace clear none: an edit starts on F2 or a double click alone.",
+          "heldBy": "apps/host/src/cell-editors.test.tsx"
         },
         {
           "area": "host",
@@ -5524,12 +5529,35 @@
         },
         {
           "area": "host",
-          "says": "A textarea, a time, a timestamp and a lookup are edited in the record's form rather than in their cells, a date is typed as its canonical text, and a lookup changed in the form shows its token in the row until a save of the row asks for its label.",
+          "says": "A textarea, a time, a timestamp and a lookup are edited in the record's form rather than in their cells.",
           "heldBy": "apps/host/src/grid-edit.test.ts"
         },
         {
           "area": "host",
-          "says": "Under Both renderers the grid edits the React form's draft alone, in Drill down every cell is edited in the record's form, and no child section's grid, Drill down level or together tab is edited in its cells."
+          "says": "A date is typed in its cell as its canonical text, with no date picker there."
+        },
+        {
+          "area": "host",
+          "says": "A lookup changed in the record's form shows its token in the row until a save of the row asks for its label.",
+          "heldBy": "apps/host/src/grid-editing.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "Under Both renderers the grid edits the React form's draft alone, and the Angular form keeps a draft of its own.",
+          "heldBy": "apps/host/src/grid-editing.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "In Drill down every cell of the Records grid is edited in the record's form, the grid being hidden once a record opens there.",
+          "heldBy": "apps/host/src/cell-editors.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "No child section's grid, Drill down level or together tab is edited in its cells."
+        },
+        {
+          "area": "host",
+          "says": "While a cell is in edit the record's form's error summary holds the keyboard for a moment only, so a screen reader may begin to say it before the editor is said again."
         }
       ]
     }

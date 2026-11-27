@@ -28,7 +28,8 @@ import type { SaveResult } from './session.js'
  *   words of why it is drawn so.
  * - **One draft.** The open row is the record's draft: edited by the grid
  *   since it was opened or saved, it is saved when it is left; a save out
- *   holds the next row until its answer; a row a save did not store is left
+ *   -- the row's, or the form's Save of the row the grid edited -- holds
+ *   the next row until its answer; a row a save did not store is left
  *   through the guard, as the form's draft always is.
  */
 
@@ -72,7 +73,7 @@ export const STALE_KEPT = 'Its changes are kept in the row and its form; Load th
 /** What the line adds to a save whose answer was lost (0031). */
 export const CHECK_IT = "Check it in the record's notice."
 
-/** A field's copy as its own rules draw it: a rule that holds whatever the answers -- `true` -- and a computed rule, which makes a field read-only (0181). */
+/** A field's copy as its own rules draw it: a rule that holds whatever the answers -- `true` -- and a computed rule, which makes a field read-only (formancy.ai 0181). */
 export function drawnOf(copy: FormSchema, key: string): DrawnField | undefined {
   const def = copy.model.fields.find((candidate) => candidate.key === key)
   if (def === undefined) return undefined
@@ -174,10 +175,14 @@ export function settled(result: SaveResult | null): RowState {
   return { kind: 'refused', outcome: result.kind, message: result.message }
 }
 
-/** What leaving the open row does: save it first, wait for its save's answer, or go -- through the guard, as today, where it holds work. */
-export function leaving(state: RowState, changed: boolean): 'save' | 'wait' | 'go' {
+/**
+ * What leaving the open row does: save it first, wait for its save's answer, or go -- through the guard, as today, where it holds work.
+ * `formSaving`: the form's own Save is out, which is the row's save too, so a row the grid edited waits for its answer.
+ */
+export function leaving(state: RowState, changed: boolean, formSaving = false): 'save' | 'wait' | 'go' {
   if (state.kind === 'saving') return 'wait'
-  return state.kind === 'edited' && changed ? 'save' : 'go'
+  if (state.kind !== 'edited' || !changed) return 'go'
+  return formSaving ? 'wait' : 'save'
 }
 
 /** Where Tab -- or Shift+Tab, `backwards` -- goes from the cell of `at` among the row's editable cells shown, in their order: another, or past either end. */
