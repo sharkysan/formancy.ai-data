@@ -1,5 +1,4 @@
-import { useEffect, useRef } from 'react'
-import type { CSSProperties, ReactElement } from 'react'
+import type { ReactElement } from 'react'
 import {
   ColumnApiModule,
   ColumnAutoSizeModule,
@@ -13,23 +12,17 @@ import {
   RowSelectionModule,
   ScrollApiModule,
 } from 'ag-grid-community'
-import type {
-  CellKeyDownEvent,
-  ColDef,
-  ColumnResizedEvent,
-  GridApi,
-  GridOptions,
-  ICellRendererParams,
-  IRowNode,
-  Module,
-  RowClickedEvent,
-} from 'ag-grid-community'
+import type { ColDef, ColumnResizedEvent, GridApi, GridOptions, ICellRendererParams, IRowNode, Module } from 'ag-grid-community'
 import { LIST_PAGE_SIZE } from '@formancy/data-client'
 import type { ListSortTerm } from '@formancy/data-client'
 import { CHOOSE_COLUMN } from './choose-column.js'
 import type { ArrangedColumn } from './columns.js'
+import { DELETE_COLUMN, deleteColumn } from './delete-column.js'
+import type { RowDelete } from './delete-column.js'
 import { cellText } from './grid-datasource.js'
 import type { GridRow } from './grid-datasource.js'
+import { keyOptions } from './grid-keys.js'
+import type { KeyCallbacks } from './grid-keys.js'
 import { roomGrid, ROW_HEIGHT } from './grid-theme.js'
 import { boxKeys, HeaderBox, NeverFilter } from './header-filter.js'
 import { changedWidths, headerFloor, WIDEST } from './widths.js'
@@ -40,20 +33,19 @@ import type { ColumnWidth, WidthChange } from './widths.js'
  * modules, the columns and the options, decided once here and read by
  * record-grid.tsx, which holds the grid's state -- and the two things the
  * page reads of the grid and sets on it, the open row's selection and the
- * sort the headers show.
+ * sort the headers show. What a key or a press does on the grid, and what
+ * its live region says of a row, are grid-keys.ts's.
  *
  * - **The page decides which row is open, not AG Grid.** Click selection is
- *   off and Space and Enter are held from AG Grid on every cell, so its own
- *   Space never toggles a selection -- which would deselect the open row --
- *   and the page is told of both keys and of a click instead.
- * - **One Tab stop.** Tab and Shift+Tab leave the grid; Tab into it lands on
- *   the open record's row when it is on this page.
+ *   off, and Space and Enter are the page's (grid-keys.ts), so AG Grid
+ *   never selects a row: the open record's is selected by the page
+ *   (`select`).
  * - **No AG Grid words.** No overlays, empty loading cells, and its live
- *   region says what the page does with a row.
+ *   region says what the page does with a row (grid-keys.ts).
  * - **A page no longer shown is asked for again**, never reused: one block
  *   in the cache (0022, 0029). No count is asked for, so no paging panel.
- * - **Nothing edits or moves**, so Delete and Backspace clear nothing and
- *   nothing is sent from here but the page's list. A person orders and
+ * - **Nothing edits or moves**, so nothing is sent from here but the page's
+ *   list: no cell is editable (grid-keys.ts), and a person orders and
  *   hides columns in the section's Columns panel instead (columns-panel.tsx,
  *   0106), whose every change is a key's: a header dragged has no keyboard
  *   path (formancy.ai 0046).
@@ -70,22 +62,10 @@ import type { ColumnWidth, WidthChange } from './widths.js'
  *   it could not be kept; the panel's Fit does it. A row's Delete is not
  *   resized.
  * - **A row's Delete is a real button** (0053), in a last column where the
- *   form offers delete: a cell the arrow keys reach, whose button takes the
- *   keyboard when the cell does. It is out of the Tab order, so the grid
- *   stays one stop, and its Enter and Space are its own, never the row's.
- *   It asks the page, which confirms in place; no key deletes.
- * - **A row's box is a real checkbox** (0166), in a first column where the
- *   form offers this person an action over a selection, on Delete's
- *   pattern (choose-column.tsx): its Space is its own, never the row's, so
- *   it never opens the record or deselects the open row; its Enter opens
- *   the record as any cell's does. A row with no box -- no token, or none
- *   at a version -- leaves Space to the row, which says why it cannot be
- *   opened.
- * - **What AG Grid's live region says of a row** as the keyboard reaches
- *   one of its cells is what the keys do there: on a field's cell, what
- *   Space and Enter open; on the box and on Delete, which take their own
- *   keys, what those do. `=` keeps a field's value (0133); the box and
- *   Delete hold none, so it asks nothing there.
+ *   form offers delete (delete-column.tsx), and **a row's box a real
+ *   checkbox** (0166), in a first column where the form offers this person
+ *   an action over a selection, on Delete's pattern (choose-column.tsx).
+ *   Each takes its own keys, never the row's (grid-keys.ts).
  */
 
 /**
@@ -113,52 +93,6 @@ export const GRID_MODULES: readonly Module[] = [
   CustomFilterModule,
 ]
 ModuleRegistry.registerModules([...GRID_MODULES])
-
-export type OpenHow = 'click' | 'space' | 'enter'
-
-const SPACE_OR_ENTER = (key: string): boolean => key === ' ' || key === 'Enter'
-
-/** What AG Grid's live region says about a row: what the page does with it. */
-const ROW_WORDS: Readonly<Record<string, string>> = {
-  ariaRowSelect: 'Space opens this record. Enter opens it and moves to it.',
-  ariaRowDeselect: 'This record is open.',
-  ariaRowToggleSelection: 'Space opens this record.',
-}
-
-/** The same in Drill down, where Space and Enter both go down to the record (0090). */
-const DRILL_ROW_WORDS: Readonly<Record<string, string>> = {
-  ariaRowSelect: 'Space or Enter opens this record and moves to it.',
-  ariaRowDeselect: 'This record is open. Space or Enter moves to it.',
-  ariaRowToggleSelection: 'Space or Enter opens this record.',
-}
-
-/** On a row's box (0166), whose Space ticks it and opens nothing; Enter opens the record as on any cell. */
-const CHOOSE_WORDS: Readonly<Record<string, string>> = {
-  ariaRowSelect: 'Space ticks or unticks this box. Enter opens the record and moves to it.',
-  ariaRowDeselect: 'This record is open. Space ticks or unticks this box.',
-}
-
-/** The same in Drill down, where Enter on the open record moves to it. */
-const DRILL_CHOOSE_WORDS: Readonly<Record<string, string>> = {
-  ariaRowSelect: 'Space ticks or unticks this box. Enter opens the record and moves to it.',
-  ariaRowDeselect: 'This record is open. Space ticks or unticks this box; Enter moves to it.',
-}
-
-/** On a row's Delete (0053), whose Space and Enter press it, in every layout: it asks, and confirms in place. */
-const DELETE_WORDS: Readonly<Record<string, string>> = {
-  ariaRowSelect: 'Space or Enter asks to delete this record.',
-  ariaRowDeselect: 'This record is open. Space or Enter asks to delete it.',
-}
-
-/** What AG Grid's live region says of a row with the keyboard on the column `colId`, in Drill down or not. */
-function rowWords(colId: string | undefined, drilling: boolean): Readonly<Record<string, string>> {
-  if (colId === CHOOSE_COLUMN) return drilling ? DRILL_CHOOSE_WORDS : CHOOSE_WORDS
-  if (colId === DELETE_COLUMN) return DELETE_WORDS
-  return drilling ? DRILL_ROW_WORDS : ROW_WORDS
-}
-
-/** A column of the page's own -- a row's box, or its Delete -- which takes its own keys and holds no field's value. */
-const ownColumn = (colId: string): boolean => colId === CHOOSE_COLUMN || colId === DELETE_COLUMN
 
 /** The value of a loading or failed row: nothing. AG Grid's skeleton says "Row data is loading" and "ERR". */
 function EmptyCell(): null {
@@ -223,88 +157,6 @@ export function headerSort(grid: GridApi<GridRow>): ListSortTerm[] {
     .map((column) => ({ field: column.colId, direction: column.sort as ListSortTerm['direction'] }))
 }
 
-/** The column of a row's Delete: `~` is in no field key (session.ts), so it never names a field's column. */
-export const DELETE_COLUMN = '~delete'
-
-/** What a row's Delete asks: the form's title, which its name gives, and what a press does. */
-export interface RowDelete {
-  noun: string
-  press(row: GridRow): void
-  /**
-   * What a row's button says and is named, where it is not Delete: a
-   * together tab's Remove and Undo remove (0155); null draws none on that
-   * row -- at a bound, or where the person may not.
-   */
-  said?: (row: GridRow) => { text: string; name: string } | null
-  /** The column's header, where it is not Delete. */
-  heading?: string
-}
-
-/**
- * A row's Delete that reads the page's handler, and its words, each time it
- * is pressed or drawn (`now`): the column is made once, and a together
- * tab's words change with its set (0155).
- */
-export function liveDelete(now: () => RowDelete | undefined, noun: string, worded: boolean, heading: string | undefined): RowDelete {
-  return {
-    noun,
-    press: (row) => now()?.press(row),
-    ...(worded ? { said: (row: GridRow) => now()?.said?.(row) ?? null } : {}),
-    ...(heading === undefined ? {} : { heading }),
-  }
-}
-
-/**
- * A row's Delete: an outline in the room's `--invalid`, text and border and
- * never a fill. Its own style attribute, in room variables, because no rule
- * of host.css reaches into a grid (0047); 28 pixels tall, past the 24 of
- * WCAG 2.5.8, inside the 36 of a row.
- */
-const DELETE_LOOK: CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  minHeight: '28px',
-  padding: '0 10px',
-  border: '1px solid var(--invalid)',
-  borderRadius: '999px',
-  background: 'transparent',
-  color: 'var(--invalid)',
-  font: 'inherit',
-  fontSize: '13px',
-  lineHeight: 1,
-  cursor: 'pointer',
-}
-
-/**
- * The cell of a row's Delete. AG Grid moves the keyboard between cells, and
- * this cell hands it to its button whenever the cell itself is focused, so
- * the arrow keys reach a real button named for the record; the button is
- * `tabIndex` -1, so Tab still leaves the grid in one stop. A row with no
- * token has none: it cannot be addressed.
- */
-function DeleteCell(params: ICellRendererParams<GridRow> & { remove: RowDelete }): ReactElement | null {
-  const button = useRef<HTMLButtonElement>(null)
-  const cell = params.eGridCell
-  useEffect(() => {
-    const forward = (event: FocusEvent): void => {
-      if (event.target === cell) button.current?.focus({ preventScroll: true })
-    }
-    cell.addEventListener('focus', forward)
-    if (document.activeElement === cell) button.current?.focus({ preventScroll: true })
-    return () => cell.removeEventListener('focus', forward)
-  }, [cell])
-  const row = params.data
-  if (row === undefined || row.record === null) return null
-  const { remove } = params
-  const said = remove.said === undefined ? { text: 'Delete', name: `Delete ${remove.noun} ${row.record}` } : remove.said(row)
-  if (said === null) return null
-  return (
-    <button type="button" tabIndex={-1} ref={button} style={DELETE_LOOK} aria-label={said.name} onClick={() => remove.press(row)}>
-      {said.text}
-    </button>
-  )
-}
-
 /**
  * One column per field the person may read, in the order the section
  * arranged them (0106): its label, sortable where the server says, made at
@@ -362,20 +214,7 @@ export function columnDefsOf(
   const chosen = choose === undefined ? fields : [choose, ...fields]
   if (remove === undefined) return chosen
   // Last, so Tab into the grid still lands on the open row's first column, and the bar stays first.
-  return [
-    ...chosen,
-    {
-      colId: DELETE_COLUMN,
-      headerName: remove.heading ?? 'Delete',
-      // A row's words, so the cell is drawn again when they change: a together tab's Remove becomes Undo remove (0155).
-      valueGetter: (params) => (params.data === undefined ? '' : (remove.said?.(params.data)?.text ?? '')),
-      sortable: false,
-      minWidth: headerFloor(remove.heading ?? 'Delete', false),
-      maxWidth: 160,
-      cellRenderer: DeleteCell,
-      cellRendererParams: { remove },
-    },
-  ]
+  return [...chosen, deleteColumn(remove)]
 }
 
 /**
@@ -392,22 +231,14 @@ export function drawWidths(grid: GridApi<GridRow>, widths: readonly ColumnWidth[
   )
 }
 
-/** What a grid tells the page, and asks of it. */
-export interface GridCallbacks {
-  /** The record open in the detail, if any: read every time, never kept. */
-  openToken(): string | null
+/** What a grid tells the page, and asks of it: what its keys and presses do (grid-keys.ts), and the rest. */
+export interface GridCallbacks extends KeyCallbacks {
   ready(api: GridApi<GridRow>): void
   resized(): void
-  /** A row asked for -- by a click, Space or Enter -- whether or not it has a token. */
-  asked(row: GridRow | undefined, how: OpenHow, rowIndex: number | null, colId: string): void
-  /** Whether the grid is shown in Drill down, where Space and Enter both go down: read every time AG Grid words a row. */
-  drilling(): boolean
   /** The headers' sort changed: by a press on one, or by the page showing the section's (0105). */
   sorted(): void
   /** A width the person set -- by a header's edge, Alt and an arrow, or the Columns panel -- once it is set (0151). */
   widthsSet(changes: WidthChange[]): void
-  /** `=` on a cell: its value kept as its column's condition (0133), or said where the column offers none. */
-  example(row: GridRow | undefined, colId: string): void
 }
 
 /** The options of a grid named by the heading `labelledBy`, for its whole life: `firstColumn` is read each time, since a person moves and hides columns under them (0106). */
@@ -422,20 +253,19 @@ export function gridOptionsFor({ labelledBy, firstColumn, on }: { labelledBy: st
   const seed = (api: GridApi<GridRow>): void => {
     for (const column of api.getColumns() ?? []) if (!settled.has(column.getColId())) settled.set(column.getColId(), Math.round(column.getActualWidth()))
   }
+  const keys = keyOptions({ firstColumn, on })
   return {
     theme: roomGrid,
     // The theme's rows, said again: a grid made inside a hidden view cannot measure its theme.
     rowHeight: ROW_HEIGHT,
     defaultColDef: {
-      editable: false,
+      ...keys.cell,
       // A field's column says otherwise (columnDefsOf); a row's Delete keeps its button's width.
       resizable: false,
       suppressMovable: true,
       // A header wraps instead of setting its column's width (WCAG 1.4.12).
       wrapHeaderText: true,
       autoHeaderHeight: true,
-      // Space and Enter belong to the page: AG Grid's own toggle never runs.
-      suppressKeyboardEvent: (params) => SPACE_OR_ENTER(params.event.key),
     },
     rowModelType: 'infinite',
     cacheBlockSize: LIST_PAGE_SIZE,
@@ -458,20 +288,8 @@ export function gridOptionsFor({ labelledBy, firstColumn, on }: { labelledBy: st
     suppressAutoSize: true,
     alwaysShowHorizontalScroll: true,
     scrollbarWidth: 16,
-    tabToNextCell: () => false,
-    tabToNextHeader: () => false,
-    // What AG Grid's live region says about a row is what the page does with
-    // it, in the layout shown now and from the cell the keyboard is on: the
-    // options are the grid's for its life, and a layout changes under it.
-    getLocaleText: ({ key, defaultValue, api }) => rowWords(api.getFocusedCell()?.column.getColId(), on.drilling())[key] ?? defaultValue,
-    focusGridInnerElement: (params) => {
-      const token = on.openToken()
-      const node = token === null ? undefined : params.api.getRowNode(token)
-      if (node === undefined || node.rowIndex === null) return false
-      params.api.ensureIndexVisible(node.rowIndex)
-      params.api.setFocusedCell(node.rowIndex, firstColumn())
-      return true
-    },
+    // Tab, the live region's words, and what a press or a key on a row asks: the keys' (grid-keys.ts).
+    ...keys.grid,
     onGridReady: (event) => {
       event.api.setGridAriaProperty('labelledby', labelledBy)
       seed(event.api)
@@ -497,29 +315,6 @@ export function gridOptionsFor({ labelledBy, firstColumn, on }: { labelledBy: st
       const changes = event.source === 'uiColumnResized' ? changedWidths(finished, settled) : []
       for (const { field, width } of finished) settled.set(field, width)
       if (changes.length > 0) on.widthsSet(changes)
-    },
-    onRowClicked: (event: RowClickedEvent<GridRow>) => {
-      // A press of the row's Delete is the button's, and of its box the box's, never the row's: neither opens the record (0053, 0166).
-      if (event.event?.target instanceof Element && event.event.target.closest('button, input') !== null) return
-      on.asked(event.data, 'click', event.rowIndex, firstColumn())
-    },
-    onCellKeyDown: (event: CellKeyDownEvent<GridRow>) => {
-      const keyboard = event.event as KeyboardEvent | null | undefined
-      const key = keyboard?.key ?? ''
-      const colId = event.column.getColId()
-      // `=` keeps the rows with the cell's value (0133) -- not with Ctrl or
-      // Cmd, which zoom, nor a plain Alt; AltGr, which some layouts type `=`
-      // with, is Ctrl and Alt together. A box or a Delete holds no value.
-      if (key === '=' && keyboard !== null && keyboard !== undefined && !keyboard.metaKey && keyboard.ctrlKey === keyboard.altKey) {
-        if (!ownColumn(colId)) on.example(event.data, colId)
-        return
-      }
-      // Space and Enter on a row's Delete are its button's, and Space on its box the box's: the browser presses or ticks it (0166).
-      const boxed = event.data?.record != null && event.data.version != null
-      const own = colId === DELETE_COLUMN || (key === ' ' && colId === CHOOSE_COLUMN && boxed)
-      if (!SPACE_OR_ENTER(key) || own) return
-      event.event?.preventDefault()
-      on.asked(event.data, key === 'Enter' ? 'enter' : 'space', event.rowIndex, colId)
     },
   }
 }

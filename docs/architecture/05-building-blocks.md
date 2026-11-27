@@ -529,7 +529,9 @@ save's answer does — framework-neutral, so both renderers show one decision
 (0029); it draws disabled, and sends in no save, a field its person may
 write in no operation ([0117](../decisions/0117-a-form-names-what-each-write-accepts-and-a-host-page-sends-nothing-none-accepts.md)), and draws a saved record for its update and a new one for its create ([0122](../decisions/0122-a-host-page-draws-a-saved-record-for-the-update-and-a-new-one-for-the-create.md)), its state field through `src/moves.ts` as the moves its person may make from where the record is ([0127](../decisions/0127-a-host-page-draws-a-state-field-as-the-moves-its-person-may-make.md)). A new record -- `open()` over no answers, and `start(prefill)` for a child's new row, through `@formancy/core`'s `withDefaults` -- starts at the defaults the form is served with, which `GET /v1/forms/:id` keeps only where this person's create takes them (data-core's `policy/starting.ts`); a record read, a copy and a form discarded back to open with their answers and start at none, and a saved record's state choice carries no default, which its choice need not offer ([0149](../decisions/0149-a-new-record-starts-with-its-columns-constant-default.md)). `src/forms-nav.tsx` draws the menu (0045) -- Find a form (`src/find-form.tsx`), the forms under their groups (`src/form-groups.tsx`) and the forms linked to the open one (`src/linked-forms.tsx`, which keeps the keyboard when the link it was on is drawn no more), each link a `src/form-link.tsx`, which `src/form-list.ts` orders, matches and links ([0144](../decisions/0144-the-host-lists-its-forms-by-group.md)); `src/record-grid.tsx`,
 `src/grid-datasource.ts` and `src/grid-options.tsx` put a page of records
-at a time in AG Grid Community (0044), its sort the section's, held beside
+at a time in AG Grid Community (0044), `src/grid-keys.ts` deciding what a
+key or a press does on a cell and what AG Grid's live region says of a
+row (0047), its sort the section's, held beside
 its filter, which its headers show and a press on one tells back
 (`src/use-grid-sort.ts`), and `src/use-grid-line.ts` says each page asked
 for, answered or refused on the grid's line and keeps the pager's place;
@@ -636,7 +638,8 @@ panel and of each child section, and `src/save-file.ts` hands the file to
 the browser through an object URL and a clicked `<a download>`
 ([0080](../decisions/0080-a-host-downloads-the-records-its-grid-lists-and-the-browser-saves-the-servers-file.md)); `src/guard.ts` and `src/leave.ts` are one guard over every way
 of leaving a form; `src/delete-flow.ts` and `src/deletion.ts` a delete
-confirmed in place
+confirmed in place, asked for by the detail's Delete record or by a
+row's Delete in the grid (`src/delete-column.tsx`)
 ([0053](../decisions/0053-a-host-deletes-a-record-from-its-detail-or-its-row-after-a-confirmation-in-place.md));
 `src/action-flow.ts` and `src/running.ts` an action run over the open
 record -- its dialog, a confirmation in place, the run, the record read
@@ -658,7 +661,10 @@ its confirmation and what the server answered, under the bar
 `src/chosen-change.ts`, `src/chosen-change-flow.ts` and
 `src/chosen-change-region.tsx` a change's fields on paper, its values and
 its words ([0176](../decisions/0176-the-host-page-changes-the-chosen-records-of-a-page-and-the-studio-grants-who-may-and-in-which-fields.md)); `src/master-panes.ts` makes the record's own forms, one session
-per renderer, as the guard knows them;
+per renderer, as the guard knows them, and `src/use-master-record.ts`
+what the detail holds and every way it changes -- a row opened, New,
+Duplicate record, Change from a date, Load, a save answered, a record
+gone;
 `src/unknown-notice.tsx` an unknown write (0031). The address names the
 form, layout and view, never the record (`src/layout.ts`), and an arrival
 whose address names no layout opens in the one the person chose last,

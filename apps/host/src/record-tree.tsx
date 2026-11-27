@@ -3,7 +3,7 @@ import type { KeyboardEvent, ReactElement } from 'react'
 import type { DataClient, FormRecord, PublishedForm } from '@formancy/data-client'
 import { LIST_PAGE_SIZE } from '@formancy/data-client'
 import { recordName } from './crumbs.js'
-import type { OpenHow } from './grid-options.js'
+import type { OpenHow } from './grid-keys.js'
 import { emptyLevelLine } from './tree-lines.js'
 
 /*

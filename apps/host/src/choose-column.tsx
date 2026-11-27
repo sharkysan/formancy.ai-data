@@ -77,7 +77,7 @@ function ChooseCell(params: ICellRendererParams<GridRow> & { choice: ChosenRows 
   )
 }
 
-/** The column, first, so the boxes are where a person looks for them; Tab into the grid still lands on the open row's first field (grid-options.tsx). */
+/** The column, first, so the boxes are where a person looks for them; Tab into the grid still lands on the open row's first field (grid-keys.ts). */
 export function chooseColumn(choice: ChosenRows): ColDef<GridRow> {
   return {
     colId: CHOOSE_COLUMN,

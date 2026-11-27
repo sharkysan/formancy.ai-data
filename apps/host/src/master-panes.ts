@@ -20,8 +20,8 @@ import { useSaveSet } from './together.js'
  * version of one (0115), or a new record -- through `open`, read as the
  * guard asks; the rows of the record's together children, held for its
  * Save, which every pane's save carries (0155); and how a record opens in
- * them (opening.ts). Kept out of form-view.tsx, which draws the form, as
- * what changes when the forms do.
+ * them (opening.ts). Kept apart from what the detail holds
+ * (use-master-record.ts), as what changes when the forms do.
  */
 export function useMasterPanes({
   client,

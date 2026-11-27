@@ -7,10 +7,12 @@ import { chooseColumn } from './choose-column.js'
 import type { ChosenRows } from './chosen-rows.js'
 import { arrange } from './columns.js'
 import type { ColumnChoice } from './columns.js'
+import { liveDelete } from './delete-column.js'
+import type { RowDelete } from './delete-column.js'
 import { answered, createDatasource } from './grid-datasource.js'
 import type { DatasourceHooks, GridColumn, GridRow, GridSource, ListClient } from './grid-datasource.js'
-import { columnDefsOf, drawWidths, gridOptionsFor, liveDelete, select, took } from './grid-options.js'
-import type { OpenHow, RowDelete } from './grid-options.js'
+import type { OpenHow } from './grid-keys.js'
+import { columnDefsOf, drawWidths, gridOptionsFor, select, took } from './grid-options.js'
 import type { SizeState } from './grid-sizing.js'
 import type { Said } from './leave.js'
 import { Pager } from './pager.js'
@@ -23,15 +25,17 @@ import { useHeldRows } from './use-held-rows.js'
 import type { HeldRows } from './use-held-rows.js'
 import type { ColumnWidth, Measured, WidthChange } from './widths.js'
 
-export type { OpenHow, RowDelete } from './grid-options.js'
-export { DELETE_COLUMN } from './grid-options.js'
+export type { RowDelete } from './delete-column.js'
+export { DELETE_COLUMN } from './delete-column.js'
+export type { OpenHow } from './grid-keys.js'
 
 /*
  * One record grid: AG Grid Community over the infinite row model, a page of
  * `LIST_PAGE_SIZE` rows at a time from `records/list` (0044, 0047), with the
  * pager and the status line that speak for it. The master grid and every
  * child grid are this one component, which puts its parts together: how
- * AG Grid is configured is grid-options.tsx's, what is asked and said
+ * AG Grid is configured is grid-options.tsx's, what a key or a press does
+ * on it grid-keys.ts's, what is asked and said
  * grid-datasource.ts's, what the line says and where the pager is
  * use-grid-line.ts's, the sort on the headers use-grid-sort.ts's, the boxes
  * under them and `=` on a cell use-header-filters.ts's, and the columns'
