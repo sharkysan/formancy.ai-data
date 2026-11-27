@@ -93,8 +93,11 @@ function noEnum(): Error {
  *   through; a real's are then made its shortest decimal by
  *   `fromCanonicalText` (0026).
  * - date `YYYY-MM-DD`; time `HH:MM`; an instant `YYYY-MM-DDTHH:MM:SSZ` in UTC.
- *   Each is formancy's shape, and a time's seconds and an instant's fraction
- *   are cut off, not rounded, because the shapes cannot hold them (0017).
+ *   Each is formancy's shape for a field that says no `precision`, as no
+ *   generated field does (spec 5, 0118), and a time's seconds and an
+ *   instant's fraction are cut off, not rounded, because those shapes
+ *   cannot hold them (0017). Spec 6's `precision`, from `@formancy/*`
+ *   0.14.0 on, could hold more, and generating it is later work.
  * - a zoneless timestamp: `YYYY-MM-DDTHH:MM:SS`, then its fraction with the
  *   trailing zeros dropped, as PostgreSQL spells it (0026). See
  *   `zonelessText`.

@@ -333,6 +333,16 @@ Filed, not hidden, because a picture is the product as it is:
   the field's type is counted and has a `maxLength`, never whether it is
   disabled, and `@formancy/react`'s `CharacterCount` draws it under the
   field, both at 0.13.0 and 0.14.0: upstream's.
+- **A select on the paper has no arrow.** The pictures were taken on
+  `@formancy/themes` 0.13.0, as each record's `stylesheet` says, whose
+  Blueprint rule for a select's arrow lost to the rule every control
+  shares, so the order's Status select is drawn without one in
+  examples-order, studio-preview, host-loaded, host-record-tabs,
+  host-typeahead, host-stale, host-refused, host-unknown and host-drift.
+  0.14.0, which the apps install now, draws it and keeps room for it.
+  Those scenes are retaken on the look their records name, Linux, with
+  Docker for the host page's database, neither of which the move to 0.14.0
+  was made on; until then they show 0.13.0's paper.
 
 ## What nothing checks
 
