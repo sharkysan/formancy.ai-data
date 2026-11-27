@@ -188,6 +188,14 @@
 //     host.css selects anything on either form or in either grid;
 //   - every `@media` condition is one the gate reads: a `max-width` in rem,
 //     from which it takes its widths (0047);
+//   - the Open beside a lookup's box (0157): in every state, each one drawn
+//     measured and passed by axe's target-size rule, and, while available,
+//     its glyph at 3:1 or more against its button, which axe's contrast
+//     rule, reading text, does not measure; every width's pass drawing one
+//     available and one unavailable, where the short window's pass, which
+//     signs in and lists the orders with no record open, draws none and is
+//     not tallied; and Tab from an order's Customer landing on it in each
+//     renderer, unavailable on a new order and available on a loaded one;
 //   - the colours have enough contrast and the targets are big enough -- the
 //     two rules jsdom cannot measure -- in every state below, a select's
 //     text behind the arrow Blueprint draws decided by
@@ -229,7 +237,7 @@
 // records chosen, the filter's, the views', the rows
 // kept while the next are asked for, the columns', Drill down's, a column's
 // width, a customer list that goes on, Stacked's line and the short window,
-// and the policy's allowance.
+// the Open beside a lookup's box, and the policy's allowance.
 //
 // `pnpm test:browser`, which builds first, runs it once per browser
 // scripts/browsers.mjs names through recordedPerBrowser -- Chromium, Firefox
@@ -260,6 +268,7 @@ import { selectTextClipped } from '../../../scripts/gradient-contrast.mjs'
 import { recordedPerBrowser } from '../../../scripts/release-report/gate-results.mjs'
 import { actionJourney } from './browser/acting.mjs'
 import { allowanceProblem } from './browser/allowance.mjs'
+import { besideProblems, besideReadings } from './browser/beside.mjs'
 import { choosingJourney } from './browser/choosing.mjs'
 import { columnsJourney } from './browser/columns.mjs'
 import { deleteJourney } from './browser/deleting.mjs'
@@ -316,6 +325,8 @@ async function run(gate, browser) {
   const list = widths()
 
   const { check } = gate
+  // The Opens beside a lookup's box a width's pass measured, available and unavailable, which each width's pass starts again.
+  let besides = { available: 0, unavailable: 0 }
   const measured = async (page, state) => {
     // A notice or a swapped record fades in (UX-SPEC §8): measured once it
     // has. One cancelled on the way -- a button's colour transition, its
@@ -345,6 +356,12 @@ async function run(gate, browser) {
     )
     // What axe asked about and no screen shows in this state, said rather than counted: its grid has scrolled it out of view, or covers it.
     if (decided.hidden.length > 0) console.log(`  shown nowhere: ${decided.hidden.join('; ')}`)
+    // Each Open beside a lookup's box: reached by axe's target size, and its glyph, which has no text for axe's contrast to read.
+    const beside = await besideReadings(page)
+    for (const open of beside) besides[open.unavailable ? 'unavailable' : 'available'] += 1
+    const { unsized, faint } = besideProblems(beside)
+    check(`${state}: axe’s target size measured and passed every Open beside a lookup’s box`, unsized)
+    check(`${state}: every available Open beside a lookup’s box draws its glyph at 3:1 or more`, faint)
     // Everything the page did to reach this state, under the policy it was
     // sent with (0083): what the browser refused, and what the console said
     // of the policy.
@@ -370,6 +387,7 @@ async function run(gate, browser) {
     let pass = 0
     for (const { label, width, refuseFonts = false } of list) {
       pass += 1
+      besides = { available: 0, unavailable: 0 }
       gate.pass({ label, width })
       stage = `measuring the pass ${label}`
       const page = await browser.newPage({ viewport: { width, height: 900 } })
@@ -438,6 +456,11 @@ async function run(gate, browser) {
           await act(page)
           await measured(page, state)
         }
+        // Every check of the Opens beside a box passes over none drawn: the pass drew both kinds.
+        check(
+          'the pass measured an Open beside a lookup’s box, available and unavailable',
+          besides.available > 0 && besides.unavailable > 0 ? null : `${String(besides.available)} available, ${String(besides.unavailable)} unavailable`,
+        )
         // Whether the page asked another origin for anything, and whether
         // every web font had loaded by the end of the pass, or, where it
         // refuses them, none had.

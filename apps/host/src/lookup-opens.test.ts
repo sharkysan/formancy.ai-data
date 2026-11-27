@@ -1,12 +1,13 @@
 import { describe, expect, test } from 'vitest'
 import type { LookupOpen } from '@formancy/data-client'
-import { namedOpens, openChoices, opensBelow, openRefused } from './lookup-opens.js'
+import { besideChoice, besideOpen, namedOpens, openChoices, opensBelow, openRefused, underOpens } from './lookup-opens.js'
 
 /*
  * What a record's panes offer under a lookup (0141): one Open per form the
  * server names for the field (0140), on the answer the field holds now,
  * each named apart from every other Open of the pane, and what a level says
- * when the read behind it is refused. Pure;
+ * when the read behind it is refused; and which of them sits beside the
+ * field's box and which under it (0157). Pure;
  * open-lookup.test.tsx holds the page to it on both engines, under both
  * renderers.
  */
@@ -105,6 +106,76 @@ describe('the Opens under a lookup', () => {
   test('are none for a field no form is named for', () => {
     expect(openChoices(namedOpens(OPENS, labelOf), 'notes', 'k1:7')).toEqual([])
     expect(openChoices(namedOpens([{ field: 'customer', forms: [] }], labelOf), 'customer', 'k1:7')).toEqual([])
+  })
+})
+
+describe('the Open beside a lookup, and the Opens under it', () => {
+  // The first form the server names sits beside the box, the rest under
+  // the field in the server's order, each on the answer: the two together
+  // are every Open 0141 offers, none twice and none lost (watched failing
+  // with the beside's form taken from the last named, and with every Open
+  // left under the field too).
+  test('are the first form named beside, and the rest under, in the server’s order', () => {
+    const named = namedOpens(OPENS, labelOf)
+    expect(besideOpen(named, 'order', 'k1:4711')).toEqual({ form: { id: 'pg-order', title: 'Order' }, label: 'Open in Order (pg-order)', token: 'k1:4711' })
+    expect(underOpens(named, 'order', 'k1:4711')).toEqual([
+      { form: { id: 'pg-order-staff', title: 'Order' }, token: 'k1:4711', label: 'Open in Order (pg-order-staff)' },
+    ])
+    expect(besideOpen(named, 'customer', 'k1:7')).toEqual({ form: { id: 'pg-customer', title: 'Customers' }, label: 'Open in Customers', token: 'k1:7' })
+    expect(underOpens(named, 'customer', 'k1:7')).toEqual([])
+    const beside = besideOpen(named, 'order', 'k1:4711')
+    expect([beside === null ? null : besideChoice(beside), ...underOpens(named, 'order', 'k1:4711')]).toEqual(openChoices(named, 'order', 'k1:4711'))
+  })
+
+  // The Open beside stays while the field is empty, so the box keeps its
+  // width as an answer comes and goes, and is unavailable then: no token
+  // to read by, and nothing under the field. An answer that is no token is
+  // as empty (watched failing with no beside for an empty field: a box
+  // that widens as it is cleared).
+  test('is there, without a token, while the answer is empty or not a token, and none are under it', () => {
+    const named = namedOpens(OPENS, labelOf)
+    for (const answer of ['', null, undefined, 4711, ['k1:7']]) {
+      expect(besideOpen(named, 'order', answer), String(answer)).toEqual({
+        form: { id: 'pg-order', title: 'Order' },
+        label: 'Open in Order (pg-order)',
+        token: null,
+      })
+      expect(underOpens(named, 'order', answer), String(answer)).toEqual([])
+    }
+  })
+
+  // A press on the Open beside an empty field opens nothing: a read by no
+  // token is refused, and the person meant no record. Once it holds one,
+  // the press opens what 0141's first Open opened (watched failing with
+  // the choice made whatever the token).
+  test('opens nothing while it has no token, and the record its answer names once it has', () => {
+    const named = namedOpens(OPENS, labelOf)
+    const empty = besideOpen(named, 'customer', '')
+    const answered = besideOpen(named, 'customer', 'k1:7')
+    expect(empty === null ? 'no beside' : besideChoice(empty)).toBeNull()
+    expect(answered === null ? 'no beside' : besideChoice(answered)).toEqual(openChoices(named, 'customer', 'k1:7')[0])
+  })
+
+  // Nothing is beside a field the server names no form for, so its box is
+  // as wide as any other's (watched failing with a beside for every field
+  // of the offer, forms or none).
+  test('are none for a field no form is named for', () => {
+    expect(besideOpen(namedOpens(OPENS, labelOf), 'notes', 'k1:7')).toBeNull()
+    expect(underOpens(namedOpens(OPENS, labelOf), 'notes', 'k1:7')).toEqual([])
+    expect(besideOpen(namedOpens([{ field: 'customer', forms: [] }], labelOf), 'customer', 'k1:7')).toBeNull()
+  })
+
+  // The Open beside is named as 0141 names the first Open, the label
+  // before the form where another lookup opens in a form of its title --
+  // and while the field is empty too, so its name does not change as the
+  // person picks an answer (watched failing with the form's title alone).
+  test('are named as namedOpens names them, answered or not', () => {
+    const staff = namedOpens(STAFF, labelOf)
+    expect(besideOpen(staff, 'approved_by', '')?.label).toBe('Open Approved by in Employee')
+    expect(besideOpen(staff, 'created_by', 'k1:2')?.label).toBe('Open Created by in Employee')
+    const both = namedOpens([...OPENS, { field: 'reorder', forms: [{ id: 'pg-order', title: 'Order' }] }], labelOf)
+    expect(besideOpen(both, 'order', null)?.label).toBe('Open Order in Order (pg-order)')
+    expect(underOpens(both, 'order', 'k1:1').map((choice) => choice.label)).toEqual(['Open Order in Order (pg-order-staff)'])
   })
 })
 

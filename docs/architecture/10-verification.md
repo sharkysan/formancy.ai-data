@@ -717,6 +717,17 @@ have been saved, with the keyboard there, where it did not -- each as
 0058's table says of a lost POST on the connection it took
 (`apps/host/scripts/browser/together.mjs`,
 [0155](../decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md)).
+It fails when an Open beside a lookup's box, in any state, is one axe's
+target-size rule did not measure and pass -- the gate's own audit fails a
+violation, and passes one the rule left undecided -- or, while available,
+draws its glyph below 3:1 against what is behind it, read from the
+computed colours, since axe's contrast rule reads text and the button has
+none; when a width's pass draws none available or none unavailable, the
+short window's pass, which opens no record, drawing none and not tallied;
+and when Tab from an order's Customer does not land on its Open in either
+renderer, unavailable on a new order and available on a loaded one
+(`apps/host/scripts/browser/beside.mjs`,
+[0157](../decisions/0157-a-lookups-first-open-sits-beside-its-field.md)).
 The studio's fails when the Choose step is not measured clean at every
 width with a rowversion order's touch column chosen, an order's lines
 saved with it and a delivery's pin refused under the box; when a touch

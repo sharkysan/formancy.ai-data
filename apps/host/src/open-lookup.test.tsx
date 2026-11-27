@@ -1,5 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
+import { computeAccessibleName } from 'dom-accessibility-api'
 import { createDataClient } from '@formancy/data-client'
 import type { DataClient } from '@formancy/data-client'
 import { audit, focusedName, unnamed } from './test-accessible.js'
@@ -26,10 +27,12 @@ import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
 import type { Engine, Plane } from './test-plane.js'
 
 /*
- * Open under a lookup (0141): under each lookup of a record whose answer is
+ * Open under a lookup (0141): for each lookup of a record whose answer is
  * a token, one button per form the server names for it (0140), which opens
  * the record that answer names one Drill down level below, in that form --
- * from any layout, which becomes Drill down. On both engines, under each
+ * from any layout, which becomes Drill down. The first form's sits beside
+ * the lookup's box, a glyph named by its label, there and unavailable while
+ * the lookup is empty; the rest under the field, in words (0157). On both engines, under each
  * renderer, against the real server, through the forms `startPlane({
  * children: true, deletes: true })` publishes: an order line, whose order
  * both the order form and the staff's order form are over, keyed by what
@@ -39,8 +42,11 @@ import type { Engine, Plane } from './test-plane.js'
  *
  * Found by role and accessible name. What the accessibility tree cannot
  * answer is read off the DOM, each where it is made: `location.hash` and
- * `localStorage`, which are the browser's; and the crumb that is the page,
- * by `aria-current`, which the tree gives no role of its own.
+ * `localStorage`, which are the browser's; the crumb that is the page,
+ * by `aria-current`, which the tree gives no role of its own; whether an
+ * Open is unavailable, by `aria-disabled`, which Testing Library's role
+ * queries do not filter on; and whether it shows its words, by its text,
+ * which the tree replaces by its `aria-label`.
  */
 
 let plane: Plane
@@ -124,11 +130,34 @@ async function notesAt(heading: string, renderer: RendererName): Promise<HTMLInp
   return waitFor(() => within(levelPane(heading, renderer)).getByLabelText<HTMLInputElement>('Notes', { exact: true }), ARRIVES)
 }
 
-/** Every Open a pane offers, by name: "Open in <form>", or "Open <lookup> in <form>". */
-function opensIn(container: HTMLElement): string[] {
+/** Every Open a pane draws, by name -- "Open in <form>", or "Open <lookup> in <form>" -- and whether it is unavailable. */
+function opensDrawn(container: HTMLElement): Array<{ name: string; unavailable: boolean }> {
   return within(container)
     .queryAllByRole('button', { name: /^Open (.+ )?in / })
-    .map((button) => button.textContent ?? '')
+    .map((button) => ({ name: computeAccessibleName(button), unavailable: button.getAttribute('aria-disabled') === 'true' }))
+}
+
+/** Every Open a pane offers now, by name: the ones drawn and available. */
+function opensIn(container: HTMLElement): string[] {
+  return opensDrawn(container)
+    .filter((open) => !open.unavailable)
+    .map((open) => open.name)
+}
+
+/**
+ * The Open beside a lookup's box in `container`, named `name`, a button that
+ * shows no words, once it is available: it is drawn, unavailable, before
+ * the record's answer arrives, where an Open under the field was not drawn
+ * at all.
+ */
+async function besideIn(container: HTMLElement, name: string): Promise<HTMLElement> {
+  const button = await waitFor(() => {
+    const found = within(container).getByRole('button', { name })
+    expect(found.getAttribute('aria-disabled'), `${name} is unavailable`).toBeNull()
+    return found
+  }, ARRIVES)
+  expect(button.textContent, `${name} shows words, as an Open under a field does`).toBe('')
+  return button
 }
 
 /** Enter on the first cell of the row of the grid `heading` names whose first cell says `first`, once it is listed. */
@@ -186,9 +215,12 @@ describe.each(ENGINES)('Open under a lookup on $engine', (engine) => {
     // order, and its first crumbs lead back up to the line as it was left,
     // its typing kept -- the level above is never read again. Opened in
     // the other order form, the order is that form's, which this clerk may
-    // only read. Without the addition, no pane offered an Open (to be
-    // watched failing in CI with the record's panes given no offer, and
-    // with Open from Stacked left in it: the address said no level).
+    // only read. The first order form's Open is the one beside the line's
+    // Order, the other's under it in words (0157). Without the addition, no
+    // pane offered an Open (to be watched failing in CI with the record's
+    // panes given no offer, and with Open from Stacked left in it: the
+    // address said no level; and with the forms' Opens all drawn under the
+    // field: the first showed its words).
     test("a line's order opens below the line in either order form, and the trail leads back up", async () => {
       const words = stamp('open')
       const { order, line } = await lineOf(engine, words)
@@ -196,8 +228,9 @@ describe.each(ENGINES)('Open under a lookup on $engine', (engine) => {
       await user.clear(quantity(renderer))
       await user.type(quantity(renderer), '42')
       await waitFor(() => expect(opensIn(recordPane(renderer))).toEqual(bothOrders(engine)), ARRIVES)
+      expect(within(recordPane(renderer)).getByRole('button', { name: `Open in Order (${engine.staff})` }).textContent).toBe(`Open in Order (${engine.staff})`)
 
-      await user.click(within(recordPane(renderer)).getByRole('button', { name: `Open in Order (${engine.formId})` }))
+      await user.click(await besideIn(recordPane(renderer), `Open in Order (${engine.formId})`))
       await waitFor(() => expect(focusedName()).toBe(`Order ${order}`), ARRIVES)
       expect(trail()).toEqual(['Records', `Order line ${line}`, `Order ${order}`])
       expect(current()).toBe(`Order ${order}`)
@@ -219,24 +252,26 @@ describe.each(ENGINES)('Open under a lookup on $engine', (engine) => {
       await waitFor(() => expect({ value: read.value, disabled: read.disabled }).toEqual({ value: words, disabled: true }), ARRIVES)
     })
 
-    // A lookup with no answer points at no record: nothing is offered under
-    // it, and the paper passes axe either way. The answer Open reads is the
-    // one the field holds now: an order picked for a new line, not saved,
-    // is the one that opens (to be watched failing in CI with the answer
-    // unchecked in openChoices: an Open under the empty Order).
-    test('an empty lookup offers nothing, and the order picked is the one that opens', async () => {
+    // A lookup with no answer points at no record: nothing is offered for
+    // it -- the Open beside its box is there, unavailable, and nothing is
+    // under it -- and the paper passes axe either way. The answer Open reads
+    // is the one the field holds now: an order picked for a new line, not
+    // saved, is the one that opens (to be watched failing in CI with the
+    // answer unchecked in openChoices: an Open under the empty Order).
+    test('an empty lookup offers nothing, its Open beside unavailable, and the order picked is the one that opens', async () => {
       const date = DATED[renderer]
       const { order } = await lineOf(engine, `dated ${date}`, date)
       const user = await lines(engine, renderer)
       await newRecord(user)
       const option = await waitFor(() => within(orderIn(renderer)).getByRole('option', { name: date }), ARRIVES)
       expect(opensIn(recordPane(renderer))).toEqual([])
+      expect(opensDrawn(recordPane(renderer))).toEqual([{ name: `Open in Order (${engine.formId})`, unavailable: true }])
       expect({ axe: await audit(), unnamed: unnamed() }).toEqual({ axe: [], unnamed: [] })
 
       await user.selectOptions(orderIn(renderer), option)
       await waitFor(() => expect(opensIn(recordPane(renderer))).toEqual(bothOrders(engine)), ARRIVES)
       expect({ axe: await audit(), unnamed: unnamed() }).toEqual({ axe: [], unnamed: [] })
-      await user.click(within(recordPane(renderer)).getByRole('button', { name: `Open in Order (${engine.formId})` }))
+      await user.click(await besideIn(recordPane(renderer), `Open in Order (${engine.formId})`))
       await waitFor(() => expect(focusedName()).toBe(`Order ${order}`), ARRIVES)
       expect(trail()).toEqual(['Records', 'New Order line', `Order ${order}`])
       const notes = await notesAt(`Order ${order}`, renderer)
@@ -252,7 +287,7 @@ describe.each(ENGINES)('Open under a lookup on $engine', (engine) => {
   test('a read the server refuses stays on the record and says why', async () => {
     const { order, line } = await lineOf(engine, stamp('open-gone'))
     const user = await lineLoaded(engine, 'React', line)
-    const open = await waitFor(() => within(recordPane('React')).getByRole('button', { name: `Open in Order (${engine.formId})` }), ARRIVES)
+    const open = await besideIn(recordPane('React'), `Open in Order (${engine.formId})`)
     // The order deleted beside the page, its lines with it (0050).
     const clerk = client(TOKENS.clerk)
     const stored = await clerk.read(engine.formId, order)
@@ -280,7 +315,7 @@ describe.each(ENGINES)('Open under a lookup on $engine', (engine) => {
   test('Open into Drill down keeps no layout for the next arrival', async () => {
     const { order, line } = await lineOf(engine, stamp('open-kept'))
     const user = await lineLoaded(engine, 'React', line)
-    await user.click(await waitFor(() => within(recordPane('React')).getByRole('button', { name: `Open in Order (${engine.formId})` }), ARRIVES))
+    await user.click(await besideIn(recordPane('React'), `Open in Order (${engine.formId})`))
     await waitFor(() => expect(focusedName()).toBe(`Order ${order}`), ARRIVES)
     expect(screen.getByRole<HTMLInputElement>('radio', { name: 'Drill down' }).checked).toBe(true)
     expect(localStorage.getItem(PREFERENCES.layout)).toBeNull()
@@ -304,14 +339,14 @@ describe.each(ENGINES)('Open under a lookup on $engine', (engine) => {
     const { order, line } = await lineOf(engine, words)
     const user = await lineLoaded(engine, 'React', line)
     const staff = `Open in Order (${engine.staff})`
-    await user.click(await waitFor(() => within(recordPane('React')).getByRole('button', { name: `Open in Order (${engine.formId})` }), ARRIVES))
+    await user.click(await besideIn(recordPane('React'), `Open in Order (${engine.formId})`))
     const notes = await notesAt(`Order ${order}`, 'React')
     await waitFor(() => expect(notes.value).toBe(words), ARRIVES)
     await user.type(notes, ' typed')
     await crumb(user, `Order line ${line}`)
     await waitFor(() => expect(focusedName()).toBe(`Order line ${line}`), ARRIVES)
 
-    await user.click(within(recordPane('React')).getByRole('button', { name: `Open in Order (${engine.formId})` }))
+    await user.click(await besideIn(recordPane('React'), `Open in Order (${engine.formId})`))
     await waitFor(() => expect(focusedName()).toBe(`Order ${order}`), ARRIVES)
     expect(unsavedNotice()).toBeNull()
     expect((await notesAt(`Order ${order}`, 'React')).value).toBe(`${words} typed`)
@@ -341,10 +376,10 @@ describe.each(ENGINES)('Open under a lookup on $engine', (engine) => {
   // A line opened below its order holds that order in its parent field,
   // drawn disabled: Open there would open the record the level above
   // shows, again, a level further down -- the line at level 1 offers both
-  // order forms under that field, as the first case shows (to be watched
-  // failing in CI with the level's opens passed through opensBelow
-  // unfiltered).
-  test('a line opened below its order offers no Open under its order', async () => {
+  // order forms for that field, as the first case shows. Nothing is drawn
+  // beside it either, not even unavailable (to be watched failing in CI
+  // with the level's opens passed through opensBelow unfiltered).
+  test('a line opened below its order offers no Open for its order', async () => {
     const words = stamp('open-parent')
     const { order, line } = await lineOf(engine, words)
     const user = mount(plane.fetch)
@@ -362,7 +397,7 @@ describe.each(ENGINES)('Open under a lookup on $engine', (engine) => {
     const below = levelPane(`Order line ${line}`, 'React')
     const parent = await waitFor(() => within(below).getByRole<HTMLSelectElement>('combobox', { name: /^Order\*?$/ }), ARRIVES)
     await waitFor(() => expect({ value: parent.value, disabled: parent.disabled }).toEqual({ value: order, disabled: true }), ARRIVES)
-    expect(opensIn(below)).toEqual([])
+    expect(opensDrawn(below)).toEqual([])
   })
 
   // A level reached through a lookup offers Open under its own lookups,
@@ -384,14 +419,14 @@ describe.each(ENGINES)('Open under a lookup on $engine', (engine) => {
     const staff = (): HTMLElement => levelPane(`Order ${order}`, 'React')
     await waitFor(() => expect(opensIn(staff()).sort()).toEqual(['Open Approved by in Employee', 'Open Created by in Employee']), ARRIVES)
 
-    await user.click(within(staff()).getByRole('button', { name: 'Open Approved by in Employee' }))
+    await user.click(await besideIn(staff(), 'Open Approved by in Employee'))
     await waitFor(() => expect(focusedName()).toBe('Employee k1:1'), ARRIVES)
     expect(trail()).toEqual(['Records', `Order line ${line}`, `Order ${order}`, `Employee ${approver}`])
     expect(window.location.hash).toBe(`#form=${engine.lines}&layout=drill&view=record&level=3`)
 
     await crumb(user, `Order ${order}`)
     await waitFor(() => expect(focusedName()).toBe(`Order ${order}`), ARRIVES)
-    await user.click(within(staff()).getByRole('button', { name: 'Open Created by in Employee' }))
+    await user.click(await besideIn(staff(), 'Open Created by in Employee'))
     await waitFor(() => expect(focusedName()).toBe('Employee k1:2'), ARRIVES)
     expect(trail()).toEqual(['Records', `Order line ${line}`, `Order ${order}`, `Employee ${creator}`])
 

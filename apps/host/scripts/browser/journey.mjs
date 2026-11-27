@@ -6,9 +6,11 @@
 // again on its own, or not, as 0058's table says of it and the connection
 // it took -- the confirmation of an unknown create (0029, 0031), and the
 // record loaded again and copied into a new one (0107). Each state is
-// measured on the way by the gate.
+// measured on the way by the gate. On the new order and the loaded one,
+// Tab from each renderer's Customer lands on the Open beside it (0157).
 
 import { fromTheTop, lostCreate } from '../../../../scripts/browser-gate.mjs'
+import { CUSTOMER_OPEN, tabsOnto } from './beside.mjs'
 import { carryOn, demo } from './workspace.mjs'
 import { describeFocus, focusedOn, until, WITHIN } from './measure.mjs'
 import { rulesReaching } from './styles.mjs'
@@ -17,6 +19,7 @@ import { rulesReaching } from './styles.mjs'
 const pane = (page, name) => page.getByRole('region', { name, exact: true })
 const paper = (page, name) => pane(page, name).getByRole('form', { name: `Order, ${name}` })
 const customer = (page, name) => paper(page, name).getByRole('combobox', { name: 'Customer' })
+const customerOpen = (page, name) => paper(page, name).getByRole('button', { name: CUSTOMER_OPEN, exact: true })
 const saveIn = (page, name) => paper(page, name).getByRole('button', { name: 'Save' })
 const status = (page, name, text) => pane(page, name).getByRole('status').filter({ hasText: text })
 const unknownNotice = (page) => pane(page, 'React').getByRole('region', { name: 'React It may have been saved' })
@@ -83,6 +86,12 @@ export function recordJourney(plane, hop, { check, measure, asked }, run) {
           return tabbable[0] === document.activeElement
         })
         check('open: through it the next Tab reaches the first control of the page', into ? null : `the focus is on ${await describeFocus(page)}`)
+        // The new order's Customer is empty: its Open beside is unavailable, and still the next stop.
+        for (const name of ['React', 'Angular'])
+          check(
+            `open: Tab from the ${name} Customer, empty, lands on its Open beside, unavailable`,
+            await tabsOnto(page, customer(page, name), customerOpen(page, name), false),
+          )
       },
     ],
     [
@@ -107,6 +116,11 @@ export function recordJourney(plane, hop, { check, measure, asked }, run) {
         // Both panes show the customer by the label the resolve route gives it.
         for (const name of ['React', 'Angular'])
           await until(async () => (await customer(page, name).inputValue()) === 'Muster AG', `the ${name} customer never showed Muster AG`)
+        for (const name of ['React', 'Angular'])
+          check(
+            `loaded: Tab from the ${name} Customer, Muster AG, lands on its Open beside, available`,
+            await tabsOnto(page, customer(page, name), customerOpen(page, name), true),
+          )
       },
     ],
     [

@@ -621,6 +621,16 @@ one more column, first, which the Columns panel neither hides nor
 moves; a lost run over them is one read per record to check; and none
 of it was run against a database or a browser before CI
 ([0166](../decisions/0166-a-person-chooses-a-pages-records-by-a-column-of-boxes-and-runs-an-action-over-them-from-a-bar-above-the-grid.md)).
+A lookup's first Open, beside its box, shows a glyph and no words, its
+name said to assistive technology and shown as a pointer's hint alone;
+beside an empty lookup it is drawn unavailable, one more Tab stop that
+does nothing and says nothing; a lookup whose record opens in more than
+one form keeps the others under the field, in words, the one beside being
+the server's first by form id; its glyph's contrast is measured in
+Blueprint alone; and neither the journeys through it on both engines nor
+the browser gate's checks of it ran against a database or a browser
+before CI
+([0157](../decisions/0157-a-lookups-first-open-sits-beside-its-field.md)).
 A record's child forms are tabs beside it, so a child's rows are a press
 away from the record's form, and another record, a record its first save
 created included, opens on its own tab; a Drill down level's section

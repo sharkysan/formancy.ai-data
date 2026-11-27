@@ -16,6 +16,13 @@ which are kept unchanged under a heading of their own below it (0171).
 
 ### Changed
 
+- **A lookup's first Open sits beside its box**
+  ([0157](docs/decisions/0157-a-lookups-first-open-sits-beside-its-field.md)):
+  on a line of its own under the field it read as the form's, not the
+  answer's. It is a button showing a glyph, named as before, joined to the
+  box through formancy 0.14.0 and unavailable while the field is empty; a
+  lookup's other forms keep their Opens under it.
+
 - **Every `@formancy/*` dependency moves to 0.14.0, and generated forms
   stay on spec 5**
   ([0118](docs/decisions/0118-generated-forms-move-to-spec-5-for-help-text-from-column-comments.md)):

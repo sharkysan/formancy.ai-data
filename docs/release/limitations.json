@@ -3915,15 +3915,15 @@
       ]
     },
     "0141": {
-      "reviewed": "sha256:ed521c03733c243281778c77b869ac06dcb9f8748533bdae8e4143377f53fd15",
+      "reviewed": "sha256:e90a0c43e6db86612735f2cf3f131c70a7639c816b2248e0b497f930bd43985f",
       "limitations": [
         {
           "area": "host",
-          "says": "Open under a lookup in Side by side, Stacked or Separate views leaves that layout for Drill down, and Back then goes up the levels rather than back to the layout chosen, which the Layout group gives back."
+          "says": "A lookup's Open in Side by side, Stacked or Separate views leaves that layout for Drill down, and Back then goes up the levels rather than back to the layout chosen, which the Layout group gives back."
         },
         {
           "area": "operations",
-          "says": "Each Open under a lookup asks the form's definition beside the record's read, two requests, and a definition reads every published form's newest version; nothing is cached."
+          "says": "Each of a lookup's Opens asks the form's definition beside the record's read, two requests, and a definition reads every published form's newest version; nothing is cached."
         },
         {
           "area": "host",
@@ -3935,7 +3935,7 @@
         },
         {
           "area": "host",
-          "says": "A child row on a section's rail and a section of the record offer no Open under their lookups: only the record and Drill down's levels do."
+          "says": "A child row on a section's rail and a section of the record offer no Open for their lookups, beside the box or under it: only the record and Drill down's levels do."
         },
         {
           "area": "host",
@@ -3948,7 +3948,7 @@
         },
         {
           "area": "host",
-          "says": "The Opens are drawn by the host page into the renderers' field addition: a host with a page of its own draws its own from the form's opens."
+          "says": "The Opens are drawn by the host page, the first beside the box and the rest into the renderers' field addition: a host with a page of its own draws its own from the form's opens."
         }
       ]
     },
@@ -4664,6 +4664,33 @@
         {
           "area": "testing",
           "says": "What THROW and RAISERROR carry is measured on SQL Server 2022 (16.0.4295.3) alone, and the adapters' suites for this change were run on each engine’s default image alone."
+        }
+      ]
+    },
+    "0157": {
+      "reviewed": "sha256:3841a8c778dcc37f9604814fff063070c3ef372499b899bf035796fe89934d66",
+      "limitations": [
+        {
+          "area": "host",
+          "says": "A lookup whose record opens in more than one form draws the first form's Open beside its box and the others under the field in words, the first being the server's first by form id rather than the person's choice.",
+          "heldBy": "apps/host/src/lookup-opens.test.ts"
+        },
+        {
+          "area": "host",
+          "says": "The Open beside a lookup's box shows a glyph and no words: its name is said to assistive technology and shown as a pointer's hint, never to a sighted person on a keyboard or a touch screen."
+        },
+        {
+          "area": "host",
+          "says": "Beside an empty lookup the Open is drawn unavailable and stays in the keyboard's order, one more Tab stop per lookup, and a press on it does nothing and says nothing on screen.",
+          "heldBy": "apps/host/src/lookup-addition.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "The glyph's contrast is measured by the host page's browser gate in Blueprint alone, its paper's theme, and an unavailable Open's glyph is faint, as WCAG 1.4.11 allows an inactive control."
+        },
+        {
+          "area": "host",
+          "says": "A host with a page of its own that draws a lookup's Opens from the form's opens needs a formancy renderer of 0.14.0 or later to put one beside the box, and has none beside a select given no source."
         }
       ]
     },
