@@ -27,8 +27,9 @@ export const GENERATED_SPEC_VERSION = '5'
  * The spec versions the data server serves a stored version in: the one the
  * generator writes, and spec 3, which every release before 0118 wrote, so a
  * version stored before the move is still served rather than refused as
- * corrupt. Never spec 4, which no release generated: a stored document that
- * says it was edited by hand.
+ * corrupt. Never spec 4 or spec 6, which no release generated, though the
+ * validator accepts both: a stored document that says either was edited by
+ * hand.
  */
 export const SERVED_SPEC_VERSIONS: readonly string[] = ['3', GENERATED_SPEC_VERSION]
 

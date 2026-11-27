@@ -5,7 +5,7 @@ import { canonicalize } from '@formancy/spec'
 import { validateSchema } from '@formancy/spec/validate'
 import type { BundleV2 } from './bundle.js'
 import { readGeneration } from './generation.js'
-import { servedSchema } from './served-schema.js'
+import { laterConstruct, servedSchema, unservedVersion } from './served-schema.js'
 
 /*
  * What a format-2 bundle carries beyond format 1 (0030), and what holds it:
@@ -70,13 +70,21 @@ export function format2Problems(document: Record<string, unknown>, form: FormSch
  * of words `applyPresentation` fitted to the bindings. The first error of
  * each, which names what to change: the rest are the alternatives the
  * schema tried after it.
+ *
+ * And in a spec version this server serves, as a form or base is
+ * (`servedSchema`): every dialog is generated in spec 5, actions having
+ * come after 0118, and a read compares none with the generator, so one
+ * edited to a version the validator accepts and no release generated --
+ * spec 6, from `@formancy/spec` 0.14.0 on -- would reach a host as stored.
  */
 function dialogProblems(bindings: FormBindings, presentation: PresentationOverrides): string[] {
   return presentedActions(bindings, presentation.actions).flatMap((action) => {
     if (action.dialog === null) return []
+    const unserved = unservedVersion(action.dialog)
+    if (unserved !== null) return [`presentation: the dialog of ${action.name}: ${unserved}`]
     const checked = validateSchema(action.dialog)
     const [first] = checked.valid ? [] : checked.errors
-    return first === undefined ? [] : [`presentation: the dialog of ${action.name}, at ${first.path}: ${first.message}`]
+    return first === undefined ? [] : [`presentation: the dialog of ${action.name}, at ${first.path}: ${laterConstruct(first) ?? first.message}`]
   })
 }
 

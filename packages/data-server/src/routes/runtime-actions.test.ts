@@ -23,6 +23,7 @@ import type {
   RoutineParameter,
 } from '@formancy/data-core'
 import type { IdentityVerifier } from '@formancy/data-identity'
+import type { FieldDef, FormSchema } from '@formancy/spec'
 import type { FastifyInstance } from 'fastify'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { actionDeadlineSetting, DEFAULT_ACTION_DEADLINE_MS } from '../action-deadline.js'
@@ -630,6 +631,46 @@ describe('a form published with actions', () => {
     await store.publish('worded', null, worded)
     const response = await app.inject({ method: 'GET', url: '/v1/forms/worded', headers: as('clerk') })
     expect([response.statusCode, response.json().code]).toEqual([500, 'corrupt-bundle'])
+  })
+
+  // Every dialog is generated in spec 5, since actions came after 0118, and
+  // a read holds a stored one to formancy's validator alone -- which from
+  // @formancy/spec 0.14.0 on accepts spec 6 (formancy.ai 0239). So a dialog
+  // edited on the volume to "6" is refused in the server's words, as a
+  // form or base is, and never reaches a host as stored; and spec 6's one
+  // construct, a time's or an instant's `precision` (formancy.ai 0238), in a
+  // spec 5 dialog is refused with the same reason rather than the validator's
+  // advice to change the dialog to "6". close asks a date, which holds no
+  // precision, so its due field is edited to an instant first, as a hand
+  // edit could. Watched failing with the dialog held to the validator
+  // alone: the dialog at "6" was served, 200, and the precision refused in
+  // the validator's sentence.
+  test('is served only where every dialog is in a spec version this server serves', async () => {
+    const only = 'and this server serves only spec "5", the version it generates, and spec "3", which it generated before (0118)'
+    const edited = (edit: (dialog: FormSchema) => void): BundleV2 => {
+      const stored = structuredClone(bundle())
+      const dialog = stored.bindings.actions?.find((action) => action.name === 'close')?.dialog
+      if (dialog === null || dialog === undefined) throw new Error('close is generated with a dialog')
+      edit(dialog)
+      return stored
+    }
+    const six = edited((dialog) => {
+      dialog.specVersion = '6'
+    })
+    expect(validateBundle(six)).toEqual({ ok: false, problems: [`presentation: the dialog of close: is spec "6", ${only}`] })
+    await store.publish('six', null, six)
+    const response = await app.inject({ method: 'GET', url: '/v1/forms/six', headers: as('clerk') })
+    expect([response.statusCode, response.json().code]).toEqual([500, 'corrupt-bundle'])
+    const close = bundle().bindings.actions?.find((action) => action.name === 'close')
+    const at = close?.dialog?.model.fields.findIndex((field) => field.key === 'due') ?? -1
+    expect(at).toBeGreaterThanOrEqual(0)
+    const precise = edited((dialog) => {
+      dialog.model.fields[at] = { ...dialog.model.fields[at], type: 'datetime', precision: 6 } as FieldDef
+    })
+    expect(validateBundle(precise)).toEqual({
+      ok: false,
+      problems: [`presentation: the dialog of close, at /model/fields/${String(at)}/precision: needs spec "6", ${only}`],
+    })
   })
 
   // A request may name an action's parameters in any order, and the
