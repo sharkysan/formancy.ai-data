@@ -16,9 +16,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  *
  * The version is this server's question as well as the validator's, because
  * the validator accepts every version its release speaks, and that grows
- * with the release: spec 4 is valid from `@formancy/spec` 0.4.0 on, and no
- * release of this server generated it, so a stored document that says it was
- * edited by hand. Another version is refused whole, since what the validator
+ * with the release: spec 4 is valid from `@formancy/spec` 0.4.0 on and spec 6
+ * from 0.14.0 on, and no release of this server generated either, so a
+ * stored document that says one was edited by hand. Another version is refused whole, since what the validator
  * would add is about a version this server does not serve. A construct of a
  * later version in a spec 3 document is refused with the same reason, by the
  * validator's code, rather than with its advice to move the document to that
