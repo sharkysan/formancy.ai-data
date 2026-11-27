@@ -26,9 +26,12 @@ export default defineConfig({
   // about is worse than an error. 4390 is the server's, 4391 the examples'.
   server: { port: 4392, strictPort: true, proxy: { '/v1': SERVER } },
   preview: { port: 4392, strictPort: true, proxy: { '/v1': SERVER } },
-  // Measured with `vite build` on 2026-11-05: one chunk of 931.4 kB
-  // minified, 252.3 kB gzipped, with @formancy/* at 0.13.0, where main at
-  // f9d935b, at 0.11.0, was 928.3 kB and 252.0 kB -- past the last limit,
+  // Measured with `vite build` on 2026-11-27: one chunk of 1,108.1 kB
+  // minified, 304.9 kB gzipped, with @formancy/* at 0.14.0, where main at
+  // c07f9cc, at 0.13.0, was 1,084.7 kB and 298.5 kB -- past the last limit,
+  // which the studio's own code had outgrown since it was set. On
+  // 2026-11-05 it was 931.4 kB and 252.3 kB at 0.13.0, where main at
+  // f9d935b, at 0.11.0, was 928.3 kB and 252.0 kB -- past the limit before,
   // which the studio's own code had outgrown since it was set. On
   // 2026-10-30 it was 908.7 kB and 246.5 kB at 0.11.0, where main at
   // 78496ef, at 0.7.0, was 855.1 kB and 233.1 kB -- past the limit before,
@@ -44,5 +47,5 @@ export default defineConfig({
   // step on demand took 70 kB off it, not worth a loading state (0024). The
   // limit is the latest measurement with a little room, so a dependency that
   // grows the bundle still warns.
-  build: { chunkSizeWarningLimit: 940 },
+  build: { chunkSizeWarningLimit: 1120 },
 })

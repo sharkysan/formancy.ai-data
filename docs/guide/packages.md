@@ -36,8 +36,11 @@ published before says
 superseding [0042](../decisions/0042-generated-forms-stay-on-spec-3-after-spec-4-is-released.md)).
 A host whose renderer is older than `@formancy/*` 0.8.0 refuses a spec 5
 form outright, so it moves its renderer before a form is published again;
-nothing here runs an older renderer. A TypeScript host on one casts the
-published form to its own `FormSchema`.
+nothing here runs an older renderer. Generated forms stay on spec 5, though
+formancy's builder writes spec 6 from `@formancy/*` 0.14.0 on. A TypeScript
+host whose renderer is older than 0.14.0 casts the published form to its own
+`FormSchema`, since `@formancy/data-client`'s types are those of the
+`@formancy/spec` it pins, where `specVersion` may be `"6"`.
 
 A host draws a published form with `@formancy/react` or
 `@formancy/angular`, given its options by `@formancy/data-client`, and

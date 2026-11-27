@@ -15,7 +15,11 @@ export const BINDINGS_VERSION = 2
  * which spec 5 brought: a host page whose renderer is older than
  * `@formancy/*` 0.8.0 refuses such a document outright, which the record
  * names as the move's cost. Spec 3 before it (0042). A field's `default`,
- * its column's constant one, is spec 5's too (0149).
+ * its column's constant one, is spec 5's too (0149). Spec 6, which
+ * `@formancy/*` writes from 0.14.0 on, adds only a time's or an instant's
+ * `precision`, which no generated field carries yet; moving this alone would
+ * refuse every version stored before as corrupt, through
+ * `SERVED_SPEC_VERSIONS`, so a move is a record of its own, as 0118 was.
  */
 export const GENERATED_SPEC_VERSION = '5'
 
