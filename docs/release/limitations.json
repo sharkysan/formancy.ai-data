@@ -3919,11 +3919,11 @@
       "limitations": [
         {
           "area": "host",
-          "says": "Open under a lookup in Side by side, Stacked or Separate views leaves that layout for Drill down, and Back then goes up the levels rather than back to the layout chosen, which the Layout group gives back."
+          "says": "A lookup's Open in Side by side, Stacked or Separate views leaves that layout for Drill down, and Back then goes up the levels rather than back to the layout chosen, which the Layout group gives back."
         },
         {
           "area": "operations",
-          "says": "Each Open under a lookup asks the form's definition beside the record's read, two requests, and a definition reads every published form's newest version; nothing is cached."
+          "says": "Each of a lookup's Opens asks the form's definition beside the record's read, two requests, and a definition reads every published form's newest version; nothing is cached."
         },
         {
           "area": "host",
@@ -3935,7 +3935,7 @@
         },
         {
           "area": "host",
-          "says": "A child row on a section's rail and a section of the record offer no Open under their lookups: only the record and Drill down's levels do."
+          "says": "A child row on a section's rail and a section of the record offer no Open for their lookups, beside the box or under it: only the record and Drill down's levels do."
         },
         {
           "area": "host",
@@ -3948,7 +3948,7 @@
         },
         {
           "area": "host",
-          "says": "The Opens are drawn by the host page into the renderers' field addition: a host with a page of its own draws its own from the form's opens."
+          "says": "The Opens are drawn by the host page, the first beside the box and the rest into the renderers' field addition: a host with a page of its own draws its own from the form's opens."
         }
       ]
     },
@@ -4668,7 +4668,7 @@
       ]
     },
     "0157": {
-      "reviewed": "sha256:100be4a9a50ddcdaaf4893e1d87a107e6721f1ee3d80fc6db11e0ec2e6e63b51",
+      "reviewed": "sha256:3841a8c778dcc37f9604814fff063070c3ef372499b899bf035796fe89934d66",
       "limitations": [
         {
           "area": "host",

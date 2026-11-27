@@ -12,8 +12,10 @@
 //   `fill` and the computed background colours from the button up to the
 //   first one that is opaque. An unavailable one, `aria-disabled`, is an
 //   inactive control, which 1.4.11 excuses.
-// - A pass that drew no such button, or none unavailable or none
-//   available, fails: every check above would pass over nothing.
+// - A width's pass that drew no such button, or none unavailable or none
+//   available, fails: every check above would pass over nothing. The short
+//   window's pass signs in and lists the orders with no record open, so it
+//   draws none, and is not tallied.
 // - Tab from the order's Customer lands on its Open, in each renderer, on a
 //   new order, the Open unavailable, and on a loaded one, available
 //   (journey.mjs).

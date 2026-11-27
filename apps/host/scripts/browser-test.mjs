@@ -191,9 +191,11 @@
 //   - the Open beside a lookup's box (0157): in every state, each one drawn
 //     measured and passed by axe's target-size rule, and, while available,
 //     its glyph at 3:1 or more against its button, which axe's contrast
-//     rule, reading text, does not measure; every pass drawing one available
-//     and one unavailable; and Tab from an order's Customer landing on it in
-//     each renderer, unavailable on a new order and available on a loaded one;
+//     rule, reading text, does not measure; every width's pass drawing one
+//     available and one unavailable, where the short window's pass, which
+//     signs in and lists the orders with no record open, draws none and is
+//     not tallied; and Tab from an order's Customer landing on it in each
+//     renderer, unavailable on a new order and available on a loaded one;
 //   - the colours have enough contrast and the targets are big enough -- the
 //     two rules jsdom cannot measure -- in every state below, a select's
 //     text behind the arrow Blueprint draws decided by
@@ -323,7 +325,7 @@ async function run(gate, browser) {
   const list = widths()
 
   const { check } = gate
-  // The Opens beside a lookup's box a pass measured, available and unavailable, which each pass starts again.
+  // The Opens beside a lookup's box a width's pass measured, available and unavailable, which each width's pass starts again.
   let besides = { available: 0, unavailable: 0 }
   const measured = async (page, state) => {
     // A notice or a swapped record fades in (UX-SPEC §8): measured once it

@@ -63,9 +63,11 @@
   gate (`apps/host/scripts/browser-test.mjs`, `browser/journey.mjs`), in
   each browser: in every state, every Open beside a box measured and passed
   by axe's target size and, while available, its glyph at 3:1 or more
-  against what is behind it; each pass drawing one available and one
-  unavailable; and Tab from the order's Customer, in each renderer, landing
-  on its Open, unavailable on a new order and available on a loaded one.
+  against what is behind it; each width's pass drawing one available and
+  one unavailable, the short window's pass, which opens no record, drawing
+  none and not tallied; and Tab from the order's Customer, in each
+  renderer, landing on its Open, unavailable on a new order and available
+  on a loaded one.
   The gate would fail with `tabindex="-1"` on the button, as the page of
   its own did; it has not been watched doing so against the plane.
 
