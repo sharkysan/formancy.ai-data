@@ -21,7 +21,8 @@
 // the open list's box covers the sentence's -- which fails the day a
 // release draws them apart, and the cost is to be read again -- and that
 // every text axe could not decide lies under the open list, so a text left
-// undecided for any other reason still fails; and it prints what the
+// undecided for any other reason still fails, but a select behind the
+// arrow Blueprint draws, which 0178's rule decides; and it prints what the
 // window shows there, nothing when the sentence is below the window.
 //
 // In Separate views, where the record is drawn alone: the third clerk's
@@ -31,6 +32,7 @@
 
 import { createFormText } from '@formancy/core/words'
 import { DEFAULT_MAX_PAGE_SIZE } from '@formancy/data-core'
+import { decideGradients } from '../../../../scripts/gradient-contrast.mjs'
 import { FORM, TOKENS } from './plane.mjs'
 import { audit, focusedOn, until, WITHIN } from './measure.mjs'
 import { carryOn, demo } from './workspace.mjs'
@@ -73,9 +75,7 @@ function listSaysMore(name, { check }) {
     const under = await page.evaluate(() => {
       const list = [...document.querySelectorAll('[role="listbox"]')].find((candidate) => !candidate.hidden)?.getBoundingClientRect()
       const covered = (box) => list !== undefined && box.top < list.bottom && box.bottom > list.top && box.left < list.right && box.right > list.left
-      const elsewhere = (window.formancyGateUndecided ?? [])
-        .filter((element) => !covered(element.getBoundingClientRect()))
-        .map((element) => element.outerHTML.slice(0, 60))
+      const elsewhere = (window.formancyGateUndecided ?? []).flatMap((element, at) => (covered(element.getBoundingClientRect()) ? [] : [at]))
       const status = [...document.querySelectorAll('[role="status"]')]
         .find((candidate) => (candidate.textContent ?? '').includes('there are more'))
         ?.getBoundingClientRect()
@@ -97,9 +97,15 @@ function listSaysMore(name, { check }) {
       `a list that goes on (${name}): the open list covers the sentence, as 0085 says formancy 0.6.0 to 0.14.0 draw it`,
       under.within ? null : 'the sentence lies outside the open list: read 0085’s cost again',
     )
+    // A select outside the list, behind the arrow Blueprint draws, is decided by 0178's rule while the list is open; any other text is not.
+    const gradients = await decideGradients(
+      page,
+      open.undecided.filter((node) => under.elsewhere.includes(node.at)),
+    )
+    const elsewhere = [...gradients.rest.map((node) => `${node.html} (${node.reason})`), ...gradients.problems]
     check(
       `a list that goes on (${name}): every text on the paper whose contrast axe left undecided lies under the open list`,
-      under.elsewhere.length === 0 ? null : `undecided elsewhere: ${under.elsewhere.slice(0, 4).join('; ')}`,
+      elsewhere.length === 0 ? null : `undecided elsewhere: ${elsewhere.slice(0, 4).join('; ')}`,
     )
     console.log(`  where the sentence is, the window shows ${under.shown}; ${String(open.undecided.length)} texts lie under the open list`)
     // Left as the gate's own audit wants it -- the keyboard out of Customer and the list closed -- once the list is gone. Closed

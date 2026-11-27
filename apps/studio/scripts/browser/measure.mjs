@@ -6,6 +6,7 @@ import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { ACCESSIBILITY_TAGS } from '@formancy/conformance'
 import { policyRefused } from '../../../../scripts/browser-gate.mjs'
+import { decideGradients } from '../../../../scripts/gradient-contrast.mjs'
 
 /**
  * Sideways scroll, and every element with a box that is past either edge --
@@ -34,7 +35,10 @@ const AXE = readFileSync(createRequire(import.meta.url).resolve('axe-core/axe.mi
 /**
  * axe at WCAG 2.2 AA with nothing switched off, and a guard on the guard: the
  * two measurements must have run over something, and every text's contrast
- * must have been decided.
+ * must have been decided. What axe leaves undecided is kept, as axe
+ * answered, in `window.formancyGateUndecided`, for
+ * scripts/gradient-contrast.mjs to decide a select behind its drawn arrow
+ * by (0178).
  */
 export async function audit(page, target) {
   // Through Playwright's evaluate, not a script element: the page's policy
@@ -44,17 +48,21 @@ export async function audit(page, target) {
   const subject = target ?? (await page.evaluateHandle(() => document))
   return subject.evaluate(
     async (context, tags) => {
-      const results = await window.axe.run(context, { runOnly: { type: 'tag', values: tags } })
+      const results = await window.axe.run(context, { runOnly: { type: 'tag', values: tags }, elementRef: true })
       const nodes = (list, id) => list.find((rule) => rule.id === id)?.nodes ?? []
+      const undecided = nodes(results.incomplete, 'color-contrast')
+      window.formancyGateUndecided = undecided.map((node) => node.element)
       return {
         axe: window.axe.version,
         violations: results.violations.map((rule) => `${rule.id} (${String(rule.nodes.length)}): ${rule.nodes[0]?.html.slice(0, 90) ?? ''}`),
         measured: ['color-contrast', 'target-size'].filter((id) => nodes(results.passes, id).length > 0),
         // Each with axe's own reason, as the host's gate says it, so a failure names why and not only what.
-        undecided: nodes(results.incomplete, 'color-contrast').map((node) => ({
+        undecided: undecided.map((node, at) => ({
           html: node.html.slice(0, 60),
           target: node.target[0],
+          at,
           reason: node.any.map((check) => check.message).join(' '),
+          keys: node.any.map((check) => check.data?.messageKey ?? null),
         })),
       }
     },
@@ -137,8 +145,14 @@ export async function measured(gate, page, state) {
   gate.axe(result.axe)
   check(`${state}: axe finds nothing at WCAG 2.2 AA`, result.violations.length === 0 ? null : result.violations.join('; '))
   check(`${state}: contrast and target size measured, over something`, result.measured.length === 2 ? null : `only ${result.measured.join(', ') || 'nothing'}`)
-  const { left, failing } = await decideInRows(page, result.undecided)
-  const undecided = [...left.slice(0, 4).map((html) => `undecided: ${html}`), ...failing.slice(0, 4).map((html) => `below AA once scrolled into view: ${html}`)]
+  // A select behind its drawn arrow first (0178), then what is left inside a browse's grid.
+  const gradients = await decideGradients(page, result.undecided)
+  const { left, failing } = await decideInRows(page, gradients.rest)
+  const undecided = [
+    ...gradients.problems.slice(0, 4).map((problem) => `undecided: ${problem}`),
+    ...left.slice(0, 4).map((html) => `undecided: ${html}`),
+    ...failing.slice(0, 4).map((html) => `below AA once scrolled into view: ${html}`),
+  ]
   check(`${state}: the contrast of every text decided`, undecided.length === 0 ? null : undecided.join('; '))
   // Everything the page did to reach this state, under the policy it was
   // sent with (0083): what the browser refused, and what the console said

@@ -1693,7 +1693,7 @@
       ]
     },
     "0058": {
-      "reviewed": "sha256:96b08a2fc7178a0c4ababbc94ccee98bc427d0d8a52f2411c7b237dfcd525059",
+      "reviewed": "sha256:43ffab99cc953d7419c50c7f3d8dbc03f5dc24950164b9c8582fbdd5a90f8266",
       "limitations": [
         {
           "area": "testing",
@@ -2758,7 +2758,7 @@
       ]
     },
     "0085": {
-      "reviewed": "sha256:7343de08bbdc37e556b27681efdd570f824f8f29a03cfd718e14beb8273d16ac",
+      "reviewed": "sha256:468b15e13f34ef6054027aba2f4f9a1477f6727ae67a74852e5f3e4951d566a9",
       "limitations": [
         {
           "area": "forms",
@@ -5461,6 +5461,19 @@
         {
           "area": "operations",
           "says": "A page source whose robots meta says anything but noindex, or that has no description or two, stops the examples page's and the live demo's deploys until their staging reads it."
+        }
+      ]
+    },
+    "0178": {
+      "reviewed": "sha256:d7055a686714341d4497408a0817dd2bbd7b69afc705aa9770d2b7dcc079f25a",
+      "limitations": [
+        {
+          "area": "testing",
+          "says": "The browser gates measure a select's text with the arrow Blueprint draws set aside, and the arrow itself, a graphic that says the box opens a list, is measured for contrast by no gate."
+        },
+        {
+          "area": "testing",
+          "says": "That a browser draws a select's chosen text inside its content box, which the gates' rule for the arrow rests on, is measured on a select of the probe's own in each browser, not on each select the rule decides."
         }
       ]
     }

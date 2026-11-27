@@ -189,7 +189,10 @@
 //   - every `@media` condition is one the gate reads: a `max-width` in rem,
 //     from which it takes its widths (0047);
 //   - the colours have enough contrast and the targets are big enough -- the
-//     two rules jsdom cannot measure -- in every state below;
+//     two rules jsdom cannot measure -- in every state below, a select's
+//     text behind the arrow Blueprint draws decided by
+//     scripts/gradient-contrast.mjs once its probe has shown that the
+//     browser clips a select's text to its content box (0178);
 //   - every web font the built page declares had loaded by the end of each
 //     pass, and in the pass that refuses every font file, none had (0058):
 //     a state measured before a late family swapped in is not caught;
@@ -252,6 +255,7 @@ import {
   policyRefused,
   rowUnmeasured,
 } from '../../../scripts/browser-gate.mjs'
+import { selectTextClipped } from '../../../scripts/gradient-contrast.mjs'
 import { recordedPerBrowser } from '../../../scripts/release-report/gate-results.mjs'
 import { actionJourney } from './browser/acting.mjs'
 import { allowanceProblem } from './browser/allowance.mjs'
@@ -471,6 +475,8 @@ async function run(gate, browser) {
       'a focus that scrolls the window or a scroller: the page says where to at once, as 0058’s table says of this browser',
       focusScrollProblem(gate.asked, await focusScroll(browser)),
     )
+    // What 0178's rule for a select's drawn arrow rests on, in this browser, on a page of its own.
+    check('a select draws its chosen text inside its content box, as 0178’s rule for its arrow takes it', await selectTextClipped(browser))
     // The policy's one allowance, watched being needed in this browser (0083).
     check(
       'without the policy’s allowance, the browser refuses the style elements AG Grid creates',

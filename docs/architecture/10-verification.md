@@ -657,7 +657,17 @@ out, a stale run or "It may have run", which the jsdom suites alone hold
 [0166](../decisions/0166-a-person-chooses-a-pages-records-by-a-column-of-boxes-and-runs-an-action-over-them-from-a-bar-above-the-grid.md))
 -- they check that nothing scrolls sideways down to 320 CSS pixels, WCAG's
 reflow width; that the first Tab lands on the skip link and the next in the
-content; axe's colour-contrast and target-size rules; and that no rule of
+content; axe's colour-contrast and target-size rules, with every text's
+contrast decided, what axe cannot decide measured by a rule of the gate's
+own or failed -- inside the host page's grids on the pixels painted
+([0047](../decisions/0047-a-hosts-workspace-lists-opens-and-edits-records-in-linked-grids.md)),
+and, in all three gates, a select's text behind the arrow Blueprint draws,
+asked of axe again with the arrow set aside where every layer of it lies
+clear of the select's content box, by `scripts/gradient-contrast.mjs`,
+whose probe checks in every browser that a select draws its text inside
+that box
+([0178](../decisions/0178-the-browser-gates-decide-a-selects-text-behind-its-drawn-arrow-with-the-arrow-set-aside.md));
+and that no rule of
 the app's own stylesheet reaches the form's paper. The host page's gate also
 fails when Enter on the skip link leaves the keyboard anywhere but `<main>`,
 and when a file Download CSV saves, through Playwright's download event, is

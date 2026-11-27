@@ -26,7 +26,8 @@ export default eslintConfig({
   // does not resolve; the install gate type-checks them, in the consumer
   // project that has them.
   untyped: ['scripts/install-fixture/**'],
-  // The scripts that drive Playwright: the apps' browser gates and pictures.
-  browser: ['apps/*/scripts/**', 'scripts/pictures/**', 'scripts/browser-gate.mjs'],
+  // The scripts that drive Playwright: the apps' browser gates and pictures,
+  // and the two modules the gates share that run code in a page.
+  browser: ['apps/*/scripts/**', 'scripts/pictures/**', 'scripts/browser-gate.mjs', 'scripts/gradient-contrast.mjs'],
   react: ['apps/examples/**/*.{ts,tsx}', 'apps/host/**/*.{ts,tsx}', 'apps/studio/**/*.{ts,tsx}'],
 })
