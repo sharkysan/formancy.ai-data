@@ -572,6 +572,14 @@ get*](../../README.md#what-you-get) is the short version, and
   host page's Drill down shows one level at a time with a trail back
   ([0110](../decisions/0110-a-form-that-is-its-own-child-is-shown-as-a-tree-of-its-records.md),
   [0090](../decisions/0090-a-hosts-workspace-can-drill-down-one-level-at-a-time-with-a-trail-back.md)).
+- **A lookup's record opens a level below the record**, in any form the
+  person may read it in, each named by the server for the lookup; the host
+  page draws the first form's Open beside the lookup's box, joined to it,
+  a button with a glyph named "Open in Customers", unavailable while the
+  lookup is empty, and the others under the field in words
+  ([0140](../decisions/0140-a-form-names-the-forms-each-lookups-record-opens-in.md),
+  [0141](../decisions/0141-a-lookups-record-opens-below-the-record.md),
+  [0157](../decisions/0157-a-lookups-first-open-sits-beside-its-field.md)).
 - **One definition, both renderers**, through one client; the host page
   draws a record in React, Angular or both, as the person chooses
   ([0029](../decisions/0029-a-host-renders-a-published-form-through-one-client.md),

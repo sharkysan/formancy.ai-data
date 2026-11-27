@@ -195,7 +195,7 @@ only enforcement is "we remember" says so plainly.
 | [0138](0138-the-studio-offers-every-lookup-it-can-by-default.md) | The studio offers every lookup it can by default | accepted |
 | [0139](0139-a-lookups-shown-columns-filter-its-records.md) | A lookup's shown columns filter its records | accepted |
 | [0140](0140-a-form-names-the-forms-each-lookups-record-opens-in.md) | A form names the forms each lookup's record opens in | accepted |
-| [0141](0141-a-lookups-record-opens-below-the-record.md) | A lookup's record opens below the record | accepted |
+| [0141](0141-a-lookups-record-opens-below-the-record.md) | A lookup's record opens below the record | accepted; amended by 0157 |
 | [0142](0142-a-records-child-forms-are-tabs-beside-it.md) | A record's child forms are tabs beside it | accepted; extended by 0155 |
 | [0143](0143-a-form-is-listed-in-a-group.md) | A form is listed in a group | accepted; extended by 0144 |
 | [0144](0144-the-host-lists-its-forms-by-group.md) | The host lists its forms by group, with a search and the forms linked to the open one | accepted |
@@ -211,6 +211,7 @@ only enforcement is "we remember" says so plainly.
 | [0154](0154-the-readme-speaks-to-a-buyer-first-and-the-detail-lives-in-the-guide.md) | The README speaks to a buyer first, and the detail lives in the guide | accepted; extended by 0168, 0172 |
 | [0155](0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md) | A record's rows may be saved with it, in one transaction guarded by its version and checked as a whole | accepted; extended by 0159 |
 | [0156](0156-a-trigger-can-refuse-a-write-in-words-the-person-reads.md) | A trigger can refuse a write in words the person reads | accepted; extended by 0160 |
+| [0157](0157-a-lookups-first-open-sits-beside-its-field.md) | A lookup's first Open sits beside its field, joined to its box | accepted |
 | [0158](0158-a-snapshot-records-the-routines-in-scope-when-asked-and-only-then.md) | A snapshot records the routines in scope when asked, and only then | accepted; amended by 0159; extended by 0161, 0163, 0167 |
 | [0159](0159-a-form-binds-a-database-routine-as-an-action-over-the-open-record.md) | A form binds a database routine as an action over the open record | accepted; extended by 0160; amended by 0161; extended by 0163, 0165, 0167 |
 | [0160](0160-an-action-runs-in-one-transaction-that-locks-the-record-moves-its-version-and-calls-the-routine-guarded-and-never-retried.md) | An action runs in one transaction that locks the record, moves its version and calls the routine, guarded and never retried | accepted; extended by 0161, 0165, 0167 |

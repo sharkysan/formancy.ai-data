@@ -1,6 +1,6 @@
 # 0141 — A lookup's record opens below the record
 
-- **Status:** accepted
+- **Status:** accepted; amended by [0157](0157-a-lookups-first-open-sits-beside-its-field.md): the first of a lookup's Opens is drawn beside its box, through formancy 0.14.0's place there, unavailable while the field is empty, and the rest under the field as here
 - **Date:** 2026-11-05
 - **Deciders:** Daniel Bacher
 - **Verified by:** `apps/host/src/lookup-opens.test.ts` -- a lookup offers

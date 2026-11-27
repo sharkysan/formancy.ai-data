@@ -65,8 +65,9 @@ type Notice = { kind: 'stale' | 'refused' | 'declined' | 'unknown'; message: str
  * generation it was said for, so a new form starts with an empty line.
  *
  * Given an `offer`, each lookup the server names forms for offers Open
- * under its field, in the paper (0141). The renderers are handed one offer
- * while its Opens say the same, a press read through a ref
+ * beside its box and under its field, in the paper (0141, 0157). The
+ * renderers are handed one offer while its Opens say the same, a press
+ * read through a ref
  * (steady-offer.ts), so neither redraws a field for a render of the page,
  * nor Angular starts again.
  *

@@ -137,13 +137,20 @@ you delete it
 ([0094](../decisions/0094-a-held-rows-delete-names-the-levels-it-drops-in-its-confirmation.md)).
 The levels are in the page's memory, so a reload starts on the records
 ([0090](../decisions/0090-a-hosts-workspace-can-drill-down-one-level-at-a-time-with-a-trail-back.md)).
-Under each lookup of a record that names a record, the paper offers one
-Open per form you may read it in -- "Open in Order (pg-order)" says the id
-where two forms share a title, and "Open Approved by in Employee" the
-lookup where two lookups open in forms of one title -- on the answer the
-field holds now, saved or not, and nothing under an empty one. Open shows that record a level
-below, in that form, from any layout, which becomes Drill down; a record
-the form does not show you leaves you where you were, saying so
+For each lookup of a record, the paper offers one Open per form you may
+read its record in -- "Open in Order (pg-order)" says the id where two
+forms share a title, and "Open Approved by in Employee" the lookup where
+two lookups open in forms of one title -- on the answer the field holds
+now, saved or not. The first form's sits beside the lookup's box, joined
+to it: a button showing an arrow leaving a box, named by those words and
+showing them as its hint under the pointer, and the next stop after the
+box for Tab. While the lookup is empty it is there, unavailable, and
+pressing it does nothing. A lookup whose record opens in more forms
+offers the others under the field, in words, while it holds an answer
+([0157](../decisions/0157-a-lookups-first-open-sits-beside-its-field.md)).
+Open shows that record a level below, in that form, from any layout,
+which becomes Drill down; a record the form does not show you leaves you
+where you were, saying so
 ([0141](../decisions/0141-a-lookups-record-opens-below-the-record.md)).
 In every layout Back goes on past the open form's earlier views and
 levels, one press each, to the form before

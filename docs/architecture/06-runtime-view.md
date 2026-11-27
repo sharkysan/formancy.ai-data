@@ -802,11 +802,15 @@ budget and a derivation, not measurements
    and not the depth, and shows the level above, replacing the entry, its
    section's grid saying the row is gone. Back, like a crumb, drops a
    row's read still out.
-5. Under each lookup of the record at level n, and in every layout,
+5. For each lookup of the record at level n, and in every layout,
    `apps/host/src/lookup-opens.ts` offers one Open per form `GET
    /v1/forms/:id` names for it (`opens`, 6.4), on the answer the engine
-   holds now, drawn in the paper through each renderer's field addition
-   (`apps/host/src/react-form.tsx`, `apps/host/src/angular-form.ts`).
+   holds now, drawn in the paper by `apps/host/src/react-form.tsx` and
+   `apps/host/src/angular-form.ts`: the first form's beside the lookup's
+   box through each renderer's `fieldBeside`, drawn unavailable while the
+   lookup is empty, and the rest under the field through its field
+   addition
+   ([0157](../decisions/0157-a-lookups-first-open-sits-beside-its-field.md)).
    Open asks the guard with a `drill` request as a section's row does,
    sends `GET /v1/forms/:form` (`apps/host/src/child-forms.ts`'s
    `levelFormOf`) beside `POST /v1/forms/:form/records/read` (6.6) by the answer
@@ -819,12 +823,15 @@ budget and a derivation, not measurements
 Held by `apps/host/src/drill.test.tsx`, `open-lookup.test.tsx` and
 `record-tabs.test.tsx` on both engines, `layout.test.ts`, `leave.test.ts`, `crumbs.test.ts`,
 `lookup-opens.test.ts`, `steady-offer.test.ts`, `lookup-addition.test.tsx`, `address.test.tsx`, and
-the browser gate's `apps/host/scripts/browser/drilling.mjs`. What it costs:
+the browser gate's `apps/host/scripts/browser/drilling.mjs` and
+`apps/host/scripts/browser/beside.mjs`. What it costs:
 the levels are in memory only, so a reload opens the records; a row open on
 a rail in another layout and the same row a level down are two panes; a
 crumb's name comes from a rule over the form's fields (0090); an Open from
 another layout leaves it for Drill down, and asks the form's definition
-each time (0141).
+each time (0141); the Open beside a box shows a glyph and no words, is a
+Tab stop while it can do nothing, and a lookup of two forms or more keeps
+its others under the field (0157).
 
 ## 6.12 Browsing a connection's rows
 

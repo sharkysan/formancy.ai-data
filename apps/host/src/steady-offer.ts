@@ -6,8 +6,9 @@ import type { LookupOffer, NamedOpen } from './lookup-opens.js'
  * as long as its Opens say the same -- compared by what they say, not by the
  * array, which a Drill down level makes again on each render -- and a press
  * read through a ref, so it reaches the handler of the page's latest render.
- * React's field addition is made once per offer, and a new one each render
- * would redraw every field's addition; Angular is handed one as it starts.
+ * React's field addition and its place beside a box are made once per
+ * offer, and a new one each render would redraw every field's addition and
+ * every lookup's box (0157); Angular is handed one as it starts.
  */
 export function useSteadyOffer(offer: LookupOffer | undefined): LookupOffer | undefined {
   const pressed = useRef(offer)
