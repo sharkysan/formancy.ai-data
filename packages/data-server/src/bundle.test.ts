@@ -555,6 +555,36 @@ describe('validateBundle', () => {
     expect(validateBundle(absent)).toMatchObject({ ok: false, problems: [expect.stringMatching(/^form: /)] })
   })
 
+  // @formancy/spec 0.14.0's validator accepts spec 6 (formancy.ai 0239),
+  // which no release of this server generated, so a version edited on the
+  // volume to "6" is refused as one at "4" is, and spec 6's one construct,
+  // a time's or an instant's `precision` (formancy.ai 0238), in a spec 5
+  // document with this server's reason rather than the validator's advice
+  // to move the document to "6". Watched failing with "6" among the
+  // versions served, when the edited version was served, and with the
+  // validator's sentence passed through, which said to change it to "6".
+  test('a form or base edited to spec 6, or given a precision, is refused', () => {
+    const only = 'and this server serves only spec "5", the version it generates, and spec "3", which it generated before (0118)'
+    const timed = () =>
+      good(
+        snapshot((columns) => {
+          columns.push(column('hired_at', 5, { kind: 'timestamp', withTimeZone: true, precision: 6 }))
+        }),
+      )
+    expect(validateBundle(timed())).toEqual({ ok: true, bundle: timed() })
+    const six = copy(timed())
+    for (const form of [six.base, six.form]) form.specVersion = '6'
+    expect(validateBundle(six)).toEqual({ ok: false, problems: [`form: is spec "6", ${only}`] })
+    const precise = copy(timed())
+    const at = precise.base.model.fields.findIndex((field) => field.key === 'hired_at')
+    expect(precise.base.model.fields[at]).toMatchObject({ type: 'datetime' })
+    for (const form of [precise.base, precise.form]) {
+      const hired = form.model.fields.find((field) => field.key === 'hired_at')
+      if (hired !== undefined) hired.precision = 6
+    }
+    expect(validateBundle(precise)).toEqual({ ok: false, problems: [`form: /model/fields/${String(at)}/precision needs spec "6", ${only}`] })
+  })
+
   // The move to spec 5 keeps every version stored before it (0118): one a
   // release before 0118 wrote says spec 3, and is served as it was stored,
   // since a read never compares a base with what this release generates.

@@ -1,10 +1,12 @@
 // What the host gate measures in the browser, as numbers and computed results:
-// sideways overflow, axe, the contrast axe cannot decide inside a grid, and
+// sideways overflow, axe, the contrast axe cannot decide inside a grid -- and,
+// through scripts/gradient-contrast.mjs, behind a select's drawn arrow -- and
 // where the keyboard is.
 
 import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { ACCESSIBILITY_TAGS } from '@formancy/conformance'
+import { decideGradients } from '../../../../scripts/gradient-contrast.mjs'
 
 /** How long Angular may take to arrive, and the server to answer: generous, for a loaded runner. */
 export const WITHIN = { timeout: 20_000 }
@@ -62,7 +64,8 @@ const AXE = readFileSync(createRequire(import.meta.url).resolve('axe-core/axe.mi
  * the two measurements must have run over something. What axe leaves
  * undecided for contrast comes back with each node's selector, reason and
  * place in `window.formancyGateUndecided`, which holds the elements axe
- * named, taken as it answered, for `decide` below: a selector axe builds
+ * named, taken as it answered, for `decide` below and for
+ * scripts/gradient-contrast.mjs (0178): a selector axe builds
  * can name a class AG Grid takes off again, `ag-row-hover` among them, so
  * the element is not found by it later.
  */
@@ -87,6 +90,7 @@ export async function audit(page, target) {
           selector: node.target[0],
           at,
           reason: node.any.map((check) => check.message).join(' '),
+          keys: node.any.map((check) => check.data?.messageKey ?? null),
         })),
       }
     },
@@ -336,14 +340,20 @@ async function reveal(page, at) {
  * the panel's content taller than a window 900 pixels high: the panel's
  * heading after a row's Delete scrolled it, and a refused filter's lines at
  * its foot, in all three browsers.
+ *
+ * A select behind the arrow Blueprint draws, which axe leaves undecided for
+ * "a background gradient", is scripts/gradient-contrast.mjs's, first: what
+ * that rule leaves undecided is `left`, and what it measures below what axe
+ * asks `selectsFailing`.
  */
 export async function decide(page, undecided) {
-  const left = []
+  const gradients = await decideGradients(page, undecided)
+  const left = [...gradients.left]
   const decided = []
   const hidden = []
   const scrolled = await page.evaluate(() => [window.scrollX, window.scrollY])
   try {
-    for (const node of undecided) {
+    for (const node of gradients.rest) {
       // An empty box its pane cuts is said by axe as having no value -- which
       // it says only of a contrast that failed, here for want of the
       // background the pane hid -- and is shown whole as a cut text is.
@@ -440,7 +450,7 @@ export async function decide(page, undecided) {
   } finally {
     await page.evaluate(([x, y]) => window.scrollTo(x, y), scrolled)
   }
-  return { left, decided, hidden, failing: decided.filter((entry) => entry.ratio < 4.5) }
+  return { left, decided, hidden, failing: decided.filter((entry) => entry.ratio < 4.5), selectsFailing: gradients.failing }
 }
 
 /** What has the keyboard's focus, said so that a failure names it. */

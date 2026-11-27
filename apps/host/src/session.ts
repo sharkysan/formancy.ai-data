@@ -28,7 +28,7 @@ import { disableFields } from './widgets.js'
  *   set back into it, so the stored spelling shows (`12.5` is `12.5000` in a
  *   numeric(18,4)). The session takes the record and the new version. The
  *   form stays editable while a save is in flight -- neither renderer holds
- *   input, at 0.3.0 to 0.13.0 -- so an answer the person changed since
+ *   input, at 0.3.0 to 0.14.0 -- so an answer the person changed since
  *   pressing Save is newer than the stored one: it is left as it is, and the
  *   result says that changes are not saved yet.
  * - **stale** (409): nothing is touched. The person's draft stays in the
@@ -36,7 +36,7 @@ import { disableFields } from './widgets.js'
  *   draft. Nothing merges.
  * - **invalid**: the server named fields, and its sentences go onto them
  *   through `applyServerErrors` -- sentences, because the renderers print an
- *   entry verbatim, at 0.3.0 to 0.13.0 (`fieldProblems`).
+ *   entry verbatim, at 0.3.0 to 0.14.0 (`fieldProblems`).
  * - **refused**: anything else is the server's sentence, verbatim, and is not
  *   sent again (0015).
  * - **declined**: a refusal the deployment worded for the person (0156), its

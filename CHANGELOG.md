@@ -16,6 +16,15 @@ which are kept unchanged under a heading of their own below it (0171).
 
 ### Changed
 
+- **Every `@formancy/*` dependency moves to 0.14.0, and generated forms
+  stay on spec 5**
+  ([0118](docs/decisions/0118-generated-forms-move-to-spec-5-for-help-text-from-column-comments.md)):
+  0.14.0 lets a host draw beside a lookup's box (formancy.ai 0237), and
+  its spec 6 adds only a time's precision, which older renderers refuse.
+  A select on the paper now shows Blueprint's arrow; a TypeScript host
+  whose renderer is older than 0.14.0 casts the published form, whose
+  type admits `"6"`.
+
 - **The examples page and the live demo ask search engines to index them**
   ([0177](docs/decisions/0177-the-examples-page-and-the-live-demo-ask-to-be-indexed-each-at-its-own-address-and-only-the-deploy-that-puts-it-there-says-so.md)):
   they are the module's only public pages, and nothing of it could be

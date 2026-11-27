@@ -12,7 +12,7 @@
 // saying so. Every check has one name in every browser (0058).
 //
 // Where the sentence is drawn, held as 0085's cost: every reference theme of
-// formancy 0.6.0 to 0.13.0, whose rules for it are the same in each, places the open list at the foot of the box (`top: 100%`,
+// formancy 0.6.0 to 0.14.0, whose rules for it are the same in each, places the open list at the foot of the box (`top: 100%`,
 // `z-index: 20`, up to 14rem tall), over the line under it, which is where
 // the status is. Measured on 2026-10-18 in Chromium 153 and Firefox 155 on
 // Windows at 1280 and 320 px: the window showed the option "First 01" at
@@ -21,8 +21,10 @@
 // the open list's box covers the sentence's -- which fails the day a
 // release draws them apart, and the cost is to be read again -- and that
 // every text axe could not decide lies under the open list, so a text left
-// undecided for any other reason still fails; and it prints what the
-// window shows there, nothing when the sentence is below the window.
+// undecided for any other reason still fails, but a select behind the
+// arrow Blueprint draws whose text 0178's rule measures at the contrast axe
+// asks; and it prints what the window shows there, nothing when the
+// sentence is below the window.
 //
 // In Separate views, where the record is drawn alone: the third clerk's
 // orders fit the Records grid's columns to other widths than the first
@@ -31,6 +33,7 @@
 
 import { createFormText } from '@formancy/core/words'
 import { DEFAULT_MAX_PAGE_SIZE } from '@formancy/data-core'
+import { decideGradients } from '../../../../scripts/gradient-contrast.mjs'
 import { FORM, TOKENS } from './plane.mjs'
 import { audit, focusedOn, until, WITHIN } from './measure.mjs'
 import { carryOn, demo } from './workspace.mjs'
@@ -73,9 +76,7 @@ function listSaysMore(name, { check }) {
     const under = await page.evaluate(() => {
       const list = [...document.querySelectorAll('[role="listbox"]')].find((candidate) => !candidate.hidden)?.getBoundingClientRect()
       const covered = (box) => list !== undefined && box.top < list.bottom && box.bottom > list.top && box.left < list.right && box.right > list.left
-      const elsewhere = (window.formancyGateUndecided ?? [])
-        .filter((element) => !covered(element.getBoundingClientRect()))
-        .map((element) => element.outerHTML.slice(0, 60))
+      const elsewhere = (window.formancyGateUndecided ?? []).flatMap((element, at) => (covered(element.getBoundingClientRect()) ? [] : [at]))
       const status = [...document.querySelectorAll('[role="status"]')]
         .find((candidate) => (candidate.textContent ?? '').includes('there are more'))
         ?.getBoundingClientRect()
@@ -94,14 +95,25 @@ function listSaysMore(name, { check }) {
       }
     })
     check(
-      `a list that goes on (${name}): the open list covers the sentence, as 0085 says formancy 0.6.0 to 0.13.0 draw it`,
+      `a list that goes on (${name}): the open list covers the sentence, as 0085 says formancy 0.6.0 to 0.14.0 draw it`,
       under.within ? null : 'the sentence lies outside the open list: read 0085’s cost again',
     )
-    check(
-      `a list that goes on (${name}): every text on the paper whose contrast axe left undecided lies under the open list`,
-      under.elsewhere.length === 0 ? null : `undecided elsewhere: ${under.elsewhere.slice(0, 4).join('; ')}`,
+    // A select outside the list, behind the arrow Blueprint draws, is decided by 0178's rule while the list is open; any other text is not.
+    const gradients = await decideGradients(
+      page,
+      open.undecided.filter((node) => under.elsewhere.includes(node.at)),
     )
-    console.log(`  where the sentence is, the window shows ${under.shown}; ${String(open.undecided.length)} texts lie under the open list`)
+    const elsewhere = [
+      ...[...gradients.rest.map((node) => `${node.html} (${node.reason})`), ...gradients.left].map((text) => `undecided elsewhere: ${text}`),
+      ...gradients.failing.map((text) => `below AA elsewhere: ${text}`),
+    ]
+    check(
+      `a list that goes on (${name}): every text on the paper whose contrast axe left undecided lies under the open list, or is a select whose text 0178’s rule measures at the contrast axe asks`,
+      elsewhere.length === 0 ? null : elsewhere.slice(0, 4).join('; '),
+    )
+    console.log(
+      `  where the sentence is, the window shows ${under.shown}; ${String(open.undecided.length - under.elsewhere.length)} texts lie under the open list`,
+    )
     // Left as the gate's own audit wants it -- the keyboard out of Customer and the list closed -- once the list is gone. Closed
     // by the gate's blur alone, Angular's list was still drawn when axe read the paper in WebKit, its texts undecidable under
     // it: twice on CI, on main after #161 and on #163.

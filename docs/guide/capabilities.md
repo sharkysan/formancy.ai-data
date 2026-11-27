@@ -252,7 +252,7 @@ get*](../../README.md#what-you-get) is the short version, and
   ([0066](../decisions/0066-a-lookup-a-person-can-search-is-generated-as-a-typeahead.md)).
   It says when its list goes on, never how long it is, and when matching
   rows cannot be chosen here: under a plain select, where it is seen, and
-  from an open typeahead's status line, which the themes of formancy 0.6.0 to 0.13.0
+  from an open typeahead's status line, which the themes of formancy 0.6.0 to 0.14.0
   draw the open list over, so a screen reader hears it and the eye does not
   ([0085](../decisions/0085-a-lookup-says-when-its-list-goes-on-never-how-long-it-is.md)).
 - **Every write is one guarded statement.** A stale save is refused instead

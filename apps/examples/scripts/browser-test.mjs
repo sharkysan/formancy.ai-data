@@ -14,7 +14,12 @@
 //     the next Tab reaches the first control of the first preview;
 //   - the colours have enough contrast and the targets are big enough -- the
 //     two rules @formancy/conformance switches off in jsdom because they are
-//     measurements, run here where they can be measured;
+//     measurements, run here where they can be measured -- and a text axe
+//     cannot decide fails, but a select's behind the arrow Blueprint draws,
+//     which scripts/gradient-contrast.mjs decides once its probe, run before
+//     the first pass, has shown that this browser clips a select's text to
+//     its content box, and fails by a check of its own when it measures it
+//     below AA (0178);
 //   - every web font the built page declares had loaded by the end of each
 //     pass, and in the pass that refuses every font file, none had (0058):
 //     a state measured before a late family swapped in is not caught;
@@ -57,6 +62,7 @@ import { afterEveryPass, canary, canaryProblem, guardRequests, hearViolations, v
 import { contentSecurityPolicy, headerRules, headersFile, headersFor, parseHeadersFile } from '../../../scripts/demo-headers.mjs'
 import { serveDemo } from '../../../scripts/demo-serve.mjs'
 import { noticesProblem } from '../../../scripts/getting-started/stack.mjs'
+import { decideGradients, selectTextClipped } from '../../../scripts/gradient-contrast.mjs'
 import { recordedPerBrowser } from '../../../scripts/release-report/gate-results.mjs'
 import { NOTICES_FILE } from '../../../scripts/third-party-notices.mjs'
 
@@ -191,7 +197,7 @@ const AXE = readFileSync(createRequire(import.meta.url).resolve('axe-core/axe.mi
  * something. A tag list that stopped selecting them would otherwise pass here
  * with nothing measured, which is exactly the state this gate replaces. An
  * element axe could not decide the contrast of is a contrast nobody measured,
- * so it fails too.
+ * so it fails too, unless it is a select 0178's rule decides.
  *
  * axe arrives through Playwright's evaluate, not a script element: the
  * page's policy refuses an inline script, as it should (0069). What
@@ -219,21 +225,33 @@ async function audit(page, target) {
   // built page showed on 2026-10-16 (0072). The two rules that ask for it
   // are css-orientation-lock, experimental and outside the tags, and
   // no-autoplay-audio, for media the page has none of.
-  return subject.evaluate(
+  //
+  // What axe left undecided is kept, as axe answered, in
+  // `window.formancyGateUndecided`, for scripts/gradient-contrast.mjs to
+  // decide a select behind its drawn arrow by (0178); every other text axe
+  // left undecided still fails, with axe's reason.
+  const result = await subject.evaluate(
     async (context, tags) => {
-      const results = await window.axe.run(context, { runOnly: { type: 'tag', values: tags }, preload: false })
+      const results = await window.axe.run(context, { runOnly: { type: 'tag', values: tags }, preload: false, elementRef: true })
       const nodes = (list, id) => list.find((rule) => rule.id === id)?.nodes ?? []
+      const undecided = nodes(results.incomplete, 'color-contrast')
+      window.formancyGateUndecided = undecided.map((node) => node.element)
       return {
         axe: window.axe.version,
         violations: results.violations.map((rule) => `${rule.id} (${String(rule.nodes.length)}): ${rule.nodes[0]?.html.slice(0, 90) ?? ''}`),
         measured: ['color-contrast', 'target-size'].filter((id) => nodes(results.passes, id).length > 0),
-        undecided: nodes(results.incomplete, 'color-contrast')
-          .map((node) => node.html.slice(0, 60))
-          .slice(0, 4),
+        undecided: undecided.map((node, at) => ({
+          html: node.html.slice(0, 60),
+          at,
+          reason: node.any.map((check) => check.message).join(' '),
+          keys: node.any.map((check) => check.data?.messageKey ?? null),
+        })),
       }
     },
     [...ACCESSIBILITY_TAGS],
   )
+  const { rest, left, failing } = await decideGradients(page, result.undecided)
+  return { ...result, undecided: [...rest.map((node) => `${node.html} (${node.reason})`), ...left].slice(0, 4), failing: failing.slice(0, 4) }
 }
 
 /**
@@ -284,10 +302,14 @@ async function run(gate, browser) {
       expected.every((id) => result.measured.includes(id)) ? null : `only ${result.measured.join(', ') || 'nothing'} had anything to measure`,
     )
     check(`${state}, and decided the contrast of every text`, result.undecided.length === 0 ? null : `undecided: ${result.undecided.join('; ')}`)
+    check(`${state}, and every select’s text behind its drawn arrow at the contrast axe asks`, result.failing.length === 0 ? null : result.failing.join('; '))
   }
 
   try {
     const list = widths()
+    // What 0178's rule for a select's drawn arrow rests on, in this browser, on a page of its own: before the first pass, since
+    // the rule decides no select in a browser until its probe has held there.
+    check('a select draws its chosen text inside its content box, as 0178’s rule for its arrow takes it', await selectTextClipped(browser))
     for (const { label, width, refuseFonts = false } of list) {
       gate.pass({ label, width })
       const page = await browser.newPage({ viewport: { width, height: 900 } })

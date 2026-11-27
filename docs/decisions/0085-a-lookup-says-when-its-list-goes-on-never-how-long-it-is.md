@@ -1,6 +1,6 @@
 # 0085 — A lookup says when its list goes on, never how long it is
 
-- **Status:** accepted
+- **Status:** accepted; narrowed by [0178](0178-the-browser-gates-decide-a-selects-text-behind-its-drawn-arrow-with-the-arrow-set-aside.md): a select outside the open list whose contrast axe leaves undecided behind the arrow Blueprint draws is decided by 0178's rule, not failed, in the check that every text axe could not decide lies under the list
 - **Date:** 2026-10-19
 - **Deciders:** Daniel Bacher
 - **Verified by:**

@@ -22,14 +22,14 @@ says.
 | `@types/mssql`, by `@formancy/data-sqlserver` | 12.3.0 | `^12.3.0` |
 | `mssql`, by `@formancy/data-sqlserver` | 12.7.4 | `^12.0.0` |
 | `tedious`, under `mssql` | 20.3.7 | `^19.2.2 \|\| ^20.0.0`, by `mssql` |
-| `@formancy/angular` | 0.13.0 | `0.13.0` |
-| `@formancy/builder-core` | 0.13.0 | `0.13.0` |
-| `@formancy/conformance` | 0.13.0 | `0.13.0` |
-| `@formancy/core` | 0.13.0 | `0.13.0` |
-| `@formancy/expressions` | 0.13.0 | `0.13.0` |
-| `@formancy/react` | 0.13.0 | `0.13.0` |
-| `@formancy/spec` | 0.13.0 | `0.13.0` |
-| `@formancy/themes` | 0.13.0 | `0.13.0` |
+| `@formancy/angular` | 0.14.0 | `0.14.0` |
+| `@formancy/builder-core` | 0.14.0 | `0.14.0` |
+| `@formancy/conformance` | 0.14.0 | `0.14.0` |
+| `@formancy/core` | 0.14.0 | `0.14.0` |
+| `@formancy/expressions` | 0.14.0 | `0.14.0` |
+| `@formancy/react` | 0.14.0 | `0.14.0` |
+| `@formancy/spec` | 0.14.0 | `0.14.0` |
+| `@formancy/themes` | 0.14.0 | `0.14.0` |
 | Node, the workspace |  | `^22.22.3 \|\| ^24.15.0 \|\| >=26.0.0` |
 | Node, the server image | `node:22.12-alpine`, every stage |  |
 | Node, CI | 22 |  |

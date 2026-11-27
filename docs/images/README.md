@@ -312,7 +312,7 @@ Filed, not hidden, because a picture is the product as it is:
   administrator plane -- it draws a sentence in place of the control, so
   nothing in the field carries `aria-required`, which is what the Blueprint
   theme draws the `*` from; the field still says "required" after Validate.
-  That is `@formancy/react`'s fallback, at 0.3.0 to 0.13.0 alike,
+  That is `@formancy/react`'s fallback, at 0.3.0 to 0.14.0 alike,
   and the themes, upstream.
 - **A starting value's note and its button spell the column's apostrophe
   two ways.** Under a starting value the generator's note says "the
@@ -332,7 +332,7 @@ Filed, not hidden, because a picture is the product as it is:
   sentence is `@formancy/core`'s `countSentence`, which asks only whether
   the field's type is counted and has a `maxLength`, never whether it is
   disabled, and `@formancy/react`'s `CharacterCount` draws it under the
-  field, both at 0.13.0: upstream's.
+  field, both at 0.13.0 and 0.14.0: upstream's.
 
 ## What nothing checks
 
@@ -343,7 +343,11 @@ Filed, not hidden, because a picture is the product as it is:
 - **What a picture looks like.** A change to a stylesheet or a theme alone, a
   font package that moved, or a Chromium rendering change leaves the text the same;
   `--check` prints a notice when the app's stylesheet changed, and fails on
-  nothing. Review holds the looks.
+  nothing. Review holds the looks. When the apps moved to
+  `@formancy/themes` 0.14.0, whose Blueprint draws a select's arrow and
+  what a host puts beside a field's box, which no app here does, only the
+  pictures with a select on the paper were retaken; the others' records
+  still name 0.13.0.
 - **A face from another origin.** That a capture refuses a font file another
   origin answered: `camera.test.mjs` holds the filter that names one, but
   the refusal is in the capture's font step, which neither `pnpm test:repo`

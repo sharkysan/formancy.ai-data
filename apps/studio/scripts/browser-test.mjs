@@ -46,7 +46,11 @@
 //     on the Choose step a touch column chosen, a form's rows saved with
 //     their record and its bounds, and a pin the server refuses of them,
 //     said under the box (0155); and an action over the open record, its
-//     parameters given, granted after its notice, and worded (0163);
+//     parameters given, granted after its notice, and worded (0163) -- a
+//     select's text behind the arrow Blueprint draws decided by
+//     scripts/gradient-contrast.mjs once its probe, run before the first
+//     pass, has shown that the browser clips a select's text to its content
+//     box, and one it measures below AA failed by a check of its own (0178);
 //   - every web font the built studio declares had loaded by the end of
 //     each pass, on each origin the pass signed in to, and in the pass that
 //     refuses every font file, none had (0058): a state measured before a
@@ -100,6 +104,7 @@ import {
   webFonts,
 } from '../../../scripts/browser-gate.mjs'
 import { FACTS } from '../../../scripts/browsers.mjs'
+import { selectTextClipped } from '../../../scripts/gradient-contrast.mjs'
 import { recordedPerBrowser } from '../../../scripts/release-report/gate-results.mjs'
 import { actions } from './browser/actions.mjs'
 import { browse } from './browser/browse.mjs'
@@ -236,6 +241,9 @@ async function run(gate, browser) {
   if (!existsSync(join(DIST, 'index.html'))) throw new Error('no built studio at apps/studio/dist: run `pnpm build` first')
 
   const list = widths()
+  // What 0178's rule for a select's drawn arrow rests on, in this browser, on a page of its own: before the first pass, since
+  // the rule decides no select in a browser until its probe has held there.
+  gate.check('a select draws its chosen text inside its content box, as 0178’s rule for its arrow takes it', await selectTextClipped(browser))
   for (const { label, width, refuseFonts = false } of list) {
     gate.pass({ label, width })
     const plane = await startPlane()

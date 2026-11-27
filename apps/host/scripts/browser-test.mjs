@@ -189,7 +189,11 @@
 //   - every `@media` condition is one the gate reads: a `max-width` in rem,
 //     from which it takes its widths (0047);
 //   - the colours have enough contrast and the targets are big enough -- the
-//     two rules jsdom cannot measure -- in every state below;
+//     two rules jsdom cannot measure -- in every state below, a select's
+//     text behind the arrow Blueprint draws decided by
+//     scripts/gradient-contrast.mjs once its probe, run before the first
+//     pass, has shown that the browser clips a select's text to its content
+//     box, and one it measures below AA failed by a check of its own (0178);
 //   - every web font the built page declares had loaded by the end of each
 //     pass, and in the pass that refuses every font file, none had (0058):
 //     a state measured before a late family swapped in is not caught;
@@ -252,6 +256,7 @@ import {
   policyRefused,
   rowUnmeasured,
 } from '../../../scripts/browser-gate.mjs'
+import { selectTextClipped } from '../../../scripts/gradient-contrast.mjs'
 import { recordedPerBrowser } from '../../../scripts/release-report/gate-results.mjs'
 import { actionJourney } from './browser/acting.mjs'
 import { allowanceProblem } from './browser/allowance.mjs'
@@ -331,6 +336,10 @@ async function run(gate, browser) {
     const decided = await decide(page, result.undecided)
     check(`${state}: the contrast of every text decided`, decided.left.length === 0 ? null : `undecided: ${decided.left.slice(0, 4).join('; ')}`)
     check(
+      `${state}: every select’s text behind its drawn arrow at the contrast axe asks`,
+      decided.selectsFailing.length === 0 ? null : decided.selectsFailing.slice(0, 4).join('; '),
+    )
+    check(
       `${state}: the grids' text, decided on the pixels, at 4.5:1 or more`,
       decided.failing.length === 0 ? null : decided.failing.map((entry) => `${entry.name} ${String(entry.ratio)}:1`).join('; '),
     )
@@ -342,6 +351,10 @@ async function run(gate, browser) {
     check(`${state}: the browser refused nothing under the page’s policy`, await policyRefused(page))
   }
 
+  // What 0178's rule for a select's drawn arrow rests on, in this browser, on a page of its own: before the first pass, since
+  // the rule decides no select in a browser until its probe has held there.
+  stage = `probing how ${browser.browserType().name()} draws a select’s text`
+  check('a select draws its chosen text inside its content box, as 0178’s rule for its arrow takes it', await selectTextClipped(browser))
   stage = `starting the plane for ${browser.browserType().name()}`
   const started = Date.now()
   const plane = await startPlane()

@@ -584,7 +584,7 @@ saved record" discards the draft
 ([0029](../decisions/0029-a-host-renders-a-published-form-through-one-client.md)).
 A lookup's list says that more rows match, never how many, and in a
 typeahead it says so only while the list is open, on a line every
-reference theme of formancy 0.6.0 to 0.13.0 draws the open list over: a screen
+reference theme of formancy 0.6.0 to 0.14.0 draws the open list over: a screen
 reader hears it, the eye does not
 ([0085](../decisions/0085-a-lookup-says-when-its-list-goes-on-never-how-long-it-is.md)).
 A form the person may only read, chosen with no record open, holds each
@@ -838,7 +838,13 @@ Safari (0058). Docker Desktop, Windows and macOS are run by no gate (0032),
 and nothing of the Cloudflare deployment has been measured through a real
 tunnel (0037). That a host on `@formancy/*` 0.3.0 reads the generated forms
 was measured by hand (0042). Most transient error codes are allowlisted from
-documentation and provoked by no test (0028). The images are moving tags
+documentation and provoked by no test (0028). The arrow formancy
+0.14.0's Blueprint draws in a select is measured for contrast by no gate,
+and the gates' rule that decides the select's text behind it rests on how
+a select of the probe's own clips its text in each browser, not on each
+select it decides
+([0178](../decisions/0178-the-browser-gates-decide-a-selects-text-behind-its-drawn-arrow-with-the-arrow-set-aside.md)).
+The images are moving tags
 (0035), and only the adapter suites and data-fixtures run on every image of
 the matrix; every other suite runs the defaults alone (0067). Why two
 SQL Server 2025 containers stopped before they were ready on CI on
@@ -979,13 +985,23 @@ and a fast database-free suite is foreclosed.
 here may patch formancy, so a generic improvement the module needs waits
 for upstream's contribution rules and its next release.
 
-**Forms on spec 5.** The cost of 0118, bought for a field's help text from
+**Forms on spec 5.** The cost of
+[0118](../decisions/0118-generated-forms-move-to-spec-5-for-help-text-from-column-comments.md),
+bought for a field's help text from
 its column's comment: a host whose renderer is older than `@formancy/*`
 0.8.0 refuses every form published since, and a deployment rolled back
 before 0118 refuses them too until an earlier version is restored. A
 renderer that does not read spec 5's `default` refuses a form that carries
 one, which every form over a column with a constant default does from
 [0149](../decisions/0149-a-new-record-starts-with-its-columns-constant-default.md) on.
+And `@formancy/data-client`'s types are those of the `@formancy/spec` it
+pins exactly (0002), whose `specVersion` admits `"6"` from 0.14.0 on,
+though every generated form says `"5"`: a TypeScript host whose renderer
+is at 0.8.0 to 0.13.0, which draws every such form, fails to compile with
+TS2322 on `specVersion` at `createFormEngine` until it casts the published
+form to its own `FormSchema` or moves its renderer, measured against
+`@formancy/core` 0.13.0 with TypeScript 6.0.3 and `skipLibCheck` off on
+2026-11-27.
 
 **Published configuration is files.** The cost of 0013 and 0062, bought
 for no lock, no daemon and no second database: one instance, and a version

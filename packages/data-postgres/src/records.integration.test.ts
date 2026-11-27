@@ -296,10 +296,11 @@ describe('reading', () => {
     })
   })
 
-  // Values PostgreSQL holds and formancy's shapes cannot. An instant with
-  // microseconds -- what now() writes into the fixture's own created_at --
-  // and a time with seconds are read cut to the shape, as SQL Server reads
-  // them (0040): to the second, in UTC, and to the minute, cut and never
+  // Values PostgreSQL holds and formancy's shapes for a field that says no
+  // `precision`, which no generated field does (spec 5, 0118), cannot. An
+  // instant with microseconds -- what now() writes into the fixture's own
+  // created_at -- and a time with seconds are read cut to the shape, as SQL
+  // Server reads them (0040): to the second, in UTC, and to the minute, cut and never
   // rounded, so `.789012` carries into nothing. Read faithfully, as before
   // 0040, neither was a value its field accepts, and a host that sends every
   // field back could not save the record. What no shape can name -- an

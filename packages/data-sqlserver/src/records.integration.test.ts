@@ -313,8 +313,9 @@ describe('reading a record', () => {
   // (0026), money to four places (its own default conversion rounds to two), a
   // uuid in lower case, an instant in UTC, a zoneless timestamp with its
   // fraction. Only a time and an instant are cut short -- a time to its
-  // minutes, an instant to its seconds -- because formancy's shapes cannot hold
-  // more (0017).
+  // minutes, an instant to its seconds -- because formancy's shapes for a
+  // field that says no `precision`, which no generated field does (spec 5,
+  // 0118), cannot hold more (0017).
   test('every other kind reads as its codec spells it, and what the shapes cannot hold is cut off', async () => {
     const records = defined(createSqlServerRecords(owner))
     const kinds = ok(await records.read({ target: target(KINDS), key: [valueOf(KINDS, 'id', '1')], columns: readable(KINDS), filters: EVERY_ROW, through: [] }))

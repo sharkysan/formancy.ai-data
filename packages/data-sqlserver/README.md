@@ -538,8 +538,12 @@ a save stored in part, `unknown-outcome`. What both engines answer is
   a `datetime`, which keeps 1/300 s, to the millisecond, rounded as SQL
   Server spells it —
   UUIDs in lower case. A time's seconds and an instant's fraction are cut
-  off, because formancy's shapes cannot hold them, as the PostgreSQL adapter
-  now cuts them too. `planUpdate` in `@formancy/data-core`, given the record
+  off, as the PostgreSQL adapter now cuts them too, because formancy's
+  shapes for a field that says no `precision` cannot hold them, and no
+  generated field says one: generated forms are spec 5
+  ([0118](../../docs/decisions/0118-generated-forms-move-to-spec-5-for-help-text-from-column-comments.md)),
+  and spec 6's `precision`, from `@formancy/*` 0.14.0 on, which could
+  hold more, is later work. `planUpdate` in `@formancy/data-core`, given the record
   as read, removes an unedited echo of either from an update and refuses to
   plan one without that read, so a save planned by it does not write the
   shorter value

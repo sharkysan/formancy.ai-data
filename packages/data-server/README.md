@@ -90,12 +90,13 @@ existed would be documented and inert.
   confirmed version column, pins over written fields and lookups — against
   the base and bindings, because a regeneration generates from that request;
   a pin taken out by hand is the one edit to it that no check short of the
-  generator can see. Publish and reads alike refuse a form or base that is
-  not in a spec version this server serves, data-core's
+  generator can see. Publish and reads alike refuse a form, a base or an
+  action's dialog that is not in a spec version this server serves, data-core's
   `SERVED_SPEC_VERSIONS` -- spec 5, which it generates, and spec 3, which
   every release before 0118 generated -- or that carries a later version's
   construct, because formancy's validator accepts every version its release
-  speaks, spec 4 included, which no release generated
+  speaks, spec 4 included and spec 6 from `@formancy/*` 0.14.0 on, neither
+  of which any release here generated
   ([0118](../../docs/decisions/0118-generated-forms-move-to-spec-5-for-help-text-from-column-comments.md)).
 - **`DRIVER_FACTORIES`** — one connection factory per engine, opening every
   connection through the adapter package's own `connect…` function, so a host
