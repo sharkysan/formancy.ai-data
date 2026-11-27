@@ -123,9 +123,9 @@ function sizeOn(text, room) {
  * `{ why }` when one of them is not a px length.
  */
 export function boxesOf(style) {
-  const side = (property) => ['top', 'right', 'bottom', 'left'].map((edge) => px(style[property.replace('*', edge)]))
-  const border = side('border-*-width')
-  const padding = side('padding-*')
+  const side = (before, after = '') => ['top', 'right', 'bottom', 'left'].map((edge) => px(style[`${before}${edge}${after}`]))
+  const border = side('border-', '-width')
+  const padding = side('padding-')
   const [width, height] = [px(style.width), px(style.height)]
   if ([...border, ...padding, width, height].some(Number.isNaN))
     return { why: `its box is not in px lengths (${style.width} by ${style.height}, ${style['box-sizing']})` }
