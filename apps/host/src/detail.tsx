@@ -7,6 +7,7 @@ import type { Said } from './leave.js'
 import type { Layout } from './layout.js'
 import type { LookupOffer } from './lookup-opens.js'
 import { Pane } from './pane.js'
+import type { SaveFrom } from './pane-reach.js'
 import { renderersOf } from './panes.js'
 import type { RendererChoice } from './prefs.js'
 import { SAVE_OUT } from './deletion.js'
@@ -84,7 +85,8 @@ export function Detail({
   loadRef: RefObject<HTMLButtonElement | null>
   onLoad: (token: string) => void
   sessions: readonly Session[]
-  onAnswer: (result: SaveResult, session: Session) => void
+  /** A save a pane answered: asked from its Save, or from the grid leaving the record's row (0179). */
+  onAnswer: (result: SaveResult, session: Session, from: SaveFrom) => void
   /** A pane's "Load the saved record" replaced its draft with what is stored. */
   onLoaded: (session: Session) => void
   /** The form offers this person a copy (0107): Duplicate record in the header of an open record. */
@@ -205,7 +207,7 @@ export function Detail({
                   owner="master"
                   title={formTitle}
                   idBase={formId}
-                  onAnswer={(result) => onAnswer(result, session)}
+                  onAnswer={(result, from) => onAnswer(result, session, from)}
                   onLoaded={() => onLoaded(session)}
                   offer={offer}
                   onShow={show}

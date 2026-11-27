@@ -14,6 +14,9 @@ import type { Status } from './pager.js'
  * leaves the pager on their page, and one AG Grid was not moved to puts
  * back what the line said before it was asked.
  *
+ * What the open row's save came to (0179) is said as the server's answer
+ * is, each sentence a new element so that one said again is heard again.
+ *
  * A record gone from the grid (0053) -- deleted, or not found by a delete
  * and closed -- is said once, before the sentence of the page asked for
  * again, and so is a list started again at its first page because the row
@@ -49,6 +52,12 @@ export interface LineSays {
   removed(said: Said): void
   /** A sentence of the page's own, until the next answer. */
   say(said: Said): void
+  /**
+   * What the open row's save came to, or why a cell is not edited (0179):
+   * `stored` in the room's teal, as the server's answer; `refused` as a
+   * refusal; each a new element, so a sentence said again is heard again.
+   */
+  told(said: Said, kind: 'stored' | 'refused' | 'pending'): void
   /** A row asked for that has no token. */
   cannotOpen(): void
   /** A page asked first that AG Grid was not moved to: the wait is over, and the line says what it said before the ask. */
@@ -158,6 +167,19 @@ export function useGridLine({
       },
       say: (said) => {
         setStatus({ kind: 'answer', text: said, help: null, clear: false, retry: false, said: null })
+      },
+      told: (said, kind) => {
+        answers.current += 1
+        const n = answers.current
+        setStatus({
+          kind: kind === 'refused' ? 'refused' : 'answer',
+          text: said,
+          help: null,
+          clear: false,
+          retry: false,
+          said: kind === 'stored' ? n : null,
+          fresh: n,
+        })
       },
       cannotOpen: () => {
         setStatus({ kind: 'refused', text: [CANNOT_OPEN], help: null, clear: false, retry: false, said: null })

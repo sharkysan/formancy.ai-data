@@ -13,9 +13,11 @@ import { WIDTH_STEP } from './widths.js'
  * The keys a record grid answers, and the ones it does not (0047, UX-SPEC
  * §7.3), in AG Grid Community as the page configures it, against the real
  * server, on a form that offers delete: Delete and Backspace clear nothing,
- * send nothing and ask nothing, because no cell is editable and no key
- * deletes -- a record is deleted from its detail's Delete record or its
- * row's Delete, behind a confirmation (0053); Alt and an arrow on a header
+ * send nothing and ask nothing, because no key but F2 edits a cell (0179)
+ * and no key deletes -- a record is deleted from its detail's Delete record or its
+ * row's Delete, behind a confirmation (0053); F2 on the open row edits a
+ * cell there, or says why not, or takes the keyboard to the field the
+ * record's form edits, by the form's own copy of the record; Alt and an arrow on a header
  * resize its column, which the page keeps (0151); and a width set in
  * Columns stays through a new page, the separator let go and the page
  * mounted again, the grid's sizing never taking it away. And every option
@@ -94,11 +96,12 @@ async function settled(): Promise<void> {
 
 describe.each(ENGINES)('the record grid on $engine', (engine) => {
   const { formId } = engine
-  // No cell is editable, so Delete and Backspace clear nothing and nothing
-  // is sent, and no key deletes: not even a confirmation opens, on a form
-  // the person may delete with (watched failing with Delete turned into a
-  // request, and with it mapped to the row's Delete: the confirmation
-  // opened).
+  // No key but F2 edits a cell (0179), so Delete and Backspace clear
+  // nothing and nothing is sent, and no key deletes: not even a
+  // confirmation opens, on a form the person may delete with (watched
+  // failing with Delete turned into a request, and with it mapped to the
+  // row's Delete: the confirmation opened; and in cell-editors.test.tsx with
+  // AG Grid's own Delete and Backspace let through to an editable cell).
   test('clears, sends and asks nothing on Delete or Backspace', async () => {
     const user = await inTheGrid(formId)
     expect(
@@ -118,6 +121,37 @@ describe.each(ENGINES)('the record grid on $engine', (engine) => {
     ).toEqual(before)
     expect(plane.sent.slice(sent).map((request) => `${request.method} ${request.path}`)).toEqual([])
     expect(screen.queryByRole('region', { name: /^Delete / })).toBeNull()
+  })
+
+  // F2 is decided by the copy the record's form draws it with (0179): on
+  // Id, which the database writes, the line says why and no editor opens;
+  // on Notes, a textarea, the keyboard goes to Notes in the record's form,
+  // the same draft; on Group, an editor named for the field and the record
+  // takes it. Typing a character there before F2 starts nothing -- `=` is
+  // the filter's (0133). A grid that decided by its own rules could edit
+  // what the form draws disabled.
+  test('F2 edits by the form’s copy: why not on Id, Notes in the form, Group in its cell', async () => {
+    const user = await inTheGrid(formId)
+    const row = document.activeElement?.closest('[role="row"]') as HTMLElement
+    const cell = (colId: string): HTMLElement =>
+      within(row)
+        .getAllByRole('gridcell')
+        .find((each) => each.getAttribute('col-id') === colId) as HTMLElement
+    const token = /^Order (k1:.+)$/.exec(screen.getByRole('heading', { level: 3, name: /^Order k1:/ }).textContent ?? '')?.[1] ?? ''
+    cell('id').focus()
+    await user.keyboard('{F2}')
+    await waitFor(() => expect(gridStatus('Records')?.textContent).toBe('Id is not written from this form.'), { timeout: 15_000 })
+    cell('group').focus()
+    await user.keyboard('x')
+    expect(screen.queryByRole('textbox', { name: `Group, Order ${token}` })).toBeNull()
+    await user.keyboard('{F2}')
+    await waitFor(() => expect(focusedName()).toBe(`Group, Order ${token}`), { timeout: 15_000 })
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(document.activeElement).toBe(cell('group')))
+    cell('notes').focus()
+    await user.keyboard('{F2}')
+    await waitFor(() => expect(document.activeElement?.closest('form')?.getAttribute('aria-label')).toMatch(/^Order, (React|Angular)$/), { timeout: 15_000 })
+    expect(focusedName()).toMatch(/^Notes/)
   })
 
   // AG Grid resizes a header's column with Alt and an arrow, two pixels a
@@ -195,10 +229,22 @@ describe.each(ENGINES)('the record grid on $engine', (engine) => {
 })
 
 // Every option the page sets has the module it needs: AG Grid otherwise
-// writes "error #200" or a warning on the console and ignores the option.
+// writes "error #200" or a warning on the console and ignores the option --
+// an editor opened and given up among them, whose module is
+// CustomEditorModule (0179; watched failing in cell-editors.test.tsx without
+// it: "error #200 ... moduleName=CustomEditor", and no editor opened).
 test('says nothing on the console, so every option it uses has its module', async () => {
   const said = [vi.spyOn(console, 'warn'), vi.spyOn(console, 'error')]
   const user = await inTheGrid(ENGINES[0].formId)
+  const row = document.activeElement?.closest('[role="row"]') as HTMLElement
+  ;(
+    within(row)
+      .getAllByRole('gridcell')
+      .find((each) => each.getAttribute('col-id') === 'group') as HTMLElement
+  ).focus()
+  await user.keyboard('{F2}')
+  await waitFor(() => expect(focusedName()).toMatch(/^Group, Order k1:/), { timeout: 15_000 })
+  await user.keyboard('{Escape}')
   await user.keyboard('{ArrowDown}{Enter}')
   await waitFor(() => expect(focusedName()).toMatch(/^Order k1:/), { timeout: 15_000 })
   const grid = said.flatMap((spy) => spy.mock.calls.map((call) => call.map(String).join(' '))).filter((text) => /AG Grid/.test(text))

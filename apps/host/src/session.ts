@@ -508,6 +508,8 @@ export function createSession({ client, formId, definition, renderer, namespace,
     release(by: HoldBy = 'delete'): void {
       holds.delete(by)
     },
+    /** What a press says while something holds this form's Save, as `hold` set it; undefined while nothing does: a grid's edit of the record waits as its Save does (0179). */
+    held: (): string | undefined => [...holds.values()][0],
     /** This form's last save whose outcome is unknown, if any. */
     unknown: (): UnknownWrite | undefined => lostHere()?.write,
     /**

@@ -18,6 +18,7 @@ import type { Said } from './leave.js'
 import { Pager } from './pager.js'
 import { useGridLine } from './use-grid-line.js'
 import { useGridSizing } from './use-grid-sizing.js'
+import type { GridEdit } from './use-grid-edit.js'
 import { useGridSort } from './use-grid-sort.js'
 import { useHeaderFilters } from './use-header-filters.js'
 import { useHeaderFloors } from './use-header-floors.js'
@@ -46,6 +47,11 @@ export type { OpenHow } from './grid-keys.js'
  * page drawn is told to the choice, which a page of another list or
  * another page clears (chosen-rows.ts, 0166); what the panel draws above
  * the well -- what may be done with the records chosen -- is its own.
+ *
+ * Given the open record's edit (use-grid-edit.ts, 0179) -- the Records
+ * grid's alone -- the open row is drawn from the record's engine, its cells
+ * edited there, and what F2, a double click and the keyboard leaving the
+ * row do are the edit's; its line says what the row's save came to.
  *
  * What it holds itself: whether its page has answered and how many rows it
  * drew, and the open record's row selected in the grid after every page --
@@ -97,6 +103,8 @@ export interface RecordGridHandle {
   reload(): void
   /** A sentence of the page's own on the status line, until the next answer. */
   say(line: Said): void
+  /** What the open row's save came to, or why a cell is not edited (0179): `stored` in the room's teal (0146), each a new element, so a sentence said again is heard again. */
+  tell(line: Said, kind: 'stored' | 'refused' | 'pending'): void
   /** A record gone from the grid: the page asked for again, and `line` said once, before its sentence. */
   removed(line: Said): void
   /** A column as the grid draws it now -- its width and the least and most it may be -- or null where the grid has none (0151). */
@@ -169,6 +177,8 @@ export interface RecordGridProps {
   alone?: boolean
   /** Told each time a page has answered and is drawn: where a section puts the keyboard back on a row its set changed. */
   onListed?: () => void
+  /** The open record's edit in its row (0179): the Records grid's alone. */
+  edit?: GridEdit
 }
 
 export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function RecordGrid(props, handle): ReactElement {
@@ -306,6 +316,8 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
     [client, formId, columns, search, parent?.field, parent?.record, filter, sort, hooks],
   )
   useEffect(() => () => datasource.abort(), [datasource])
+  // The grid gone: the open record's edit holds none of it.
+  useEffect(() => () => latest.current.edit?.attach(null), [])
   useEffect(() => applySelection(), [openToken, applySelection])
   // After the parent's line is quieted (use-grid-line.ts): a new list's first page is asked here, and its line is the quiet one.
   // A page AG Grid was not moved to: the wait is over, and the line says what it said before the ask.
@@ -346,6 +358,9 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
       say(said) {
         line.say(said)
       },
+      tell(said, kind) {
+        line.told(said, kind)
+      },
       removed(said) {
         line.removed(said)
         if (heldNow.current?.reload() !== true) api.current?.purgeInfiniteCache()
@@ -375,7 +390,7 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
   const removeNoun = props.remove?.noun
   const removeWorded = props.remove?.said !== undefined
   const removeHeading = props.remove?.heading
-  const { choose } = props
+  const { choose, edit } = props
   // Each header's floor, measured again where the page's fonts loading changed one (0151).
   const floors = useHeaderFloors(columns)
   const columnDefs = useMemo(
@@ -388,8 +403,9 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
         latest.current.widths,
         floors,
         choose === undefined ? undefined : chooseColumn(choose),
+        edit,
       ),
-    [arranged, removeNoun, removeWorded, removeHeading, boxedKeys, floors, choose],
+    [arranged, removeNoun, removeWorded, removeHeading, boxedKeys, floors, choose, edit],
   )
 
   const options = useMemo(
@@ -401,6 +417,7 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
           openToken: () => latest.current.openToken,
           ready: (ready) => {
             api.current = ready
+            latest.current.edit?.attach(ready)
             if (!shown.current.loaded) ready.setGridAriaProperty('busy', 'true')
             headers.ready(ready)
             // The sort the section opens on: a default view's (0105).
@@ -415,6 +432,12 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
             else latest.current.onOpen(row.record, how, { rowIndex: rowIndex ?? 0, colId })
           },
           drilling: () => latest.current.drilling === true,
+          edits: (row, colId) => {
+            const how = latest.current.edit?.how(row, colId)
+            return how === undefined || how.kind === 'never' ? null : how.kind
+          },
+          edit: (row, colId, rowIndex) => latest.current.edit?.start(row, colId, rowIndex),
+          moved: (rowIndex) => latest.current.edit?.moved(rowIndex),
           example: (row, colId) => {
             if (headers.example(row, colId)) return
             const label = latest.current.columns.find((column) => column.key === colId)?.label ?? colId

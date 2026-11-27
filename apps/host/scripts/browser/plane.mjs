@@ -365,6 +365,8 @@ export async function startPlane() {
     deleteCustomer: (no) => sql`delete from sales.customer where tenant_id = 1 and customer_no = ${no}`,
     /** An order's group written beside the page, as the database's owner; `null` puts it back. */
     setGroup: (record, group) => sql`update sales."order" set "group" = ${group} where id = ${record.slice('k1:'.length)}`,
+    /** An order's group as the database's owner reads it: what a cell of its row saved (0179). */
+    groupOf: async (record) => (await sql`select "group" from sales."order" where id = ${record.slice('k1:'.length)}`)[0]?.group ?? null,
     /** An order changed beside the page, through the server as tenant 1's clerk: its version moves on. */
     change: async (record, notes) => {
       const { version } = await call(TOKENS.clerk, `/v1/forms/${FORM}/records/read`, { record })

@@ -15,6 +15,8 @@ export interface Status {
   retry: boolean
   /** The how-manyth answer of the server the line says, whose words are drawn in its teal for a moment (0146); null for the page's own words. */
   said: number | null
+  /** The how-manyth sentence about the open row's save (0179): drawn as a new element, so one said again is heard again. */
+  fresh?: number
 }
 
 /**
@@ -60,7 +62,13 @@ export function Pager({
       <div className="status-cell">
         <p role="status" id={`${id}-line`} className="status" data-kind={status.kind}>
           {status.said === null ? (
-            <Words said={status.text} />
+            status.fresh === undefined ? (
+              <Words said={status.text} />
+            ) : (
+              <span key={status.fresh}>
+                <Words said={status.text} />
+              </span>
+            )
           ) : (
             <ServerDid said={status.said}>
               <Words said={status.text} />

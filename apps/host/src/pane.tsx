@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { ReactElement } from 'react'
 import type { FormEngine } from '@formancy/core'
 import type { FormRecord } from '@formancy/data-client'
 import { useAfterRender } from './after-render.js'
 import { AngularForm } from './angular-mount.js'
+import { focusField, told, usePaneReach } from './pane-reach.js'
+import type { SaveFrom } from './pane-reach.js'
 import { useGuardContext } from './guard.js'
 import type { LeaveRequest } from './leave.js'
 import type { LookupOffer } from './lookup-opens.js'
@@ -36,8 +38,11 @@ export const KEPT_DISCARDED =
 /** What the saved line's colour repeats: the server's answer, a save still out, or a refusal (UX-SPEC §5.11). */
 type Kind = 'answer' | 'pending' | 'refused'
 
-/** What a save opened, and the how-manyth notice it is: a new one is drawn afresh, never over the last one's state. `keep`: a stale save of rows alone, whose changes can be kept (0155). */
-type Notice = { kind: 'stale' | 'refused' | 'declined' | 'unknown'; message: string; n: number; keep?: true }
+/**
+ * What a save opened, and the how-manyth notice it is: a new one is drawn afresh, never over the last one's state. `keep`: a stale save of rows
+ * alone, whose changes can be kept (0155). `quiet`: a save the grid sent leaving its row (0179), whose notice takes no keyboard from the grid.
+ */
+type Notice = { kind: 'stale' | 'refused' | 'declined' | 'unknown'; message: string; n: number; keep?: true; quiet?: true }
 
 /**
  * One renderer's half of the page: a region named by its heading, the saved
@@ -88,6 +93,13 @@ type Notice = { kind: 'stale' | 'refused' | 'declined' | 'unknown'; message: str
  * or the renderer's summary of a refused answer, which take the keyboard,
  * show its tab first (`onShow`): nothing hidden takes the keyboard, and a
  * refusal said there is heard by nobody.
+ *
+ * A record grid's open row is this pane's draft (0179), and its save is
+ * the pane's own (pane-reach.ts): sent as Save sends it and said on this
+ * line, a stale or a lost one opening this notice -- which takes no
+ * keyboard from the grid, whose line says what to do -- and every save
+ * this pane answers, from either, told to the grid. F2 on a cell the form
+ * edits puts the keyboard on that field here, its tab shown first.
  */
 export function Pane({
   session,
@@ -111,8 +123,8 @@ export function Pane({
   idBase: string
   /** A child row's heading, which names its panes first, so no two regions share a name. */
   namedBy?: string
-  /** A save the server answered with a record: the workspace shows it in its grid. */
-  onAnswer?: (result: SaveResult) => void
+  /** A save the server answered with a record: the workspace shows it in its grid -- asked from the form's Save, or from the grid leaving its row (0179). */
+  onAnswer?: (result: SaveResult, from: SaveFrom) => void
   /** The stored record replaced the draft, by "Load the saved record": the workspace shows what is stored, as after a save. */
   onLoaded?: () => void
   /** Open under each lookup of the record (0141); none under a child row's rail. */
@@ -265,7 +277,7 @@ function PaneBody({
   /** `stored`: the server saved or created the record, which the line says in teal for a moment. */
   say: (text: string, kind?: Kind, stored?: boolean) => void
   offer: LookupOffer | undefined
-  onAnswer: ((result: SaveResult) => void) | undefined
+  onAnswer: ((result: SaveResult, from: SaveFrom) => void) | undefined
   onReload: () => Promise<string | null>
   onLoad: (record: FormRecord) => void
   /** Keep my line changes (0155): null when the record was read again; otherwise the server's sentence. */
@@ -274,9 +286,9 @@ function PaneBody({
 }): ReactElement {
   const [notice, setNotice] = useState<Notice | null>(null)
   const opened = useRef(0)
-  const open = (kind: Notice['kind'], message: string, keep = false): void => {
+  const open = (kind: Notice['kind'], message: string, keep = false, quiet = false): void => {
     opened.current += 1
-    setNotice({ kind, message, n: opened.current, ...(keep ? { keep: true as const } : {}) })
+    setNotice({ kind, message, n: opened.current, ...(keep ? { keep: true as const } : {}), ...(quiet ? { quiet: true as const } : {}) })
   }
   const [sheet, setSheet] = useState<HTMLFormElement | null>(null)
   const noticeRef = useRef<HTMLDivElement>(null)
@@ -292,7 +304,7 @@ function PaneBody({
   // would say it twice (formancy.ai's ErrorSummary and ResumeNotice). In a
   // tab another hides, once the tab is shown (0142).
   useEffect(() => {
-    if (notice === null) return
+    if (notice === null || notice.quiet === true) return
     const focus = (): void => noticeRef.current?.focus()
     if (toShow.current?.() === true) after(focus)
     else focus()
@@ -303,7 +315,7 @@ function PaneBody({
    * this part is gone -- Load or New replaced the form -- when only the
    * pane's line is still there to say it.
    */
-  function show(result: SaveResult | null): void {
+  function show(result: SaveResult | null, from: SaveFrom): void {
     if (result?.kind === 'busy' || result?.kind === 'replaced' || result?.kind === 'held') {
       // About another press, or another form: the notice, if any, is still this form's.
       // A press that sent nothing is refused; a replaced form's answer is an answer.
@@ -312,7 +324,7 @@ function PaneBody({
     }
     if (result?.kind === 'stale' || result?.kind === 'refused' || result?.kind === 'declined' || result?.kind === 'unknown') {
       say('')
-      open(result.kind, result.message, result.kind === 'stale' && result.keep === true)
+      open(result.kind, result.message, result.kind === 'stale' && result.keep === true, from === 'grid')
       return
     }
     // About a row saved with the record (0155): its tab takes the keyboard there, and this line says nothing was saved.
@@ -322,23 +334,46 @@ function PaneBody({
       return
     }
     setNotice(null)
-    if (result?.kind === 'saved' || result?.kind === 'created') onAnswer?.(result)
+    if (result?.kind === 'saved' || result?.kind === 'created') onAnswer?.(result, from)
     // A refused selection is said on its field and in the error summary,
     // which takes the focus -- its tab shown first, where one hides it --
     // and this line says only that nothing was saved.
     if (result?.kind === 'invalid') {
-      toShow.current?.()
+      // From the grid the keyboard stays there, on the first invalid cell it shows (use-grid-edit.ts).
+      if (from === 'form') toShow.current?.()
       say(`Not saved. ${result.message}${result.declined === true ? ` ${DECLINED_BY}` : ''}`, 'refused')
     } else say(result === null ? '' : result.message, 'answer', result?.kind === 'saved' || result?.kind === 'created')
   }
 
-  async function submit(outcome: Submitted): Promise<void> {
+  async function submit(outcome: Submitted, from: SaveFrom = 'form'): Promise<SaveResult | null> {
     // The line changes as soon as a save is sent, so the answer is heard even
     // when its words are the last save's: "Saved." twice in a row is no change
     // to a live region, and nothing would be said.
     if (outcome.ok) say(SAVING, 'pending')
-    show(await session.save(outcome))
+    const result = await session.save(outcome)
+    show(result, from)
+    told(session, result, from)
+    return result
   }
+
+  // What a record grid's open row asks of this pane (0179): its save, sent as Save sends it, and a field of its form.
+  const submitNow = useRef(submit)
+  submitNow.current = submit
+  const reach = useMemo(
+    () => ({
+      save: () => {
+        const outcome = engine.submit()
+        return submitNow.current(outcome.ok ? { ok: true, data: engine.value() } : { ok: false }, 'grid')
+      },
+      goTo: (field: string) => {
+        const focus = (): void => focusField(engine, field)
+        if (toShow.current?.() === true) after(focus)
+        else focus()
+      },
+    }),
+    [engine, after],
+  )
+  usePaneReach(session, reach)
 
   async function reload(): Promise<void> {
     const problem = await onReload()

@@ -15,6 +15,11 @@ import { themeQuartz } from 'ag-grid-community'
  *   room's focus; AG Grid draws the cell's from `rangeSelectionBorderColor`,
  *   which otherwise follows the accent.
  * - Rows are ruled in the quieter `--edge`; columns are not ruled.
+ * - A cell in edit (0179) is framed in the violet a person acts with, two
+ *   pixels, with no shadow of AG Grid's; its editor is a native control of
+ *   the page's own, drawn by its style attribute in the room's variables
+ *   (cell-editors.tsx), and AG Grid's own inputs, which the page draws
+ *   none of, are given the same ground, text and edges.
  *
  * Sizes are AG Grid's pixels: 36px rows (the plugin's data-dense row), 14px
  * cells, a 13px header.
@@ -37,6 +42,13 @@ export const ROOM_GRID = {
   oddRowBackgroundColor: 'var(--ground)',
   selectedRowBackgroundColor: { ref: 'accentColor', mix: 0.3, onto: 'backgroundColor' },
   rangeSelectionBorderColor: 'var(--server)',
+  cellEditingBorder: { style: 'solid', width: 2, color: 'var(--client)' },
+  cellEditingShadow: false,
+  inputBackgroundColor: 'var(--ground)',
+  inputTextColor: 'var(--text)',
+  inputBorder: { style: 'solid', width: 1, color: 'var(--edge-strong)' },
+  inputFocusBorder: { style: 'solid', width: 2, color: 'var(--server)' },
+  inputInvalidBorder: { style: 'solid', width: 2, color: 'var(--invalid)' },
   focusShadow: { spread: 2, color: 'var(--server)' },
   fontFamily: 'var(--sans)',
   headerFontFamily: 'var(--sans)',

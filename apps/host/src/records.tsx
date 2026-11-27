@@ -17,6 +17,7 @@ import { RecordTree } from './record-tree.js'
 import { Segmented } from './segmented.js'
 import { SelectionBar } from './selection-bar.js'
 import type { Selection } from './selection-bar.js'
+import type { GridEdit } from './use-grid-edit.js'
 import { useGridState } from './use-grid-state.js'
 import { useOwnViews } from './use-own-views.js'
 import { ViewPicker } from './view-picker.js'
@@ -40,7 +41,8 @@ import { ViewPicker } from './view-picker.js'
  * written into the address, as no filter is (0104). Where the form serves
  * this person an action over a selection, or a deletion or a change of the
  * records chosen, the grid has a column of boxes and what may be done with
- * the records chosen is a bar above its well (0166, 0174, 0176).
+ * the records chosen is a bar above its well (0166, 0174, 0176). The open
+ * record's cells are edited in its row of the grid (0179).
  */
 /** The Records panel's grid, kept apart from every child section's (0106). */
 const RECORDS: GridSection = { kind: 'records' }
@@ -68,6 +70,7 @@ export function Records({
   drilling,
   tree,
   onTreeOpen,
+  edit,
 }: {
   client: DataClient
   formId: string
@@ -98,6 +101,8 @@ export function Records({
   tree: string | null
   /** A record opened from the tree; `back` gives the keyboard back to its item. */
   onTreeOpen: (token: string, how: OpenHow, back: () => void) => void
+  /** The open record's edit in its row (0179). */
+  edit?: GridEdit
 }): ReactElement {
   const [typed, setTyped] = useState(search)
   const [shape, setShape] = useState<'grid' | 'tree'>('grid')
@@ -262,6 +267,7 @@ export function Records({
             after={after}
             {...(selection.offered ? { choose: selection.rows, aboveWell: <SelectionBar selection={selection} idBase="records-choice" /> } : {})}
             drilling={drilling}
+            {...(edit === undefined ? {} : { edit })}
             onOpen={onOpen}
             onSort={state.setSort}
             onWidths={state.setWidths}

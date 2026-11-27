@@ -29,6 +29,7 @@ import { useActions } from './selection-bar.js'
 import { laneStyle, Split, useLine } from './split.js'
 import { Trail } from './trail.js'
 import { useDrill } from './use-drill.js'
+import { useGridEdit } from './use-grid-edit.js'
 import type { FormOf } from './use-drill.js'
 import { DISCARDED, useMasterRecord } from './use-master-record.js'
 
@@ -50,7 +51,9 @@ import { DISCARDED, useMasterRecord } from './use-master-record.js'
  * the grid each over the records chosen of its page (0166, selection-bar.tsx) and, where
  * the server offers it, their deletion (0174). Each lookup of the record offers Open under
  * its field, which goes a Drill down level below it, from any layout (0141). What the
- * detail holds, and every way it changes, is use-master-record.ts's.
+ * detail holds, and every way it changes, is use-master-record.ts's. The open record's
+ * row of the grid is its draft too, edited in its cells and saved when it is left
+ * (use-grid-edit.ts, 0179): a row asked for leaves it first.
  */
 export function FormView({
   client,
@@ -143,6 +146,22 @@ export function FormView({
     dropLevels: () => drill.dropAll(),
   })
   const { open, openRef, sessions, opening, say } = master
+  const edit = useGridEdit({
+    client,
+    formId,
+    definition,
+    title,
+    columns,
+    renderer,
+    drilling,
+    sessions,
+    openRef,
+    openToken: open?.kind === 'record' ? open.token : null,
+    grid,
+    after,
+    open: (token, at, then) => master.askRow(token, 'space', at, then),
+    toRecord: () => void reveal('record'),
+  })
   const canDelete = definition.operations.includes('delete') && definition.deleting !== null
   const removal = useDeleteFlow({
     client,
@@ -330,7 +349,7 @@ export function FormView({
           refit={released}
           onSearch={setSearch}
           onNew={master.startNew}
-          onOpen={master.askRow}
+          onOpen={(token, how, at) => edit.leave(token, () => master.askRow(token, how, at))}
           remove={canDelete ? { noun: title, press: deleteRow } : undefined}
           after={
             removal.deletion.state !== 'idle' && removal.deletion.target.from.kind === 'row' && definition.deleting !== null ? (
@@ -341,6 +360,7 @@ export function FormView({
           drilling={drilling}
           tree={childForms.find((each) => each.child.form === formId)?.child.field ?? null}
           onTreeOpen={master.openFrom}
+          edit={edit}
         />
         {splitter === null ? null : (
           <Split

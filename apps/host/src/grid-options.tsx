@@ -2,6 +2,7 @@ import type { ReactElement } from 'react'
 import {
   ColumnApiModule,
   ColumnAutoSizeModule,
+  CustomEditorModule,
   CustomFilterModule,
   InfiniteRowModelModule,
   LocaleModule,
@@ -12,9 +13,10 @@ import {
   RowSelectionModule,
   ScrollApiModule,
 } from 'ag-grid-community'
-import type { ColDef, ColumnResizedEvent, GridApi, GridOptions, ICellRendererParams, IRowNode, Module } from 'ag-grid-community'
+import type { ColDef, ColumnResizedEvent, EditableCallbackParams, GridApi, GridOptions, ICellRendererParams, IRowNode, Module } from 'ag-grid-community'
 import { LIST_PAGE_SIZE } from '@formancy/data-client'
 import type { ListSortTerm } from '@formancy/data-client'
+import { CellEditorOf } from './cell-editors.js'
 import { CHOOSE_COLUMN } from './choose-column.js'
 import type { ArrangedColumn } from './columns.js'
 import { DELETE_COLUMN, deleteColumn } from './delete-column.js'
@@ -25,6 +27,7 @@ import { keyOptions } from './grid-keys.js'
 import type { KeyCallbacks } from './grid-keys.js'
 import { roomGrid, ROW_HEIGHT } from './grid-theme.js'
 import { boxKeys, HeaderBox, NeverFilter } from './header-filter.js'
+import type { GridEdit } from './use-grid-edit.js'
 import { changedWidths, headerFloor, WIDEST } from './widths.js'
 import type { ColumnWidth, WidthChange } from './widths.js'
 
@@ -44,11 +47,14 @@ import type { ColumnWidth, WidthChange } from './widths.js'
  *   region says what the page does with a row (grid-keys.ts).
  * - **A page no longer shown is asked for again**, never reused: one block
  *   in the cache (0022, 0029). No count is asked for, so no paging panel.
- * - **Nothing edits or moves**, so nothing is sent from here but the page's
- *   list: no cell is editable (grid-keys.ts), and a person orders and
- *   hides columns in the section's Columns panel instead (columns-panel.tsx,
- *   0106), whose every change is a key's: a header dragged has no keyboard
- *   path (formancy.ai 0046).
+ * - **Nothing moves, and nothing edits but the open record**, so nothing is
+ *   sent from here but the page's list: a grid given the open record's
+ *   edit (use-grid-edit.ts, 0179) draws that row from its engine and edits
+ *   its cells there, in an editor of the page's own (cell-editors.tsx),
+ *   whose save is the record's form's; every other cell is not editable
+ *   (grid-keys.ts). A person orders and hides columns in the section's
+ *   Columns panel instead (columns-panel.tsx, 0106), whose every change is
+ *   a key's: a header dragged has no keyboard path (formancy.ai 0046).
  * - **A field's column is resized by hand** (0151): its header's edge
  *   dragged, as AG Grid draws it, or Alt and an arrow on its header, which
  *   is AG Grid's own and takes those keys from the browser whether a column
@@ -76,7 +82,7 @@ import type { ColumnWidth, WidthChange } from './widths.js'
  * for the page's own words in AG Grid's live region, ColumnApiModule for
  * reading the headers' sort and showing the section's on them (0105),
  * CustomFilterModule for the floating row that holds each header's box
- * (0132);
+ * (0132), CustomEditorModule for the open record's cells' editors (0179);
  * grid-keys.test.tsx fails on the console error AG Grid writes for an
  * option whose module is missing.
  */
@@ -91,6 +97,7 @@ export const GRID_MODULES: readonly Module[] = [
   LocaleModule,
   ColumnApiModule,
   CustomFilterModule,
+  CustomEditorModule,
 ]
 ModuleRegistry.registerModules([...GRID_MODULES])
 
@@ -99,20 +106,27 @@ function EmptyCell(): null {
   return null
 }
 
+/** A row's mark after its first value -- Saving…, Not saved (0179) -- set off by its own margin and weight: a style attribute, as nothing inside the grid is styled by a host rule. */
+const MARK_LOOK = { marginLeft: '8px', fontWeight: 600 } as const
+
 /**
  * The first shown column's cell: the value after a slot that holds a violet
  * bar on the open row, the shape that says "open" (UX-SPEC §5.9). SVG attributes,
  * no CSS rule: nothing inside the grid is styled by the host. Hidden from
- * the accessibility tree, where `aria-selected` says it.
+ * the accessibility tree, where `aria-selected` says it. Then the open
+ * row's mark, where its draft's save is out or did not store (0179): text,
+ * read with the row.
  */
-function OpenCell(params: ICellRendererParams<GridRow>): ReactElement {
+function OpenCell(params: ICellRendererParams<GridRow> & { edit?: GridEdit }): ReactElement {
   const open = params.node.isSelected() === true
+  const mark = params.edit?.mark(params.data) ?? ''
   return (
     <>
       <svg aria-hidden="true" focusable="false" width="12" height="15" viewBox="0 0 12 15">
         {open ? <rect x="0" y="0" width="4" height="15" rx="2" fill="var(--client)" /> : null}
       </svg>
       {String(params.value ?? '')}
+      {mark === '' ? null : <span style={MARK_LOOK}>{mark}</span>}
     </>
   )
 }
@@ -166,7 +180,9 @@ export function headerSort(grid: GridApi<GridRow>): ListSortTerm[] {
  * (`floors`, measured by use-header-floors.ts, or `headerFloor` where none is given), nor a person's drag past `WIDEST`. A column the person
  * hid is there, `hide`, with whatever sort it holds: the sort a view or the
  * section gives it is the headers' still, so the datasource asks for it
- * (grid-datasource.ts). The first shown carries the open row's bar.
+ * (grid-datasource.ts). The first shown carries the open row's bar. Given
+ * the open record's `edit` (0179), the open row is drawn from its engine and
+ * a field's cell is editable where the edit says, in the page's editor.
  */
 export function columnDefsOf(
   columns: readonly ArrangedColumn[],
@@ -176,6 +192,8 @@ export function columnDefsOf(
   floors: ReadonlyMap<string, number> = new Map(),
   /** The column of the boxes a person chooses records with (choose-column.tsx, 0166): first, where the form offers this person an action over a selection or a deletion or a change of chosen records (0174, 0176). */
   choose?: ColDef<GridRow>,
+  /** The open record's edit in its row (use-grid-edit.ts, 0179): the Records grid's alone. */
+  edit?: GridEdit,
 ): ColDef<GridRow>[] {
   const first = columns.find((column) => column.shown)?.key
   const set = new Map(widths.map((each) => [each.field, each.width]))
@@ -184,7 +202,7 @@ export function columnDefsOf(
     return {
       colId: column.key,
       headerName: column.label,
-      valueGetter: (params) => cellText(params.data, column),
+      valueGetter: (params) => cellText(edit === undefined ? params.data : edit.drawn(params.data), column),
       sortable: column.sortable,
       unSortIcon: column.sortable,
       hide: !column.shown,
@@ -196,7 +214,15 @@ export function columnDefsOf(
       // before -- it would put back a width the person has since dragged
       // past (grid-widths.test.tsx). After that the grid's width is the column's.
       ...(width === undefined ? {} : { initialWidth: width }),
-      ...(column.key === first ? { cellRenderer: OpenCell } : {}),
+      ...(column.key === first ? { cellRenderer: OpenCell, cellRendererParams: { edit } } : {}),
+      // Editable where the open record's edit says, now: AG Grid asks each time an edit would start (0179).
+      ...(edit === undefined
+        ? {}
+        : {
+            editable: (params: EditableCallbackParams<GridRow>) => edit.editable(params.data, column.key),
+            cellEditor: CellEditorOf,
+            cellEditorParams: { edit, field: column.key },
+          }),
       // A box under the header where the filter line may name the column (0132): the page's, never AG Grid's filter or its button.
       // Shown only: a hidden column's box would keep a row of empty cells under the headers.
       ...(boxed.has(column.key) && column.shown

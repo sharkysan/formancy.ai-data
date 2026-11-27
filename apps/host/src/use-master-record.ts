@@ -9,6 +9,7 @@ import { copiedLine, copyOf, leftOut } from './duplicate.js'
 import { useGuardContext } from './guard.js'
 import type { Said } from './leave.js'
 import { useMasterPanes } from './master-panes.js'
+import type { SaveFrom } from './pane-reach.js'
 import { isOpen, nextLine, nextOf } from './next-version.js'
 import type { Opening } from './opening.js'
 import type { OpenHow, RecordGridHandle, RowAt } from './record-grid.js'
@@ -85,16 +86,16 @@ export interface MasterRecord {
   canDuplicate: boolean
   /** The open record is an open version this person may change from a date (0115). */
   canChange: boolean
-  /** A row of the grid asked for, and the keyboard back on its cell where the person keeps editing. */
-  askRow: (token: string, how: OpenHow, at: RowAt) => void
-  /** A record opened from the grid or the tree (0110), through the guard; `toRow` gives the keyboard back to where it was opened from. */
-  openFrom: (token: string, how: OpenHow, toRow: () => void) => void
+  /** A row of the grid asked for, and the keyboard back on its cell where the person keeps editing; `then`, once it is open -- F2's edit of it (0179). */
+  askRow: (token: string, how: OpenHow, at: RowAt, then?: () => void) => void
+  /** A record opened from the grid or the tree (0110), through the guard; `toRow` gives the keyboard back to where it was opened from; `then`, once it is open. */
+  openFrom: (token: string, how: OpenHow, toRow: () => void, then?: () => void) => void
   startNew: () => void
   /** Duplicate record (0107), or Change from a date (0115). */
   startCopy: (kind: 'duplicate' | 'change') => void
   load: (token: string) => void
-  /** A save the server answered in one of the record's panes. */
-  answered: (result: SaveResult, session: Session) => void
+  /** A save the server answered in one of the record's panes: from its Save, or from the grid leaving the record's row (0179). */
+  answered: (result: SaveResult, session: Session, from?: SaveFrom) => void
   /** What the crumb calls the record, and what its sections' conditions read, from what `session` holds as stored. */
   storedIn: (session: Session) => void
   /** A pane's "Load the saved record". */
@@ -148,15 +149,16 @@ export function useMasterRecord({
     if (said !== undefined) say(said)
   }
 
-  function askRow(token: string, how: OpenHow, at: RowAt): void {
-    openFrom(token, how, () => grid.current?.focusAt(at))
+  function askRow(token: string, how: OpenHow, at: RowAt, then?: () => void): void {
+    openFrom(token, how, () => grid.current?.focusAt(at), then)
   }
 
-  function openFrom(token: string, how: OpenHow, toRow: () => void): void {
+  function openFrom(token: string, how: OpenHow, toRow: () => void, then?: () => void): void {
     // In Drill down every open goes down a level: a click and Space too (0090).
     const moves = how === 'enter' || drilling
-    if (open?.kind === 'record' && open.token === token) {
+    if (openRef.current?.kind === 'record' && openRef.current.token === token) {
       if (moves) toDetail()
+      then?.()
       return
     }
     const request = { kind: 'row', record: token } as const
@@ -168,6 +170,7 @@ export function useMasterRecord({
             opened(now.token, [...(now.discarded ? DISCARDED : []), 'Opened ', { code: token }, '.'])
             if (moves) toDetail()
             else if (now.discarded) after(toRow)
+            if (then !== undefined) after(then)
           },
           refused: (message, dropped) => {
             say([message], 'refused')
@@ -259,9 +262,14 @@ export function useMasterRecord({
     )
   }
 
-  /** The grid shows what is stored, and a created record is the detail's (opening.ts). */
-  function answered(result: SaveResult, session: Session): void {
-    grid.current?.reload()
+  /**
+   * The grid shows what is stored, and a created record is the detail's
+   * (opening.ts). A save from the grid leaving the record's row reads no
+   * page: its row takes what is stored in place, so no row moves under the
+   * keyboard (use-grid-edit.ts, 0179).
+   */
+  function answered(result: SaveResult, session: Session, from: SaveFrom = 'form'): void {
+    if (from === 'form') grid.current?.reload()
     opening.answered(result, session, (now) => {
       tabs.created()
       opened(now.token, now.discarded ? [...DISCARDED, 'Opened ', { code: now.token }, '.'] : undefined)
