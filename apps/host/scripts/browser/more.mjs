@@ -22,8 +22,9 @@
 // release draws them apart, and the cost is to be read again -- and that
 // every text axe could not decide lies under the open list, so a text left
 // undecided for any other reason still fails, but a select behind the
-// arrow Blueprint draws, which 0178's rule decides; and it prints what the
-// window shows there, nothing when the sentence is below the window.
+// arrow Blueprint draws whose text 0178's rule measures at the contrast axe
+// asks; and it prints what the window shows there, nothing when the
+// sentence is below the window.
 //
 // In Separate views, where the record is drawn alone: the third clerk's
 // orders fit the Records grid's columns to other widths than the first
@@ -102,12 +103,17 @@ function listSaysMore(name, { check }) {
       page,
       open.undecided.filter((node) => under.elsewhere.includes(node.at)),
     )
-    const elsewhere = [...gradients.rest.map((node) => `${node.html} (${node.reason})`), ...gradients.problems]
+    const elsewhere = [
+      ...[...gradients.rest.map((node) => `${node.html} (${node.reason})`), ...gradients.left].map((text) => `undecided elsewhere: ${text}`),
+      ...gradients.failing.map((text) => `below AA elsewhere: ${text}`),
+    ]
     check(
-      `a list that goes on (${name}): every text on the paper whose contrast axe left undecided lies under the open list`,
-      elsewhere.length === 0 ? null : `undecided elsewhere: ${elsewhere.slice(0, 4).join('; ')}`,
+      `a list that goes on (${name}): every text on the paper whose contrast axe left undecided lies under the open list, or is a select whose text 0178’s rule measures at the contrast axe asks`,
+      elsewhere.length === 0 ? null : elsewhere.slice(0, 4).join('; '),
     )
-    console.log(`  where the sentence is, the window shows ${under.shown}; ${String(open.undecided.length)} texts lie under the open list`)
+    console.log(
+      `  where the sentence is, the window shows ${under.shown}; ${String(open.undecided.length - under.elsewhere.length)} texts lie under the open list`,
+    )
     // Left as the gate's own audit wants it -- the keyboard out of Customer and the list closed -- once the list is gone. Closed
     // by the gate's blur alone, Angular's list was still drawn when axe read the paper in WebKit, its texts undecidable under
     // it: twice on CI, on main after #161 and on #163.

@@ -664,8 +664,10 @@ own or failed -- inside the host page's grids on the pixels painted
 and, in all three gates, a select's text behind the arrow Blueprint draws,
 asked of axe again with the arrow set aside where every layer of it lies
 clear of the select's content box, by `scripts/gradient-contrast.mjs`,
-whose probe checks in every browser that a select draws its text inside
-that box
+whose probe checks in every browser, before the first pass and before the
+rule decides anything there, that a select of the appearance `none` draws
+its text inside that box, and which fails a select it measures below AA
+by a check of its own
 ([0178](../decisions/0178-the-browser-gates-decide-a-selects-text-behind-its-drawn-arrow-with-the-arrow-set-aside.md));
 and that no rule of
 the app's own stylesheet reaches the form's paper. The host page's gate also

@@ -16,8 +16,10 @@
 //     two rules @formancy/conformance switches off in jsdom because they are
 //     measurements, run here where they can be measured -- and a text axe
 //     cannot decide fails, but a select's behind the arrow Blueprint draws,
-//     which scripts/gradient-contrast.mjs decides once a probe has shown
-//     that this browser clips a select's text to its content box (0178);
+//     which scripts/gradient-contrast.mjs decides once its probe, run before
+//     the first pass, has shown that this browser clips a select's text to
+//     its content box, and fails by a check of its own when it measures it
+//     below AA (0178);
 //   - every web font the built page declares had loaded by the end of each
 //     pass, and in the pass that refuses every font file, none had (0058):
 //     a state measured before a late family swapped in is not caught;
@@ -248,8 +250,8 @@ async function audit(page, target) {
     },
     [...ACCESSIBILITY_TAGS],
   )
-  const { rest, problems } = await decideGradients(page, result.undecided)
-  return { ...result, undecided: [...rest.map((node) => `${node.html} (${node.reason})`), ...problems].slice(0, 4) }
+  const { rest, left, failing } = await decideGradients(page, result.undecided)
+  return { ...result, undecided: [...rest.map((node) => `${node.html} (${node.reason})`), ...left].slice(0, 4), failing: failing.slice(0, 4) }
 }
 
 /**
@@ -300,10 +302,14 @@ async function run(gate, browser) {
       expected.every((id) => result.measured.includes(id)) ? null : `only ${result.measured.join(', ') || 'nothing'} had anything to measure`,
     )
     check(`${state}, and decided the contrast of every text`, result.undecided.length === 0 ? null : `undecided: ${result.undecided.join('; ')}`)
+    check(`${state}, and every select’s text behind its drawn arrow at the contrast axe asks`, result.failing.length === 0 ? null : result.failing.join('; '))
   }
 
   try {
     const list = widths()
+    // What 0178's rule for a select's drawn arrow rests on, in this browser, on a page of its own: before the first pass, since
+    // the rule decides no select in a browser until its probe has held there.
+    check('a select draws its chosen text inside its content box, as 0178’s rule for its arrow takes it', await selectTextClipped(browser))
     for (const { label, width, refuseFonts = false } of list) {
       gate.pass({ label, width })
       const page = await browser.newPage({ viewport: { width, height: 900 } })
@@ -405,9 +411,6 @@ async function run(gate, browser) {
       )
       await page.close()
     }
-
-    // What 0178's rule for a select's drawn arrow rests on, in this browser, on a page of its own.
-    check('a select draws its chosen text inside its content box, as 0178’s rule for its arrow takes it', await selectTextClipped(browser))
 
     console.log('')
     // A failed check fails the run in recordedPerBrowser, which says so.

@@ -13,8 +13,15 @@
 - **Verified by:**
   - `scripts/gradient-contrast.test.mjs`, in `pnpm test:repo`: the rule is
     for a text axe gave the gradient alone as its reason, read from axe's
-    message key and not its sentence; a computed background's lists split
-    at the commas outside a gradient or a `calc()`; lengths, percentages
+    message key and not its sentence; it is for a select drawn as one box
+    and no other element -- not one `multiple`, nor of a `size` past 1, nor
+    a div or an input; it decides nothing in a browser before the probe has
+    held there, or once it has failed, nor an element gone from the page,
+    nor a select of another appearance than `none`; axe's answer with the
+    gradients set aside is a pass only when axe failed nothing and left
+    nothing undecided, and a failure carries both ratios; a computed
+    background's lists split at the commas outside a gradient or a
+    `calc()`; lengths, percentages
     and their sums read as the browsers serialize them, and an `em`, a
     product or a nested function not read; `right 18px` the same place as
     `calc(100% - 18px)`; an element's boxes from its computed size, borders
@@ -28,8 +35,14 @@
     fixed to the window, an origin, a size or a position it does not read,
     or a gradient with no size of its own, which fills its box. Watched
     failing on 2026-11-27 with CSS's repetition of a background's lists
-    taken out ("expected undefined to deeply equal [ Array(2) ]") and with
-    the pixel's margin dropped ("expected false to be true"), each put back.
+    taken out ("expected undefined to deeply equal [ Array(2) ]"), with
+    the pixel's margin dropped ("expected false to be true"), with the
+    one-box test made to answer true ("expected true to be false"), with
+    the probe's and the appearance's conditions taken out ("expected null
+    to be 'no probe has yet shown that this brow…'" and "expected null to
+    be 'a select of the appearance auto, wher…'"), and with a pass read
+    before a failure ("expected { verdict: 'passes' } to deeply equal {
+    verdict: 'violation', …(2) }"), each put back.
   - The three browser gates, `pnpm test:browser`, which the `browser` job
     of `.github/workflows/gates.yml` runs once per browser on every pull
     request and before every release:
@@ -37,31 +50,53 @@
     contrast of every text" and "after a failed submit, and decided the
     contrast of every text", `apps/studio/scripts/browser/measure.mjs`'
     and `apps/host/scripts/browser-test.mjs`' "*state*: the contrast of
-    every text decided", and `apps/host/scripts/browser/more.mjs`' "a list
-    that goes on (*renderer*): every text on the paper whose contrast axe
-    left undecided lies under the open list" each fail a select the rule
-    leaves undecided or measures below what axe asks; and each gate, once
-    per browser, makes "a select draws its chosen text inside its content
-    box, as 0178’s rule for its arrow takes it", `selectTextClipped`'s
-    probe. Watched failing on 2026-11-27 in the examples gate, in Chromium
-    153.0.8010.12 on Windows 11, at every width and in both states: with
-    the select's end padding taken away (`padding-inline-end: 0.625rem`
-    put in `app.css`), "a gradient over the box its text is drawn in:
-    218,19 to 223,24 and 223,19 to 228,24, the text's 11,9 to 231,33" for
-    both panes' Status; with its text `#9aa5b1`, "its gradients clear of
-    its text, at 2.5:1, below the 4.5:1 it asks", while "clean, axe finds
-    nothing at WCAG 2.2 AA" passed; and with the probe's content box
-    measured 20 pixels short of its end, "read ltr, it drew 104 pixels of
-    its text past its content box; read rtl, it drew 104 pixels of its
-    text past its content box"; each put back. The examples gate then
+    every text decided" each fail a select the rule leaves undecided; the
+    examples page's "clean, and every select’s text behind its drawn arrow
+    at the contrast axe asks" and "after a failed submit, and every
+    select’s text behind its drawn arrow at the contrast axe asks", and the
+    studio's and the host page's "*state*: every select’s text behind its
+    drawn arrow at the contrast axe asks", each fail one it measures below
+    what axe asks; `apps/host/scripts/browser/more.mjs`' "a list that goes
+    on (*renderer*): every text on the paper whose contrast axe left
+    undecided lies under the open list, or is a select whose text 0178’s
+    rule measures at the contrast axe asks" fails either; and each gate,
+    once per browser and before its first pass, makes "a select draws its
+    chosen text inside its content box, as 0178’s rule for its arrow takes
+    it", `selectTextClipped`'s probe, whose verdict the rule reads before
+    it decides a select in that browser. Watched failing on 2026-11-27 in
+    the examples gate, in Chromium 153.0.8010.12 on Windows 11, at every
+    width and in both states, each plant put on the page's selects through
+    the CSSOM before every audit: with the select's end padding taken away
+    (`padding-inline-end: 0.625rem`), "a gradient over the box its text is
+    drawn in: 218,19 to 223,24 and 223,19 to 228,24, the text's 11,9 to
+    231,33" for both panes' Status; with its appearance `auto`, "a select
+    of the appearance auto, where the probe measured none"; with its text
+    `#9aa5b1`, "its gradients clear of its text, at 2.5:1, below the 4.5:1
+    axe asks" in the check of its own, while "clean, axe finds nothing at
+    WCAG 2.2 AA", "decided the contrast of every text" and the page's
+    policy check passed; with that text, and the select's `style`
+    attribute set back by `setAttribute` as the rule first did,
+    "style-src-attr refused inline" in the policy check and the refusal's
+    error in the console's, in every pass, and the next audit's "after a
+    failed submit, axe finds nothing at WCAG 2.2 AA" failing on the text
+    the arrow's removal, never undone, had left bare; and with the probe's
+    content box measured 20 pixels
+    short of its end, "read ltr, it drew 104 pixels of its text past its
+    content box; read rtl, it drew 104 pixels of its text past its content
+    box", and both panes' Status left undecided by the rule, "this
+    browser’s probe did not hold"; each put back. The examples gate then
     passed in Chromium 153.0.8010.12 and Firefox 155.0 on Windows 11; the
     studio's and the host page's gates, and WebKit, are CI's.
 
   **Held by review alone:** that axe's colours, its stack and its
   compositing, once the select's images are set aside, are what a person
   sees under the text -- they are axe's, as for every other text the gates
-  decide; and that no page reacts to the select's `style` attribute
-  changing for the moment axe takes.
+  decide; that no page reacts to the select's `style` attribute changing
+  for the moment axe takes; and that the attribute, once its
+  `background-image` is put back through the CSSOM, says what it said: it
+  is then the CSSOM's serialization of the select's declarations, which
+  for a style the CSSOM wrote, as React writes one, was the text it had
+  before, in Chromium 153 and Firefox 155 on 2026-11-27.
 
 ## Context
 
@@ -125,7 +160,8 @@ decided by it only when:
 - axe's reason is the background gradient and nothing else, by its
   message key;
 - its element is a select drawn as one box, neither `multiple` nor of a
-  `size` past 1;
+  `size` past 1, of the computed appearance `none`, as the probe's selects
+  are;
 - every layer of the select's own computed `background-image` is a
   gradient, or `none`, drawn once (`no-repeat`), scrolling with the
   element, with a size and a position the module reads -- px, percentages
@@ -137,13 +173,21 @@ decided by it only when:
   transform, lies at least a pixel clear of its content box.
 
 Then the select is asked of axe's colour-contrast again, alone, with
-`background-image: none !important` in its `style` attribute, which is put
-back exactly as it was: the gradients paint nowhere the text is, so axe
-measures what is under the text, with its own stack, compositing and
-threshold for the text's size. A pass is decided; a violation fails, with
-axe's ratio and the one it asks; and anything axe still cannot decide
-fails with axe's reason. Anything the rule is not for is left to the
-gate's own deciders, or fails as before.
+`background-image: none !important` set on it through the CSSOM, and
+afterwards its own inline `background-image` put back through the CSSOM,
+or its `style` attribute removed when it had none. A script that sets a
+style attribute is refused by a `style-src` without 'unsafe-inline', as
+the examples page's and the studio's are: Chromium then keeps the arrow
+off for the rest of the pass, and Firefox empties the select's inline
+style, while neither refuses what the CSSOM sets -- measured under
+`style-src 'self'` on 2026-11-27 in Chromium 153 and Firefox 155. The
+gradients paint nowhere the text is, so axe measures what is under the
+text, with its own stack, compositing and threshold for the text's size.
+A pass is decided; a violation fails a check of its own in each gate, kept
+apart from what is left undecided, with axe's ratio and the one it asks;
+and anything axe still cannot decide fails with axe's reason, as does
+whatever the rule leaves before asking. Anything the rule is not for is
+left to the gate's own deciders, or fails as before.
 
 **What it rests on is measured in every browser.** That a select draws
 its chosen text inside its content box is the browsers' to say, so
@@ -152,9 +196,15 @@ two selects, black on white, padded at their end as Blueprint pads one,
 their label far past the box, one read each way; the ink of each, read
 from a screenshot the page decodes, must lie within a pixel of the content
 box, inside it, and reach within 12 pixels of its end. Each gate makes
-that check once per browser, under one name, so a browser that stops
-clipping turns its leg red by name. The three agree, so it is no row of
-0058's `FACTS`; a browser that disagreed would make it one.
+that check once per browser, under one name, before its first pass, and
+the probe's verdict is kept for the browser it ran in: the rule decides
+no select in a browser until its probe has held there, so a browser that
+stops clipping turns the probe's check red by name, and every select's
+with it. Chromium 153 and Firefox 155 were measured agreeing on
+2026-11-27, and the WebKit of Playwright's Windows build drew the same,
+read for information alone; whether the gates' Linux WebKit agrees is the
+CI run's to show. So it is no row of 0058's `FACTS`; a browser that
+disagreed would make it one.
 
 **The audits keep what axe left undecided**, as axe answered, in
 `window.formancyGateUndecided`, as the host's always had, with each node's
@@ -168,9 +218,10 @@ and panes, and the open list's state for the texts outside the list.
 **What it buys.** The gates hold 0.14.0's selects to AA as they held the
 selects before it, in all three browsers, and say why when they cannot. A
 select's text under AA, which axe's own audit cannot see behind the
-gradient and so lets pass as nothing found, fails by name: watched with
-the Status's text at 2.5:1 while "axe finds nothing" passed. One rule
-decides it for three gates, so the three cannot disagree.
+gradient and so lets pass as nothing found, fails by name, in a check of
+its own: watched with the Status's text at 2.5:1 while "axe finds
+nothing" passed. One rule decides it for three gates, so the three cannot
+disagree.
 
 **What it costs.**
 
@@ -184,17 +235,21 @@ decides it for three gates, so the three cannot disagree.
   either the theme or this rule changes. That is the point, and it falls
   on whoever moves the theme.
 - **The probe is the browser's, not each select's.** It measures a select
-  of its own, not every select the rule decides; a select whose own styles
-  let its text past its content box in some browser would be decided by a
-  clip the probe never saw. Blueprint's do not, and the probe's select is
-  padded as Blueprint pads one.
+  of its own, of the appearance `none`, and the rule decides a select of
+  that appearance alone, so one the platform draws, or Chromium's
+  `base-select`, stays undecided. But a select of that appearance whose
+  own styles let its text past its content box in some browser would be
+  decided by a clip the probe never saw. Blueprint's do not, and the
+  probe's select is padded as Blueprint pads one.
 - **An axe release can switch the rule off.** It is keyed on axe's
   `bgGradient`; a release that renames it, or reports the select another
   way, leaves the rule deciding nothing, and the gates fail closed until
   the key is read again.
 - **The select is measured with its style attribute changed** for as long
-  as axe takes. A page that reacted to that would be measured in a state a
-  person never reaches; none of the three does.
+  as axe takes, and the attribute is then the CSSOM's writing of the
+  select's declarations, the text it had only where the CSSOM wrote that
+  too. A page that reacted to either would be measured in a state a person
+  never reaches; none of the three does.
 - **One more path in the lint configuration.** The module runs code in a
   page, so `eslint.config.mjs` names it among the `browser` files with
   `scripts/browser-gate.mjs`, beside the paths 0116 listed.
@@ -220,6 +275,13 @@ decides it for three gates, so the three cannot disagree.
 - **Every element with a gradient**, not only a select. A text in another
   element can run past its content box, which no probe here measured; the
   rule would decide texts it cannot see.
+- **The probe after the passes, its own check alone failing the leg.** A
+  browser whose probe failed would still record every select's contrast
+  as decided, at every width, by a rule whose ground it had just lost; run
+  first, its verdict leaves those selects undecided, each by name.
+- **The selects' failures in the check that every text was decided.**
+  That check would then fail a text the rule had decided, saying it was
+  undecided; kept apart, each check says what it found.
 - **The arrow drawn another way upstream**, as a pseudo-element or a mask.
   axe leaves a text over a pseudo-element undecided too ("could not be
   determined due to a pseudo element", as inside the host's grids, 0047),

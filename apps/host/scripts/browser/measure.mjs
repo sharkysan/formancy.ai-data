@@ -343,11 +343,12 @@ async function reveal(page, at) {
  *
  * A select behind the arrow Blueprint draws, which axe leaves undecided for
  * "a background gradient", is scripts/gradient-contrast.mjs's, first: what
- * that rule leaves undecided or measures below what axe asks is `left`.
+ * that rule leaves undecided is `left`, and what it measures below what axe
+ * asks `selectsFailing`.
  */
 export async function decide(page, undecided) {
   const gradients = await decideGradients(page, undecided)
-  const left = [...gradients.problems]
+  const left = [...gradients.left]
   const decided = []
   const hidden = []
   const scrolled = await page.evaluate(() => [window.scrollX, window.scrollY])
@@ -449,7 +450,7 @@ export async function decide(page, undecided) {
   } finally {
     await page.evaluate(([x, y]) => window.scrollTo(x, y), scrolled)
   }
-  return { left, decided, hidden, failing: decided.filter((entry) => entry.ratio < 4.5) }
+  return { left, decided, hidden, failing: decided.filter((entry) => entry.ratio < 4.5), selectsFailing: gradients.failing }
 }
 
 /** What has the keyboard's focus, said so that a failure names it. */

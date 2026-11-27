@@ -11,13 +11,15 @@
 // measured.
 //
 // The rule is the narrowest that decides it: a select drawn as one box --
-// not `multiple`, `size` at most 1 -- whose undecided contrast axe gives
-// that reason alone for, and whose own background images are every one a
-// gradient drawn once, each lying, by its computed size, position and
-// origin, at least MARGIN clear of the select's content box. A browser
-// draws a select's chosen text inside that box and clips it there, which
-// `selectTextClipped` measures in the browser the gate runs, on a page of
-// its own, and each gate checks in every browser under one name. So the
+// not `multiple`, `size` at most 1 -- of the computed appearance `none`,
+// whose undecided contrast axe gives that reason alone for, and whose own
+// background images are every one a gradient drawn once, each lying, by
+// its computed size, position and origin, at least MARGIN clear of the
+// select's content box. A browser draws such a select's chosen text inside
+// that box and clips it there, which `selectTextClipped` measures in the
+// browser the gate runs, on a page of its own, and each gate checks in
+// every browser under one name before its first pass: the rule decides
+// nothing in a browser whose probe has not run, or did not hold. So the
 // gradients paint nowhere the text is, and the text is asked of axe again
 // with the select's background images taken off: axe's own colours, its
 // own stack and compositing and its own threshold for the text's size
@@ -25,14 +27,15 @@
 // undecided, and the gate fails it: an image that is not a gradient, one
 // that repeats, one whose size or position this file cannot read, one over
 // the content box, an element that is not such a select, and whatever axe
-// still cannot decide with the images off.
+// still cannot decide with the images off. What axe then measures below
+// the ratio it asks is kept apart, for each gate's check of it.
 //
 // Each gate's audit keeps the elements axe left undecided, as axe answered,
 // in `window.formancyGateUndecided`, and gives each node its index there
 // (`at`), its markup (`html`), axe's reason and axe's message keys
 // (`keys`); `decideGradients` reads them before the next audit replaces
-// them. Everything here that is not run in the page is pure, and
-// gradient-contrast.test.mjs holds it.
+// them. What is run in the page only reads and asks axe; every decision is
+// a pure function here, and gradient-contrast.test.mjs holds each.
 
 /** How far clear of the content box a gradient lies, and how far past it the probe lets a text's ink go: a pixel either way for how a browser snaps an edge. */
 export const MARGIN = 1
@@ -197,8 +200,49 @@ export function gradientProblem(style) {
   return `a gradient over the box its text is drawn in: ${lying.map(say).join(' and ')}, the text's ${say(content)}`
 }
 
-/** The computed properties `gradientProblem` reads. */
+/**
+ * Whether an element, as `decideOne` reads it in the page -- its
+ * `localName`, `multiple` and `size` -- is a select drawn as one box:
+ * neither `multiple` nor of a `size` past 1. An element that is not a
+ * select has neither property, and is not one.
+ */
+export const oneBox = ({ tag, multiple, size }) => tag === 'select' && multiple === false && Number.isInteger(size) && size <= 1
+
+/**
+ * Why the rule leaves a node undecided without asking axe again, or null to
+ * ask it: `probed`, this browser's probe -- undefined before one has run,
+ * null when it held, else what it saw -- and `read`, what `decideOne` read
+ * of the node in the page, null for a node gone from it.
+ */
+export function whyLeft(probed, read) {
+  if (probed === undefined) return 'no probe has yet shown that this browser clips a select’s text to its content box'
+  if (probed !== null) return `this browser’s probe did not hold: ${probed}`
+  if (read === null) return 'gone from the page'
+  if (!oneBox(read)) return 'a gradient behind a text that is not a select drawn as one box'
+  const appearance = read.style.appearance ?? ''
+  if (appearance !== 'none') return `a select of the appearance ${appearance || 'nobody read'}, where the probe measured none`
+  return gradientProblem(read.style)
+}
+
+/**
+ * What axe's colour-contrast answered of the select alone, its gradients
+ * set aside -- `violations`, the data of each node it failed; `incomplete`,
+ * the message of each it could not decide; `passes`, how many it passed --
+ * as the rule's verdict: `passes`, a `violation` with axe's ratio and the
+ * ratio it asks, or `left` with why.
+ */
+export function verdictOf({ violations, incomplete, passes }) {
+  if (violations.length > 0) return { verdict: 'violation', ratio: violations[0].contrastRatio, expected: violations[0].expectedContrastRatio }
+  if (incomplete.length > 0) return { verdict: 'left', why: `its gradients set aside, still undecided: ${incomplete[0]}` }
+  return passes > 0 ? { verdict: 'passes' } : { verdict: 'left', why: 'its gradients set aside, axe measured nothing' }
+}
+
+/** What each browser's probe found, by the Browser it ran in: null when it held, else the sentence `selectTextClipped` returned. */
+const probes = new WeakMap()
+
+/** The computed properties the rule reads: `gradientProblem`'s, and the appearance the probe measured. */
 const READ = [
+  'appearance',
   'background-image',
   'background-repeat',
   'background-size',
@@ -213,9 +257,14 @@ const READ = [
 ]
 
 /**
- * One node the rule is for: `passes`, a `violation` with axe's ratio and
- * the ratio it asks, or `left` with why. The select's own `style` attribute
- * is put back exactly as it was, whatever axe does.
+ * One node the rule is for, in `page`: read in the page, decided by
+ * `whyLeft`, and only then asked of axe again, its verdict `verdictOf`'s.
+ * The select's own inline `background-image` is put back through the CSSOM
+ * as it was, or its `style` attribute removed when it had none, whatever
+ * axe does: a page's `style-src` without 'unsafe-inline' refuses a style
+ * attribute a script sets, and Firefox then empties the element's inline
+ * style, while it refuses nothing set through the CSSOM -- measured under
+ * `style-src 'self'` on 2026-11-27 in Chromium 153 and Firefox 155.
  */
 async function decideOne(page, at) {
   const read = await page.evaluate(
@@ -224,59 +273,60 @@ async function decideOne(page, at) {
       if (element === undefined || !element.isConnected) return null
       const style = getComputedStyle(element)
       return {
-        select: element instanceof HTMLSelectElement && !element.multiple && element.size <= 1,
+        tag: element.localName,
+        multiple: element.multiple,
+        size: element.size,
         style: Object.fromEntries(properties.map((property) => [property, style.getPropertyValue(property)])),
       }
     },
     { index: at, properties: READ },
   )
-  if (read === null) return { verdict: 'left', why: 'gone from the page' }
-  if (!read.select) return { verdict: 'left', why: 'a gradient behind a text that is not a select drawn as one box' }
-  const problem = gradientProblem(read.style)
-  if (problem !== null) return { verdict: 'left', why: problem }
-  return page.evaluate(async (index) => {
+  const why = whyLeft(probes.get(page.context().browser()), read)
+  if (why !== null) return { verdict: 'left', why }
+  const answer = await page.evaluate(async (index) => {
     const element = window.formancyGateUndecided[index]
     const attribute = element.getAttribute('style')
+    const inline = { value: element.style.getPropertyValue('background-image'), priority: element.style.getPropertyPriority('background-image') }
     element.style.setProperty('background-image', 'none', 'important')
     try {
       // No preload, as the examples page's audit says: the rule reads no stylesheet, and a fetch from elsewhere is the page's to fail.
       const results = await window.axe.run(element, { runOnly: { type: 'rule', values: ['color-contrast'] }, preload: false })
-      const data = (outcome) => outcome[0]?.nodes[0]?.any[0]?.data ?? {}
-      if (results.violations.length > 0) {
-        const { contrastRatio, expectedContrastRatio } = data(results.violations)
-        return { verdict: 'violation', ratio: contrastRatio, expected: expectedContrastRatio }
+      const first = (outcome) => outcome.flatMap((rule) => rule.nodes).map((node) => node.any[0] ?? {})
+      return {
+        violations: first(results.violations).map((check) => check.data ?? {}),
+        incomplete: first(results.incomplete).map((check) => check.message ?? ''),
+        passes: first(results.passes).length,
       }
-      if (results.incomplete.length > 0)
-        return { verdict: 'left', why: `its gradients set aside, still undecided: ${results.incomplete[0]?.nodes[0]?.any[0]?.message ?? ''}` }
-      return results.passes.length > 0 ? { verdict: 'passes' } : { verdict: 'left', why: 'its gradients set aside, axe measured nothing' }
     } finally {
       if (attribute === null) element.removeAttribute('style')
-      else element.setAttribute('style', attribute)
+      else if (inline.value === '') element.style.removeProperty('background-image')
+      else element.style.setProperty('background-image', inline.value, inline.priority)
     }
   }, at)
+  return verdictOf(answer)
 }
 
 /**
  * The undecided nodes of the audit just run that the rule is for, decided:
- * `rest`, the nodes it is not for, for the gate's own deciders, and
- * `problems`, one sentence each for a node it left undecided or measured
- * below the ratio axe asks.
+ * `rest`, the nodes it is not for, for the gate's own deciders; `left`, one
+ * sentence each for a node it left undecided; and `failing`, one each for a
+ * node axe measured, its gradients set aside, below the ratio it asks.
  */
 export async function decideGradients(page, undecided) {
   const rest = []
-  const problems = []
+  const left = []
+  const failing = []
   for (const node of undecided) {
     if (!onGradientAlone(node)) {
       rest.push(node)
       continue
     }
     const decided = await decideOne(page, node.at)
-    if (decided.verdict === 'passes') continue
-    problems.push(
-      `${node.html} (axe: ${String(node.reason)} -- ${decided.verdict === 'violation' ? `its gradients clear of its text, at ${String(decided.ratio)}:1, below the ${String(decided.expected)} it asks` : decided.why})`,
-    )
+    if (decided.verdict === 'violation')
+      failing.push(`${node.html} (its gradients clear of its text, at ${String(decided.ratio)}:1, below the ${String(decided.expected)} axe asks)`)
+    else if (decided.verdict === 'left') left.push(`${node.html} (axe: ${String(node.reason)} -- ${decided.why})`)
   }
-  return { rest, problems }
+  return { rest, left, failing }
 }
 
 /** The probe's selects: black on white, a label far longer than the box, one each way of reading, padded at their end as Blueprint pads a select for its arrow. */
@@ -284,15 +334,23 @@ const PROBE_PAGE = `<!doctype html><style>body{margin:0;background:#fff}select{a
 
 /**
  * What the rule rests on, measured in `browser` on a page of its own: a
- * select drawn as one box draws its chosen text inside its content box,
- * reading either way, and clips it there. Each probe select's label runs
+ * select drawn as one box, of the appearance `none`, draws its chosen text
+ * inside its content box, reading either way, and clips it there. Each probe select's label runs
  * far past its box; its pixels are read from a screenshot decoded by the
  * page, and ink -- a pixel whose darkest channel is below half -- must lie
  * inside the content box, reach within 12 px of its end, and nowhere be
  * more than MARGIN past it. Null when it holds, or a sentence saying what
- * the browser drew.
+ * the browser drew; kept for `browser`, so that `decideGradients` decides a
+ * select in it only once the probe has held there.
  */
 export async function selectTextClipped(browser) {
+  const verdict = await probeSelects(browser)
+  probes.set(browser, verdict)
+  return verdict
+}
+
+/** `selectTextClipped`'s measurement, in a page of its own in `browser`. */
+async function probeSelects(browser) {
   const page = await browser.newPage({ viewport: { width: 320, height: 200 } })
   try {
     await page.setContent(PROBE_PAGE)

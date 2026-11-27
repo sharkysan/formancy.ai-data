@@ -5465,7 +5465,7 @@
       ]
     },
     "0178": {
-      "reviewed": "sha256:d7055a686714341d4497408a0817dd2bbd7b69afc705aa9770d2b7dcc079f25a",
+      "reviewed": "sha256:3efb6d1a895cedf5d198a47ab8a6f0c2cda6052181c822dd41aae75345b1ff8b",
       "limitations": [
         {
           "area": "testing",
@@ -5473,7 +5473,7 @@
         },
         {
           "area": "testing",
-          "says": "That a browser draws a select's chosen text inside its content box, which the gates' rule for the arrow rests on, is measured on a select of the probe's own in each browser, not on each select the rule decides."
+          "says": "That a browser draws a select's chosen text inside its content box, which the gates' rule for the arrow rests on, is measured on a select of the probe's own, of the appearance none, in each browser, not on each select the rule decides; a select of another appearance stays undecided and fails its gate."
         }
       ]
     }

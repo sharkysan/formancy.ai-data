@@ -838,7 +838,13 @@ Safari (0058). Docker Desktop, Windows and macOS are run by no gate (0032),
 and nothing of the Cloudflare deployment has been measured through a real
 tunnel (0037). That a host on `@formancy/*` 0.3.0 reads the generated forms
 was measured by hand (0042). Most transient error codes are allowlisted from
-documentation and provoked by no test (0028). The images are moving tags
+documentation and provoked by no test (0028). The arrow formancy
+0.14.0's Blueprint draws in a select is measured for contrast by no gate,
+and the gates' rule that decides the select's text behind it rests on how
+a select of the probe's own clips its text in each browser, not on each
+select it decides
+([0178](../decisions/0178-the-browser-gates-decide-a-selects-text-behind-its-drawn-arrow-with-the-arrow-set-aside.md)).
+The images are moving tags
 (0035), and only the adapter suites and data-fixtures run on every image of
 the matrix; every other suite runs the defaults alone (0067). Why two
 SQL Server 2025 containers stopped before they were ready on CI on

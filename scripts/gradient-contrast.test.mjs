@@ -1,13 +1,28 @@
 import { describe, expect, test } from 'vitest'
-import { boxesOf, gradientLayers, gradientProblem, linear, MARGIN, onGradientAlone, over, position, splitTop } from './gradient-contrast.mjs'
+import {
+  boxesOf,
+  gradientLayers,
+  gradientProblem,
+  linear,
+  MARGIN,
+  onGradientAlone,
+  oneBox,
+  over,
+  position,
+  splitTop,
+  verdictOf,
+  whyLeft,
+} from './gradient-contrast.mjs'
 
 /**
  * 0178's rule for a text axe leaves undecided behind a select's drawn
- * arrow, in the parts that need no browser: which nodes it is for, how a
- * computed background is read into the boxes its layers paint, and when
- * one lies over the box the text is drawn in. What axe says once the
- * gradients are set aside, and whether a browser clips a select's text to
- * its content box, are measured in each browser by the gates.
+ * arrow, in the parts that need no browser: which nodes and elements it is
+ * for, that it decides nothing before its probe has held, how a computed
+ * background is read into the boxes its layers paint, when one lies over
+ * the box the text is drawn in, and what axe's answer with the gradients
+ * set aside comes to. What axe answers, and whether a browser clips a
+ * select's text to its content box, are measured in each browser by the
+ * gates.
  */
 
 /**
@@ -42,6 +57,14 @@ const BLUEPRINT = {
   'padding-left': '10px',
 }
 
+/**
+ * That select as `decideOne` reads it in the page: no `size` attribute,
+ * which a select reads as 0, and the appearance `none` Blueprint gives it,
+ * as Chromium 153 and Firefox 155 computed it for `appearance: none` on
+ * 2026-11-27.
+ */
+const SELECT = { tag: 'select', multiple: false, size: 0, style: { ...BLUEPRINT, appearance: 'none' } }
+
 describe('which undecided texts the rule is for', () => {
   test('a text axe gave the gradient alone as its reason, and no other', () => {
     // A rule matched on axe's sentence passes for the wrong reason when the sentence is reworded; and one that took any
@@ -51,6 +74,65 @@ describe('which undecided texts the rule is for', () => {
     expect(onGradientAlone({ keys: ['bgGradient', 'pseudoContent'] })).toBe(false)
     expect(onGradientAlone({ keys: [] })).toBe(false)
     expect(onGradientAlone({ reason: "Element's background color could not be determined due to a background gradient" })).toBe(false)
+  })
+
+  test('a select drawn as one box, and no other element', () => {
+    // The probe measured where a one-box select clips its text; a list box, or a div, can draw its text past its content box,
+    // where a gradient the rule set aside as clear of the text would lie under it.
+    expect(oneBox({ tag: 'select', multiple: false, size: 0 })).toBe(true)
+    expect(oneBox({ tag: 'select', multiple: false, size: 1 })).toBe(true)
+    expect(oneBox({ tag: 'select', multiple: true, size: 0 })).toBe(false)
+    expect(oneBox({ tag: 'select', multiple: false, size: 4 })).toBe(false)
+    expect(oneBox({ tag: 'div', multiple: undefined, size: undefined })).toBe(false)
+    expect(oneBox({ tag: 'input', multiple: false, size: 20 })).toBe(false)
+  })
+
+  test('nothing is decided in a browser before its probe has held there', () => {
+    // A gate that decided its selects before the probe ran, or after it failed, would pass every contrast check in a browser
+    // whose selects draw their text past the box the rule takes the arrow to lie clear of.
+    expect(whyLeft(undefined, SELECT)).toBe('no probe has yet shown that this browser clips a select’s text to its content box')
+    expect(whyLeft('read ltr, it drew 104 pixels of its text past its content box', SELECT)).toBe(
+      'this browser’s probe did not hold: read ltr, it drew 104 pixels of its text past its content box',
+    )
+    expect(whyLeft(null, SELECT)).toBeNull()
+  })
+
+  test('an element that is gone, is no select drawn as one box, or is not of the appearance the probe measured is never decided', () => {
+    // Each is a text the probe says nothing of: decided, its gradients set aside, axe would measure a text the arrow may lie over.
+    expect(whyLeft(null, null)).toBe('gone from the page')
+    for (const element of [
+      { ...SELECT, multiple: true },
+      { ...SELECT, size: 4 },
+      { ...SELECT, tag: 'div', multiple: undefined, size: undefined },
+    ])
+      expect(whyLeft(null, element)).toBe('a gradient behind a text that is not a select drawn as one box')
+    // The platform's select, or Chromium's base-select, lays its text out as the probe's `appearance: none` never showed.
+    expect(whyLeft(null, { ...SELECT, style: { ...SELECT.style, appearance: 'auto' } })).toBe('a select of the appearance auto, where the probe measured none')
+    expect(whyLeft(null, { ...SELECT, style: { ...SELECT.style, appearance: 'base-select' } })).toBe(
+      'a select of the appearance base-select, where the probe measured none',
+    )
+    expect(whyLeft(null, { ...SELECT, style: BLUEPRINT })).toBe('a select of the appearance nobody read, where the probe measured none')
+    // And a select it is for still answers to where its gradients lie.
+    expect(whyLeft(null, { ...SELECT, style: { ...SELECT.style, 'padding-right': '10px' } })).toMatch(/^a gradient over the box its text is drawn in/)
+  })
+})
+
+describe('what axe answers with the gradients set aside', () => {
+  test('a pass is decided, a failure carries both ratios, and anything else is left', () => {
+    // A verdict that took "nothing failed" for a pass would decide a select axe measured nothing of, or still could not decide;
+    // and one that read a pass first would let a failing text pass beside another axe passed.
+    expect(verdictOf({ violations: [], incomplete: [], passes: 1 })).toEqual({ verdict: 'passes' })
+    expect(verdictOf({ violations: [{ contrastRatio: 2.5, expectedContrastRatio: '4.5:1' }], incomplete: [], passes: 1 })).toEqual({
+      verdict: 'violation',
+      ratio: 2.5,
+      expected: '4.5:1',
+    })
+    const pseudo = "Element's background color could not be determined due to a pseudo element"
+    expect(verdictOf({ violations: [], incomplete: [pseudo], passes: 1 })).toEqual({
+      verdict: 'left',
+      why: `its gradients set aside, still undecided: ${pseudo}`,
+    })
+    expect(verdictOf({ violations: [], incomplete: [], passes: 0 })).toEqual({ verdict: 'left', why: 'its gradients set aside, axe measured nothing' })
   })
 })
 

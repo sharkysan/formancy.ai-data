@@ -149,11 +149,15 @@ export async function measured(gate, page, state) {
   const gradients = await decideGradients(page, result.undecided)
   const { left, failing } = await decideInRows(page, gradients.rest)
   const undecided = [
-    ...gradients.problems.slice(0, 4).map((problem) => `undecided: ${problem}`),
+    ...gradients.left.slice(0, 4).map((html) => `undecided: ${html}`),
     ...left.slice(0, 4).map((html) => `undecided: ${html}`),
     ...failing.slice(0, 4).map((html) => `below AA once scrolled into view: ${html}`),
   ]
   check(`${state}: the contrast of every text decided`, undecided.length === 0 ? null : undecided.join('; '))
+  check(
+    `${state}: every select’s text behind its drawn arrow at the contrast axe asks`,
+    gradients.failing.length === 0 ? null : gradients.failing.slice(0, 4).join('; '),
+  )
   // Everything the page did to reach this state, under the policy it was
   // sent with (0083): what the browser refused, and what the console said
   // of the policy.
