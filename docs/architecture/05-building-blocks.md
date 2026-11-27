@@ -526,7 +526,8 @@ outside the plane.
 else ([0047](../decisions/0047-a-hosts-workspace-lists-opens-and-edits-records-in-linked-grids.md)).
 `src/session.ts` is one pane's session — engine, record, version, what a
 save's answer does — framework-neutral, so both renderers show one decision
-(0029); it draws disabled, and sends in no save, a field its person may
+(0029); through `src/drawn-copies.ts`, the copies of a form a record is
+drawn with, it draws disabled, and sends in no save, a field its person may
 write in no operation ([0117](../decisions/0117-a-form-names-what-each-write-accepts-and-a-host-page-sends-nothing-none-accepts.md)), and draws a saved record for its update and a new one for its create ([0122](../decisions/0122-a-host-page-draws-a-saved-record-for-the-update-and-a-new-one-for-the-create.md)), its state field through `src/moves.ts` as the moves its person may make from where the record is ([0127](../decisions/0127-a-host-page-draws-a-state-field-as-the-moves-its-person-may-make.md)). A new record -- `open()` over no answers, and `start(prefill)` for a child's new row, through `@formancy/core`'s `withDefaults` -- starts at the defaults the form is served with, which `GET /v1/forms/:id` keeps only where this person's create takes them (data-core's `policy/starting.ts`); a record read, a copy and a form discarded back to open with their answers and start at none, and a saved record's state choice carries no default, which its choice need not offer ([0149](../decisions/0149-a-new-record-starts-with-its-columns-constant-default.md)). `src/forms-nav.tsx` draws the menu (0045) -- Find a form (`src/find-form.tsx`), the forms under their groups (`src/form-groups.tsx`) and the forms linked to the open one (`src/linked-forms.tsx`, which keeps the keyboard when the link it was on is drawn no more), each link a `src/form-link.tsx`, which `src/form-list.ts` orders, matches and links ([0144](../decisions/0144-the-host-lists-its-forms-by-group.md)); `src/record-grid.tsx`,
 `src/grid-datasource.ts` and `src/grid-options.tsx` put a page of records
 at a time in AG Grid Community (0044), `src/grid-keys.ts` deciding what a
@@ -664,7 +665,14 @@ its words ([0176](../decisions/0176-the-host-page-changes-the-chosen-records-of-
 per renderer, as the guard knows them, and `src/use-master-record.ts`
 what the detail holds and every way it changes -- a row opened, New,
 Duplicate record, Change from a date, Load, a save answered, a record
-gone;
+gone; the open record edited in its row of the Records grid: `src/grid-edit.ts`
+which cells are edited in the cell, in the record's form or never and
+why, read from `src/drawn-copies.ts`'s copy, the row's states and when
+leaving it saves, framework-neutral; `src/use-grid-edit.ts` doing it on
+AG Grid and the page, the row drawn from the engine; `src/cell-editors.tsx`
+the editors, native controls of the page's own writing into the engine;
+and `src/pane-reach.ts` the pane's Save and fields, which the grid's save
+and F2 go through ([0179](../decisions/0179-a-grid-edits-the-open-records-cells-and-saves-its-row-when-it-is-left.md));
 `src/unknown-notice.tsx` an unknown write (0031). The address names the
 form, layout and view, never the record (`src/layout.ts`), and an arrival
 whose address names no layout opens in the one the person chose last,

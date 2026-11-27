@@ -109,7 +109,8 @@ says each with the record that holds it, and the [studio's](./docs/guide/studio.
 and [host page's](./docs/guide/host.md) pages picture them.
 
 - **Lists**, searched, sorted and filtered inside the read policy, with
-  views an administrator names and views a person keeps.
+  views an administrator names and views a person keeps, and the open
+  record edited in its row, saved as its form saves it.
 - **Lookups** offering only the rows a person may choose, checked again on
   save.
 - **Child records** in tabs beside their parent, as a tree, or a level at

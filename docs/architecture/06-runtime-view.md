@@ -1445,3 +1445,41 @@ for one not changed, four on SQL Server for one whose read failed, past
 what any deadline keeps inside the proxy's 60 s; and on the host page a
 confirmation that cannot say which record will be refused, and one
 request over the choice at a time (§11).
+
+## 6.19 Editing the open record in its row
+
+1. On the Records grid ([0179](../decisions/0179-a-grid-edits-the-open-records-cells-and-saves-its-row-when-it-is-left.md)), F2 or a double click on a cell asks
+   `apps/host/src/use-grid-edit.ts`, which reads `grid-edit.ts`'s rule over
+   the copy a pane draws the record with (`drawn-copies.ts`): on the open
+   row, the engine's snapshot of the field; on another, the copy's own
+   rules. Never edited, the grid's line says why. Edited in the form, the
+   record is shown as Enter shows it and the keyboard goes to that field,
+   through the pane (`pane-reach.ts`).
+2. On another row, the open one is left first -- saved where the grid
+   edited it, or waited for where its save is out -- and the record is
+   opened as Space opens it, through the guard; once it is read the edit
+   begins, the line saying so where the read differs from the page.
+3. An editor of the page's own (`cell-editors.tsx`) writes each change into
+   the engine, so the record's form shows it as it is typed; AG Grid holds
+   no value, and with `readOnlyEdit` writes none. Tab and Shift+Tab go to
+   the row's next and previous editable cell; Escape puts the cell back.
+4. The row is saved when it is left -- the keyboard or a press on another
+   row, Tab past its last editable cell, Enter -- where the grid edited it
+   and its answers still differ: the pane's own Save, sent as its Save sends
+   it, the same `records/update` and outcomes, said in the pane, whose
+   notice opens without taking the keyboard. While it is out the row says
+   Saving…, its cells take no edit and the next row waits for its answer.
+5. Stored, the row takes what is stored and its version in place
+   (`rowNode.setData`) and no page is read again; a lookup it changed is
+   asked for its label. Not stored, the row's first cell says so, the line
+   why, and an invalid one puts the keyboard back in its first invalid
+   cell's editor.
+
+Held by `apps/host/src/grid-edit.test.ts` and `cell-editors.test.tsx`
+without a server, and on both engines by `grid-editing.test.tsx`,
+`in-flight.test.tsx`, `grid-keys.test.tsx` and `page.test.tsx`, with the
+browser gate's `apps/host/scripts/browser/editing.mjs`. The suites that
+start a database and the browser gate were written without one, and CI is
+their first run. What it costs: a read per row entered, a row out of its
+sort until the page is read again, one draft at a time, and the form's
+fields for a textarea, a time, a timestamp and a lookup (§11).

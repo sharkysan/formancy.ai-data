@@ -405,6 +405,25 @@ No test holds the Drill down levels that hold a chosen record other than
 the open one: the fixture has no form that is its own child and may be
 deleted.
 
+The open record edited in its row of the Records grid
+([0179](../decisions/0179-a-grid-edits-the-open-records-cells-and-saves-its-row-when-it-is-left.md)) was written on 2026-11-27 without a database. What needs none ran
+and was watched failing with its rule taken out: which cells are edited
+where, read from the copy a pane draws the record with, the row's states
+and its mark, when leaving it saves, where Tab goes and the line's words
+(`apps/host/src/grid-edit.test.ts`); and AG Grid's editing as the page
+configures it, over a real session and engine with no server -- F2's
+editor, named and passing axe, Tab and Shift+Tab, Escape, no other key
+starting an edit, F2's why, the row's words, a lost save said on the row,
+and an invalid one back in its editor (`cell-editors.test.tsx`), each run
+with a configuration of its own that starts no database. On both engines
+-- F2, Tab, Shift+Tab, Enter and Escape in each renderer, a row saved in
+place, stale, invalid, declined, refused and lost each said on the row, a
+save out holding F2 and another row, Space on another row saving first
+(`grid-editing.test.tsx`), the form's Save busy while a grid save is out
+(`in-flight.test.tsx`), F2 by the form's copy (`grid-keys.test.tsx`), axe
+in each state (`page.test.tsx`) -- and the browser gate's three states
+(`apps/host/scripts/browser/editing.mjs`) run first in CI.
+
 The host page's change of the records chosen and the studio's grant of it
 ([0176](../decisions/0176-the-host-page-changes-the-chosen-records-of-a-page-and-the-studio-grants-who-may-and-in-which-fields.md)) were written on 2026-11-22 without a database. What needs
 none ran and was watched failing with its rule taken out: the fields

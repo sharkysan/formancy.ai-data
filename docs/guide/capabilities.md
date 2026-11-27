@@ -580,6 +580,17 @@ get*](../../README.md#what-you-get) is the short version, and
   ([0140](../decisions/0140-a-form-names-the-forms-each-lookups-record-opens-in.md),
   [0141](../decisions/0141-a-lookups-record-opens-below-the-record.md),
   [0157](../decisions/0157-a-lookups-first-open-sits-beside-its-field.md)).
+- **The open record is edited in its row of the grid**, since
+  [0179](../decisions/0179-a-grid-edits-the-open-records-cells-and-saves-its-row-when-it-is-left.md): F2 or a double click on a cell of the Records grid edits it there
+  -- text, a number, a date, a checkbox, a select -- or, for a textarea, a
+  time, a timestamp or a lookup, takes the keyboard to that field of the
+  record's form. The row is the form's draft, so either shows what the
+  other typed, and which cells are edited is the copy the form draws the
+  record with. A row is saved when it is left -- another row, Tab past its
+  last cell, Enter -- by the form's own Save, and stored in place with no
+  page read again; one not stored says so in its first cell and on the
+  grid's line. One draft at a time, and a row saved keeps its place until
+  the page is read again.
 - **One definition, both renderers**, through one client; the host page
   draws a record in React, Angular or both, as the person chooses
   ([0029](../decisions/0029-a-host-renders-a-published-form-through-one-client.md),

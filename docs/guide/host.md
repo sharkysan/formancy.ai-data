@@ -281,6 +281,33 @@ its child sections' files. The line names the file, not how many
 records it holds, and says the page handed it over, not that the browser
 kept it.
 
+The open record's row of the Records grid is its form's draft too
+([0179](../decisions/0179-a-grid-edits-the-open-records-cells-and-saves-its-row-when-it-is-left.md)). F2 or a double click on one of its cells edits it there, in an
+input, a checkbox or a select named for the field and the record --
+"Group, Order `k1:9`" -- and as the keyboard reaches a cell the grid says
+"F2 edits it", or "F2 edits it in the record's form" on a textarea, a
+time, a timestamp or a lookup, where F2 takes the keyboard to that field
+of the form. On another row F2 opens that record first, as Space does,
+and edits the cell once it is read. Typing a character starts nothing,
+so `=` still keeps a cell's value as its column's condition. What a cell
+is edited in, and whether it is, is what the form draws: a field written
+on create only, one you may only read, one the database writes or a state
+with nowhere to move is never edited, and F2 there says why. In an editor
+Tab and Shift+Tab go to the row's next and previous editable cell, and
+Escape gives that cell's typing up, the row's other changes kept. The row
+is saved when you leave it -- the keyboard or a press on another row, Tab
+past its last editable cell, Enter -- by the form's own Save, which its
+pane says; while it is out the row says Saving…, and the next row waits
+for its answer. Saved, the row shows what is stored where it is, and the
+grid says "Saved Order `k1:9`." without reading the page again, so the
+row keeps its place until the page is read. Not saved, its first cell
+says so and the grid's line why: a stale save keeps its changes, which
+Load the saved record in the record's notice discards; an invalid one
+puts the keyboard back in the cell to fix and names the rest, which the
+form shows. Under Both the grid edits the React form; in Drill down every
+cell is edited in the form; child sections' grids are not edited in their
+cells.
+
 Where the server offers you delete, the open record's header has Delete
 record, a child row's its own Delete, and each grid row a Delete button
 named for its record, which the arrow keys reach without making the grid

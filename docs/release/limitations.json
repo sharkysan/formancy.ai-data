@@ -1307,7 +1307,7 @@
       ]
     },
     "0047": {
-      "reviewed": "sha256:2fbca00ca72051b8a79aa317e3b744749307e337bd9425b8d8506f439840c616",
+      "reviewed": "sha256:a2be2a2395110e38ce49c88e84312f87e949e70b6b2442f81084d6c4e93eb70d",
       "limitations": [
         {
           "area": "host",
@@ -3528,7 +3528,7 @@
       ]
     },
     "0122": {
-      "reviewed": "sha256:b6f9b819aaf27d032017e5a98343ff79efc3bed35049a8e836be31947a33e331",
+      "reviewed": "sha256:6bef9df5b975d620f07604cf73ed17a3332545effd41aa04e7493b347ee08823",
       "limitations": [
         {
           "area": "host",
@@ -4112,7 +4112,7 @@
       ]
     },
     "0146": {
-      "reviewed": "sha256:afba63844c6dad37e465066bf67d2bc5a52b6128d2aa28da787595a15cb86a29",
+      "reviewed": "sha256:ec9f5872e30613b86d7410b2c9d05432dbaba9167b3939b5acd83e0e55a1fea8",
       "limitations": [
         {
           "area": "host",
@@ -5501,6 +5501,35 @@
         {
           "area": "testing",
           "says": "That a browser draws a select's chosen text inside its content box, which the gates' rule for the arrow rests on, is measured on a select of the probe's own, of the appearance none, in each browser, not on each select the rule decides; a select of another appearance stays undecided and fails its gate."
+        }
+      ]
+    },
+    "0179": {
+      "reviewed": "sha256:7f9cf3fac4644f7f3a6672dc4801f585fe64cfe3ad06047be4ab2d1c0b1eace9",
+      "limitations": [
+        {
+          "area": "host",
+          "says": "The host page's Records grid edits the open record's cells alone: F2 or a double click on another row opens that record first, a read of it before its editor opens, and typing a character starts no edit.",
+          "heldBy": "apps/host/src/grid-editing.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "A row saved from its cells keeps its place until the page is read again -- a page turn, Ask again, a sort, a filter or the form's Save -- so a list sorted by the field just changed is out of order until then.",
+          "heldBy": "apps/host/src/grid-editing.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "Only the open row holds a draft: a row whose save did not store is left by mending it, by the form's Discard or Load the saved record, or by answering the unsaved-changes question.",
+          "heldBy": "apps/host/src/grid-editing.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "A textarea, a time, a timestamp and a lookup are edited in the record's form rather than in their cells, a date is typed as its canonical text, and a lookup changed in the form shows its token in the row until a save of the row asks for its label.",
+          "heldBy": "apps/host/src/grid-edit.test.ts"
+        },
+        {
+          "area": "host",
+          "says": "Under Both renderers the grid edits the React form's draft alone, in Drill down every cell is edited in the record's form, and no child section's grid, Drill down level or together tab is edited in its cells."
         }
       ]
     }
