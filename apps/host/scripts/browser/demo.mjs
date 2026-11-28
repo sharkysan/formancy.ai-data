@@ -198,6 +198,13 @@ export async function demoPass({ origin, prefix, check, timed }) {
     const note = `Changed in the browser at ${new Date().toISOString()}`
     await paper(first, 'Order').getByRole('textbox', { name: 'Notes' }).fill(note)
     await paper(first, 'Order').getByRole('button', { name: 'Save' }).click()
+    // The form's line, not the grid, says the save stored: the open row
+    // draws the form's draft (0179), so it shows the note before Save is
+    // pressed, and New record pressed while the save is out is asked about.
+    await first
+      .getByRole('status')
+      .filter({ hasText: /^Saved\.$/ })
+      .waitFor(WITHIN)
     await grid(records(page), 'Records').getByRole('gridcell', { name: note }).waitFor(WITHIN)
     check('a change to the order is saved, and the records grid shows it', null)
 

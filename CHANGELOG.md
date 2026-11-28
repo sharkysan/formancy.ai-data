@@ -14,6 +14,12 @@ which are kept unchanged under a heading of their own below it (0171).
 
 ### Added
 
+- **The open record is edited in its row of the Records grid**
+  ([0179](docs/decisions/0179-a-grid-edits-the-open-records-cells-and-saves-its-row-when-it-is-left.md)): F2 or a double click edits a cell there, as the record's form
+  draws it, and the row is saved by the form's own Save when it is left,
+  stored in place. The row and the form are one draft, so nothing merges
+  and nothing new reaches the server.
+
 ### Changed
 
 - **A lookup's first Open sits beside its box**

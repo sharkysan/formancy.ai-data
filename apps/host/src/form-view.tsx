@@ -3,41 +3,35 @@ import type { ReactElement, ReactNode, RefObject } from 'react'
 import type { DataClient, FormMenuEntry, PublishedForm } from '@formancy/data-client'
 import { useAfterRender } from './after-render.js'
 import type { ChildForm } from './children.js'
-import { recordName, trailOf } from './crumbs.js'
+import { trailOf } from './crumbs.js'
 import { DeleteRegion } from './delete-confirm.js'
 import { useDemo } from './demo-tools.js'
 import { useDeleteFlow } from './delete-flow.js'
 import { detailTarget, gone, rowTarget, SAVE_OUT } from './deletion.js'
 import type { DeleteTarget } from './deletion.js'
 import { Detail } from './detail.js'
-import type { MasterOpen } from './detail.js'
-import { copiedLine, copyOf, leftOut } from './duplicate.js'
 import { DrillLevel } from './drill-level.js'
 import { FormHead, savedWith } from './form-head.js'
 import { columnsOf } from './grid-datasource.js'
 import type { GridRow } from './grid-datasource.js'
 import { useGuardContext } from './guard.js'
-import type { Said } from './leave.js'
 import type { Layout, View } from './layout.js'
 import { levelOpens } from './lookup-opens.js'
-import { useMasterPanes } from './master-panes.js'
-import { isOpen, nextLine, nextOf } from './next-version.js'
 import { renderersOf } from './panes.js'
 import { axisOf } from './prefs.js'
 import type { Axis, RendererChoice, Shares } from './prefs.js'
 import { DELETE_COLUMN } from './record-grid.js'
-import type { OpenHow, RecordGridHandle, RowAt } from './record-grid.js'
+import type { RecordGridHandle } from './record-grid.js'
 import { Records } from './records.js'
-import { RecordTabs, useTabStart } from './record-tabs.js'
+import { RecordTabs } from './record-tabs.js'
 import { focusChoice } from './segmented.js'
 import { useActions } from './selection-bar.js'
-import type { SaveResult, Session } from './session.js'
 import { laneStyle, Split, useLine } from './split.js'
 import { Trail } from './trail.js'
 import { useDrill } from './use-drill.js'
+import { useGridEdit } from './use-grid-edit.js'
 import type { FormOf } from './use-drill.js'
-
-const DISCARDED: Said = ['Discarded the unsaved changes. ']
+import { DISCARDED, useMasterRecord } from './use-master-record.js'
 
 /**
  * One open form (0047): its header -- the title and id, what this person
@@ -56,8 +50,10 @@ const DISCARDED: Said = ['Discarded the unsaved changes. ']
  * over the open record the server serves too (0162, action-flow.ts), and the bar above
  * the grid each over the records chosen of its page (0166, selection-bar.tsx) and, where
  * the server offers it, their deletion (0174). Each lookup of the record offers Open under
- * its field, which goes a Drill down level below it, from any layout (0141). The record's
- * own forms are made in master-panes.ts.
+ * its field, which goes a Drill down level below it, from any layout (0141). What the
+ * detail holds, and every way it changes, is use-master-record.ts's. The open record's
+ * row of the grid is its draft too, edited in its cells and saved when it is left
+ * (use-grid-edit.ts, 0179): a row asked for leaves it first.
  */
 export function FormView({
   client,
@@ -120,35 +116,52 @@ export function FormView({
   const lanes = useRef<HTMLDivElement>(null)
   const recordsHeading = useRef<HTMLHeadingElement>(null)
   const detailHeading = useRef<HTMLHeadingElement>(null)
-  const newRef = useRef<HTMLButtonElement>(null)
   const searchRef = useRef<HTMLInputElement>(null)
-  const loadRef = useRef<HTMLButtonElement>(null)
-  const [open, setOpen] = useState<MasterOpen>(null)
-  const openRef = useRef<MasterOpen>(null)
-  openRef.current = open
-  const tabs = useTabStart(open)
-  const [line, setLine] = useState<{ said: Said; kind: 'answer' | 'refused' }>({ said: [], kind: 'answer' })
   const [search, setSearch] = useState('')
   const demo = useDemo()
-  const [loadRefusal, setLoadRefusal] = useState<string | null>(null)
-  /** What the record's crumb calls it, from what is stored (crumbs.ts). */
-  const [masterName, setMasterName] = useState<string | null>(null)
-  /** The open record's answers as stored -- as read, or as its last save left them -- which a section's condition is read from (0109); null for a new record. */
-  const [stored, setStored] = useState<Readonly<Record<string, unknown>> | null>(null)
   /** How many times the separator has been let go: each grid in the lanes fits its columns again. */
   const [released, setReleased] = useState(0)
   const deleteButton = useRef<HTMLButtonElement>(null)
-  const duplicateButton = useRef<HTMLButtonElement>(null)
-  const changeButton = useRef<HTMLButtonElement>(null)
 
   const title = entry.title
   const canCreate = definition.operations.includes('create')
-  /** What a copy carries (0107): `null` from the server where it offers no create, and then no Duplicate record. */
-  const copied = definition.copied ?? []
-  /** Where a version may be changed from a date (0113): the fields it starts and ends at, and the chain's key; else null. */
-  const versions = definition.versions
   const columns = useMemo(() => columnsOf(definition, null), [definition])
-  const { saveSet, sessions, opening } = useMasterPanes({ client, formId, definition, title, childForms, open: openRef })
+  const drilling = layout === 'drill'
+  const both = renderer === 'both'
+  /** One view at a time: Separate views' two, or Drill down's levels (0090). */
+  const paged = layout === 'separate' || layout === 'drill'
+  const master = useMasterRecord({
+    client,
+    formId,
+    definition,
+    title,
+    childForms,
+    both,
+    drilling,
+    grid,
+    after,
+    demo,
+    toDetail,
+    // Read when the detail changes, after `drill` below is made.
+    dropLevels: () => drill.dropAll(),
+  })
+  const { open, openRef, sessions, opening, say } = master
+  const edit = useGridEdit({
+    client,
+    formId,
+    definition,
+    title,
+    columns,
+    renderer,
+    drilling,
+    sessions,
+    openRef,
+    openToken: open?.kind === 'record' ? open.token : null,
+    grid,
+    after,
+    open: (token, at, then) => master.askRow(token, 'space', at, then),
+    toRecord: () => void reveal('record'),
+  })
   const canDelete = definition.operations.includes('delete') && definition.deleting !== null
   const removal = useDeleteFlow({
     client,
@@ -162,7 +175,7 @@ export function FormView({
     onLoad: (target) => {
       // The row's version moves with the record: the grid lists it again.
       grid.current?.reload()
-      load(target.record)
+      master.load(target.record)
     },
     onBack: (target) => {
       if (target.from.kind === 'detail') deleteButton.current?.focus()
@@ -196,18 +209,11 @@ export function FormView({
     renderer,
     grid,
     drill,
-    onReread: storedIn,
-    onLoad: load,
+    onReread: master.storedIn,
+    onLoad: master.load,
     onGone: dropRecord,
     onShow: reveal,
   })
-  const drilling = layout === 'drill'
-  const nameOf = (session: Session): string | null => recordName(definition.form.model.fields, session.saved().answers, null)
-
-  const both = renderer === 'both'
-  /** One view at a time: Separate views' two, or Drill down's levels (0090). */
-  const paged = layout === 'separate' || layout === 'drill'
-  const say = (said: Said, kind: 'answer' | 'refused' = 'answer'): void => setLine({ said, kind })
   /** Open under the record's lookups: its record a level down; refused, said on the detail's line. */
   const offer = drill.offer({ level: 1, owner: 'master' }, levelOpens(definition, null), (message) => say([message], 'refused'))
 
@@ -223,128 +229,6 @@ export function FormView({
   function toDetail(): void {
     if (paged) onView('record', false, 1)
     after(() => detailHeading.current?.focus())
-  }
-
-  /** The record now open in every pane, and what the detail's line says of it, if anything. */
-  function opened(token: string, said?: Said): void {
-    drill.dropAll()
-    setOpen({ kind: 'record', token })
-    setMasterName(sessions[0] === undefined ? null : nameOf(sessions[0]))
-    setStored(sessions[0]?.saved().answers ?? null)
-    setLoadRefusal(null)
-    if (said !== undefined) say(said)
-  }
-
-  function askRow(token: string, how: OpenHow, at: RowAt): void {
-    openFrom(token, how, () => grid.current?.focusAt(at))
-  }
-
-  /** A record opened from the grid or the tree (0110), through the guard; `toRow` gives the keyboard back to where it was opened from. */
-  function openFrom(token: string, how: OpenHow, toRow: () => void): void {
-    // In Drill down every open goes down a level: a click and Space too (0090).
-    const moves = how === 'enter' || drilling
-    if (open?.kind === 'record' && open.token === token) {
-      if (moves) toDetail()
-      return
-    }
-    const request = { kind: 'row', record: token } as const
-    ask(
-      request,
-      (discarded) =>
-        opening.read(request, token, discarded, {
-          opened: (now) => {
-            opened(now.token, [...(now.discarded ? DISCARDED : []), 'Opened ', { code: token }, '.'])
-            if (moves) toDetail()
-            else if (now.discarded) after(toRow)
-          },
-          refused: (message, dropped) => {
-            say([message], 'refused')
-            if (dropped) after(toRow)
-          },
-          back: toRow,
-        }),
-      toRow,
-    )
-  }
-
-  function startNew(): void {
-    ask(
-      { kind: 'new' },
-      (discarded) => {
-        opening.replaced()
-        drill.dropAll()
-        for (const session of sessions) session.open()
-        setOpen({ kind: 'new' })
-        setMasterName(null)
-        setStored(null)
-        setLoadRefusal(null)
-        say([...(discarded ? DISCARDED : []), both ? 'Both forms are empty, for a new record.' : 'The form is empty, for a new record.'])
-        toDetail()
-      },
-      () => newRef.current?.focus(),
-    )
-  }
-
-  /**
-   * Duplicate record (0107): the open record read again, and every pane
-   * opened on a copy of it as a new record -- the answers the server names,
-   * no token, no version -- after asking, as New does, about work the
-   * detail holds. The line says what was copied and what was not. Change
-   * from a date (0115) is the same read, every pane opened on the next
-   * version of the open one, which its save ends.
-   */
-  function startCopy(kind: 'duplicate' | 'change'): void {
-    const now = openRef.current
-    if (now?.kind !== 'record' || (kind === 'change' && versions === null)) return
-    const request = { kind, record: now.token } as const
-    const back = (): void => (kind === 'duplicate' ? duplicateButton : changeButton).current?.focus()
-    ask(
-      request,
-      (discarded) =>
-        opening.read(
-          request,
-          now.token,
-          discarded,
-          {
-            opened: (done, record) => {
-              drill.dropAll()
-              setOpen(kind === 'duplicate' ? { kind: 'new' } : { kind: 'next', of: done.token })
-              setMasterName(null)
-              setStored(null)
-              setLoadRefusal(null)
-              const line =
-                kind === 'duplicate' ? copiedLine(done.token, leftOut(definition.form.model.fields, record, copied), both) : nextLine(done.token, both)
-              say([...(done.discarded ? DISCARDED : []), ...line])
-              toDetail()
-            },
-            refused: (message) => say([message], 'refused'),
-            back,
-          },
-          (record) => (kind === 'duplicate' || versions === null ? copyOf(record, copied) : nextOf(record, versions)),
-          (record) => (kind === 'change' && record.record !== null && record.version !== null ? { record: record.record, version: record.version } : undefined),
-        ),
-      back,
-    )
-  }
-
-  function load(token: string): void {
-    setLoadRefusal(null)
-    const request = { kind: 'load', record: token } as const
-    const toLoad = (): void => loadRef.current?.focus()
-    ask(
-      request,
-      (discarded) =>
-        opening.read(request, token, discarded, {
-          opened: (now) =>
-            opened(now.token, [...(now.discarded ? DISCARDED : []), 'Loaded record ', { code: token }, both ? ' into both forms.' : ' into the form.']),
-          refused: (message) => {
-            setLoadRefusal(message)
-            demo.reveal()
-          },
-          back: toLoad,
-        }),
-      toLoad,
-    )
   }
 
   /** The keyboard on the open row: its cell when it is on this page, otherwise the Records heading, which says so. */
@@ -374,28 +258,6 @@ export function FormView({
       },
       () => focusChoice(`renderer-${formId}`, renderer),
     )
-  }
-
-  /** A save the server answered in the record's panes: the grid shows what is stored, and a created record is the detail's (opening.ts). */
-  function answered(result: SaveResult, session: Session): void {
-    grid.current?.reload()
-    opening.answered(result, session, (now) => {
-      tabs.created()
-      opened(now.token, now.discarded ? [...DISCARDED, 'Opened ', { code: now.token }, '.'] : undefined)
-    })
-    if (result.kind === 'saved') storedIn(session)
-  }
-
-  /** What the crumb calls the record, and what its sections' conditions read, from what `session` holds as stored. */
-  function storedIn(session: Session): void {
-    setMasterName(nameOf(session))
-    setStored(session.saved().answers)
-  }
-
-  /** A pane's "Load the saved record": the grid and the crumb say what is stored, as after a save. */
-  function loadedSaved(session: Session): void {
-    grid.current?.reload()
-    storedIn(session)
   }
 
   /** The open record's Delete, in the detail's header (0053). While a save of it is out, it waits for the answer, and says so. */
@@ -433,15 +295,7 @@ export function FormView({
   /** A record gone from the page dropped from every Drill down level that holds it, and closed where it is the open one: its forms emptied (0053, 0094, 0174). */
   function dropRecord(token: string): void {
     drill.levels.recordGone(formId, token)
-    const now = openRef.current
-    if (now?.kind !== 'record' || now.token !== token) return
-    opening.replaced()
-    drill.dropAll()
-    for (const session of sessions) session.open()
-    openRef.current = null
-    setOpen(null)
-    setLoadRefusal(null)
-    say([])
+    master.close(token)
   }
 
   // Back or Forward between the two views of Separate views: the half the
@@ -462,7 +316,7 @@ export function FormView({
   const splitter = useLine(axisOf(layout), shares, lanes)
   const style = laneStyle(shares, splitter)
   /** Drill down's trail: the records, the record, and each level held down to the one shown. */
-  const crumbs = trailOf(title, open === null ? null : open.kind === 'record' ? { token: open.token, name: masterName } : 'new', drill.path, drill.shown)
+  const crumbs = trailOf(title, open === null ? null : open.kind === 'record' ? { token: open.token, name: master.name } : 'new', drill.path, drill.shown)
 
   return (
     <>
@@ -489,13 +343,13 @@ export function FormView({
           openToken={open?.kind === 'record' ? open.token : null}
           canCreate={canCreate}
           headingRef={recordsHeading}
-          newRef={newRef}
+          newRef={master.newRef}
           searchRef={searchRef}
           search={search}
           refit={released}
           onSearch={setSearch}
-          onNew={startNew}
-          onOpen={askRow}
+          onNew={master.startNew}
+          onOpen={(token, how, at) => edit.leave(token, () => master.askRow(token, how, at))}
           remove={canDelete ? { noun: title, press: deleteRow } : undefined}
           after={
             removal.deletion.state !== 'idle' && removal.deletion.target.from.kind === 'row' && definition.deleting !== null ? (
@@ -505,7 +359,8 @@ export function FormView({
           selection={actions.selection}
           drilling={drilling}
           tree={childForms.find((each) => each.child.form === formId)?.child.field ?? null}
-          onTreeOpen={openFrom}
+          onTreeOpen={master.openFrom}
+          edit={edit}
         />
         {splitter === null ? null : (
           <Split
@@ -524,7 +379,7 @@ export function FormView({
           formTitle={title}
           formId={formId}
           open={open}
-          line={line}
+          line={master.line}
           layout={layout}
           canCreate={canCreate}
           hidden={drilling ? drill.shown !== 1 : paged && view === 'records'}
@@ -533,18 +388,18 @@ export function FormView({
           renderer={renderer}
           onRenderer={chooseRenderer}
           demo={demo}
-          loadRefusal={loadRefusal}
-          loadRef={loadRef}
-          onLoad={load}
+          loadRefusal={master.loadRefusal}
+          loadRef={master.loadRef}
+          onLoad={master.load}
           sessions={sessions}
-          onAnswer={answered}
-          onLoaded={loadedSaved}
-          canDuplicate={copied.length > 0}
-          duplicateRef={duplicateButton}
-          onDuplicate={() => startCopy('duplicate')}
-          canChange={open?.kind === 'record' && isOpen(stored, versions)}
-          changeRef={changeButton}
-          onChange={() => startCopy('change')}
+          onAnswer={master.answered}
+          onLoaded={master.loadedSaved}
+          canDuplicate={master.canDuplicate}
+          duplicateRef={master.duplicateRef}
+          onDuplicate={() => master.startCopy('duplicate')}
+          canChange={master.canChange}
+          changeRef={master.changeRef}
+          onChange={() => master.startCopy('change')}
           canDelete={canDelete}
           saving={saving}
           deleteRef={deleteButton}
@@ -560,20 +415,20 @@ export function FormView({
             <RecordTabs
               client={client}
               childForms={childForms}
-              record={tabs.start}
+              record={master.tabStart}
               heading={heading}
               headingId="detail-heading"
               idBase="detail"
               parentNoun={title}
               parent={parent}
-              stored={stored}
+              stored={master.stored}
               renderer={renderer}
               refit={released}
               onShow={() => reveal('record')}
               drill={drill}
               level={1}
               drilling={drilling}
-              saveSet={saveSet}
+              saveSet={master.saveSet}
             >
               {panes}
             </RecordTabs>

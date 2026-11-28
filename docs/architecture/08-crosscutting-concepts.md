@@ -752,6 +752,15 @@ user interface is the rule, and this is what each part of it rests on.
   done; and a question asked over a choice closes, nothing run, when the
   choice changes under it
   ([0166](../decisions/0166-a-person-chooses-a-pages-records-by-a-column-of-boxes-and-runs-an-action-over-them-from-a-bar-above-the-grid.md)).
+  The open record's row is its form's draft: F2 is the one key that starts
+  an edit in it, typing a character starting nothing; its editors are
+  native controls of the page's own, named for their field and record and
+  styled by their own style attribute in the room's variables, the cell's
+  frame the theme's parameter; Tab moves among its editable cells only
+  while one edits, the grid one Tab stop otherwise; AG Grid's live region
+  says "F2 edits it" where it does; and the row's first cell and the
+  grid's line say what its save came to, each sentence a new element
+  ([0179](../decisions/0179-a-grid-edits-the-open-records-cells-and-saves-its-row-when-it-is-left.md)).
 - **Accessible name only.** Tests find elements by role and accessible name
   ([formancy.ai 0034](https://github.com/sharkysan/formancy.ai/blob/main/docs/decisions/0034-accessible-name-only.md));
   where the tree cannot answer, a test reads the DOM and its header says

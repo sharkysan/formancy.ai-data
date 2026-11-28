@@ -2,9 +2,10 @@ import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import { computeAccessibleDescription } from 'dom-accessibility-api'
 import { SAVE_OUT } from './deletion.js'
+import { SAVE_WAITED } from './grid-edit.js'
 import { RUN_HELD, RUNNING } from './running.js'
 import { CLOSE_WORDS } from './test-actions.js'
-import { focusedName } from './test-accessible.js'
+import { audit, focusedName, unnamed } from './test-accessible.js'
 import { askClose, closed, closeRegion, closing, openActionOrder, runIt, runsSent } from './test-acting.js'
 import {
   answer,
@@ -12,7 +13,10 @@ import {
   chooseForm,
   chooseRenderer,
   control,
+  dataCell,
   dataRows,
+  gridSection,
+  gridStatus,
   load,
   mount,
   newRecord,
@@ -20,6 +24,7 @@ import {
   RENDERERS,
   said,
   save,
+  searchRecords,
   showChild,
   shows,
   signIn,
@@ -76,19 +81,70 @@ async function writesHeld(holding: Holding, count: number): Promise<void> {
   await waitFor(() => expect(holding.held).toHaveLength(count), { timeout: 15_000 })
 }
 
-/** A fresh order of tenant 1's, made beside the page, as the stale suite makes one. */
-async function freshOrder({ formId }: Engine): Promise<string> {
+/** A fresh order of tenant 1's, made beside the page, as the stale suite makes one; noted `notes`, where given, which a search finds. */
+async function freshOrder({ formId }: Engine, notes?: string): Promise<string> {
   const definition = await plane.clerk.form(formId)
   if (!definition.ok) throw new Error(definition.message)
   const name = definition.value.form.model.fields.find((field) => field.key === 'customer')?.optionsSource ?? ''
   const found = await plane.clerk.query(formId, name, { operation: 'create', search: 'Muster' })
   if (!found.ok || found.value.rows[0] === undefined) throw new Error('no customer to order for')
-  const created = await plane.clerk.create(formId, { customer: found.value.rows[0].token, order_date: EDGES.orderDate, status: 'placed', amount: '1' })
+  const created = await plane.clerk.create(formId, {
+    customer: found.value.rows[0].token,
+    order_date: EDGES.orderDate,
+    status: 'placed',
+    amount: '1',
+    ...(notes === undefined ? {} : { notes }),
+  })
   if (!created.ok || created.value.record === null) throw new Error('the order was not created')
   return created.value.record
 }
 
 describe.each(ENGINES)('a save in flight on $engine', (engine) => {
+  // A save the grid sent leaving the open row (0179) is the form's own:
+  // while it is out the row says Saving…, the form's Save sends nothing and
+  // says the previous save is not answered, F2 on the row says the save is
+  // waited for, and the page passes the floor; once answered, the row's
+  // line and the form both say it stored, and it is stored once. Two saves
+  // of one draft at once would be two versions racing.
+  test('a save the grid sent is the form’s: its Save is busy while it is out, F2 waits, and the floor holds', async () => {
+    const notes = stamp('grid-held')
+    const record = await freshOrder(engine, notes)
+    const holding = holdingWrites(plane.fetch)
+    const user = mount(holding.fetch)
+    await signIn(user, TOKENS.clerk)
+    await chooseForm(user, engine.formId)
+    await chooseRenderer(user)
+    await searchRecords(user, notes, [record.slice(record.indexOf(':') + 1)])
+    const grid = within(gridSection('Records')).getByRole('grid', { name: 'Records' })
+    await user.click(dataCell(grid))
+    await screen.findByRole('heading', { level: 3, name: `Order ${record}` }, { timeout: 15_000 })
+    // The row's Group cell, by the `col-id` AG Grid writes on it: the tree names a cell by its value alone.
+    const group = (): HTMLElement =>
+      within(dataRows(grid)[0] as HTMLElement)
+        .getAllByRole('gridcell')
+        .find((cell) => cell.getAttribute('col-id') === 'group') as HTMLElement
+    group().focus()
+    await user.keyboard('{F2}')
+    await waitFor(() => expect(focusedName()).toBe(`Group, Order ${record}`), { timeout: 15_000 })
+    await user.keyboard('{Control>}a{/Control}{Backspace}From the grid{Enter}')
+    await writesHeld(holding, 1)
+    await said('React', /^Saving…$/)
+    expect(within(dataRows(grid)[0] as HTMLElement).getAllByRole('gridcell')[0]?.textContent).toMatch(/Saving…$/)
+    await save(user, 'React')
+    await said('React', /^The previous save has not been answered yet\. This press sent nothing: press Save again once it has\.$/)
+    group().focus()
+    await user.keyboard('{F2}')
+    await waitFor(() => expect(gridStatus('Records')?.textContent).toBe(SAVE_WAITED), { timeout: 15_000 })
+    expect(await audit()).toEqual([])
+    expect(unnamed()).toEqual([])
+    expect(holding.held).toHaveLength(1)
+    holding.answer()
+    await waitFor(() => expect(gridStatus('Records')?.textContent).toBe(`Saved Order ${record}.`), { timeout: 15_000 })
+    await said('React', /^Saved\.$/)
+    const stored = await plane.clerk.read(engine.formId, record)
+    expect(stored.ok && stored.value.answers['group']).toBe('From the grid')
+  })
+
   // Typed while the save was out: the answer the server stored for Notes is
   // older than what the field holds, and a pane that set it back would erase
   // the person's words and then say "Saved." over the loss. The second press

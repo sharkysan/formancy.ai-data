@@ -29,6 +29,7 @@ import {
   RENDERERS,
   said,
   save,
+  searchRecords,
   stamp,
   showChild,
   shows,
@@ -169,6 +170,55 @@ describe.each(ENGINES)('the page on $engine', ({ connection, formId, lines, remo
     await save(user, 'React')
     await said('React', /^Not saved\./)
     expect(await floor('refused selection')).toEqual(CLEAN('refused selection'))
+  })
+
+  // The open record edited in its row (0179): a cell in edit -- an editor
+  // of the page's own inside the grid, named for its field and record --
+  // its row saving, and its row not saved, the row's first cell saying so
+  // beside its Id, each held to the floor. An editor without a name, or a
+  // mark that broke the row's cell, is what this finds.
+  test('passes the floor with a cell in edit, its row saving and its row not saved', async () => {
+    const notes = stamp('floor-cells')
+    const record = await freshOrder(formId, notes)
+    const holding = holdingWrites(plane.fetch)
+    const user = mount(holding.fetch)
+    await signIn(user, TOKENS.clerk)
+    await chooseForm(user, formId)
+    await searchRecords(user, notes, [record.slice(record.indexOf(':') + 1)])
+    const grid = within(gridSection('Records')).getByRole('grid', { name: 'Records' })
+    await user.click(dataCell(grid))
+    await screen.findByRole('heading', { level: 3, name: `Order ${record}` }, { timeout: 15_000 })
+    // The row's Group cell, by the `col-id` AG Grid writes on it: the tree names a cell by its value alone.
+    const group = (): HTMLElement =>
+      within(dataRows(grid)[0] as HTMLElement)
+        .getAllByRole('gridcell')
+        .find((cell) => cell.getAttribute('col-id') === 'group') as HTMLElement
+    const edit = async (text: string): Promise<void> => {
+      group().focus()
+      await user.keyboard('{F2}')
+      await waitFor(() => expect(focusedName()).toBe(`Group, Order ${record}`), { timeout: 15_000 })
+      await user.keyboard(`{Control>}a{/Control}{Backspace}${text}`)
+    }
+    await edit('Floor')
+    expect(await floor('a cell in edit')).toEqual(CLEAN('a cell in edit'))
+    await user.keyboard('{Enter}')
+    await waitFor(() => expect(holding.held).toHaveLength(1), { timeout: 15_000 })
+    expect(await floor('its row saving')).toEqual(CLEAN('its row saving'))
+    holding.answer()
+    await waitFor(() => expect(gridStatus('Records')?.textContent).toBe(`Saved Order ${record}.`), { timeout: 15_000 })
+
+    // Changed beside the page, then edited again: the save is stale, and the row says so.
+    const read = await plane.clerk.read(formId, record)
+    if (!read.ok) throw new Error(read.message)
+    await plane.clerk.update(formId, { record, version: read.value.version ?? '', answers: { notes: `${notes} beside` } })
+    await edit('Floor again')
+    await user.keyboard('{Enter}')
+    await waitFor(() => expect(holding.held).toHaveLength(1), { timeout: 15_000 })
+    holding.answer()
+    await waitFor(() => expect(within(dataRows(grid)[0] as HTMLElement).getAllByRole('gridcell')[0]?.textContent).toMatch(/Not saved$/), {
+      timeout: 15_000,
+    })
+    expect(await floor('its row not saved')).toEqual(CLEAN('its row not saved'))
   })
 
   // A save and a delete the deployment's trigger refused in words for the

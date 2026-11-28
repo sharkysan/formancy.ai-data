@@ -136,6 +136,16 @@
 //     page, its confirmation in place with Keep them the next Tab, and Enter
 //     on Delete them from the keyboard, the keyboard then on what the server
 //     answered, one order deleted in the database and the other still chosen;
+//   - the open record edited in its row (0179): F2 on its cell puts the
+//     keyboard in an editor of the page's own inside the grid's well, named
+//     for its field and record, which axe passes while it is open;
+//     Shift+Tab and Tab move it among the row's editable cells, past the
+//     one the record's form edits; Enter saves the row with the keyboard
+//     on its cell, the line saying so and the database holding it; Escape
+//     gives the cell's edit up; and a stale save says Not saved in the
+//     row's first cell and on the line that its changes are kept, the
+//     keyboard still on the cell, axe passing the page with that mark
+//     drawn and its contrast decided;
 //   - a grid's Columns (0106): Enter on Columns opens its panel and keeps
 //     the keyboard there, the next Tab on the first column's Show; Space on
 //     a Show hides its column and asks the server nothing, and a column
@@ -234,7 +244,7 @@
 // server of the built page, the stylesheet's reads, the measurements, the
 // workspace's states, the record's journey, a delete's states, Download
 // CSV's, an order's lines saved with it, an action's, an action over the
-// records chosen, the filter's, the views', the rows
+// records chosen, the open record edited in its row, the filter's, the views', the rows
 // kept while the next are asked for, the columns', Drill down's, a column's
 // width, a customer list that goes on, Stacked's line and the short window,
 // the Open beside a lookup's box, and the policy's allowance.
@@ -273,6 +283,7 @@ import { choosingJourney } from './browser/choosing.mjs'
 import { columnsJourney } from './browser/columns.mjs'
 import { deleteJourney } from './browser/deleting.mjs'
 import { drillJourney } from './browser/drilling.mjs'
+import { editingJourney } from './browser/editing.mjs'
 import { exportJourney } from './browser/exporting.mjs'
 import { filterJourney } from './browser/filtering.mjs'
 import { recordJourney } from './browser/journey.mjs'
@@ -444,6 +455,8 @@ async function run(gate, browser) {
           ...actionJourney(plane, gate, run),
           // On the action order's records, and back on the orders' Records at its end too.
           ...choosingJourney(plane, gate, run),
+          // On the orders' Records, an order edited in its row, its draft discarded at the end.
+          ...editingJourney(plane, gate, run),
           ...filterJourney(plane, gate),
           ...viewJourney(plane, gate),
           ...waitingJourney(plane, gate),
@@ -540,7 +553,7 @@ async function run(gate, browser) {
   // A failed check fails the run in recordedPerBrowser, which says so.
   if (gate.failures().length > 0) return
   console.log(
-    `browser checks passed: the host page's workspace, journey, deletes, downloads, an order's lines saved with it, an action, an action over the records chosen, filter, views, columns, Drill down, widths and a list that goes on at ${String(new Set(list.map(({ width }) => width)).size)} widths, one of them also with the web fonts refused, and Stacked in ${SHORT.label}, against the real server on PostgreSQL, in ${String(Math.round((Date.now() - started) / 1000))} s`,
+    `browser checks passed: the host page's workspace, journey, deletes, downloads, an order's lines saved with it, an action, an action over the records chosen, a record edited in its row, filter, views, columns, Drill down, widths and a list that goes on at ${String(new Set(list.map(({ width }) => width)).size)} widths, one of them also with the web fonts refused, and Stacked in ${SHORT.label}, against the real server on PostgreSQL, in ${String(Math.round((Date.now() - started) / 1000))} s`,
   )
 }
 

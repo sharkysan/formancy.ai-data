@@ -600,6 +600,20 @@ Records grid alone
 ([0174](../decisions/0174-the-host-page-deletes-the-chosen-records-of-a-page-and-the-studio-grants-who-may.md)),
 and changed the same way, one value for every record
 ([0176](../decisions/0176-the-host-page-changes-the-chosen-records-of-a-page-and-the-studio-grants-who-may-and-in-which-fields.md)).
+Only the open record's row of the Records grid is edited in its cells:
+F2 on another row reads that record before its editor opens; a row saved
+from its cells keeps its place until the page is read again, so a list
+sorted by the field just changed is out of order until then; one draft at
+a time, a row whose save did not store left only by mending it, Discard,
+Load the saved record or the unsaved-changes question; a textarea, a
+time, a timestamp and a lookup edited in the record's form, a date typed
+as text, and a lookup changed there shown by its token in the row until
+the row's save asks for its label; under Both the React form's draft
+alone, in Drill down every cell the form's, no child section's grid,
+Drill down level or together tab edited in cells, and, while a cell is in
+edit, the form's error summary holding the keyboard for a moment only,
+which a screen reader may begin to say before the editor again
+([0179](../decisions/0179-a-grid-edits-the-open-records-cells-and-saves-its-row-when-it-is-left.md)).
 An action over the open record is offered in its detail alone, never a
 child row's or a Drill down level's; every run asks a
 confirmation, after its dialog where it has one, even where its

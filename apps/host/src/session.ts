@@ -15,8 +15,7 @@ import type { Work } from './leave.js'
 import type { TakenRows } from './save-set.js'
 import { recordOutcome } from './with-rows.js'
 import type { WithRows } from './with-rows.js'
-import { withMoves } from './moves.js'
-import { disableFields } from './widgets.js'
+import { drawnCopies } from './drawn-copies.js'
 
 /*
  * One pane's session: the engine that holds a person's answers, the record
@@ -204,50 +203,15 @@ function said(outcome: WriteOutcome, created: boolean): string {
   return outcome.value.record === null ? 'Created.' : `Created record ${outcome.value.record}.`
 }
 
-/**
- * The fields this person may write in no write the form offers them (0117):
- * a pinned tenant, a field the database writes, one the policy lets them
- * read and not write. A field written on create only is not one of them.
- */
-function unwrittenFields({ form, writable }: PublishedForm): Set<string> {
-  const written = new Set([...(writable.create ?? []), ...(writable.update ?? [])])
-  return new Set(form.model.fields.map((field) => field.key).filter((key) => !written.has(key)))
-}
-
-/**
- * The fields one write does not accept from this person (0122): those its
- * list leaves out, or -- a write the form does not offer them -- those no
- * write accepts, since such a form is drawn for the other write or read-only.
- */
-function notAcceptedOn({ form, writable }: PublishedForm, operation: 'create' | 'update', unwritten: ReadonlySet<string>): string[] {
-  const accepted = writable[operation]
-  if (accepted === null) return [...unwritten]
-  return form.model.fields.map((field) => field.key).filter((key) => !accepted.includes(key))
-}
-
 export function createSession({ client, formId, definition, renderer, namespace, fixed = [], rows }: SessionOptions) {
-  // What this person writes in no operation is drawn as nothing writes it
-  // and sent in no body: a renderer submits a disabled field, and a body
-  // that echoed it would carry the tenant a token alone carries (0117).
-  const unwritten = unwrittenFields(definition)
-  // The host's copies of the form, one for each write: the published one,
-  // with the fields the page fills in and those that write does not accept
-  // from this person disabled -- on a saved record a field written on create
-  // only, which an update would refuse (0122). A new record keeps its copy
-  // through the updates after its create, since the engine is kept (0029).
-  // A field's default, the create's alone, is served only where this
-  // person's create takes it (0149), so the copy starts nothing a save of
-  // it would be refused for.
-  const forCreate = disableFields(definition.form, [...fixed, ...notAcceptedOn(definition, 'create', unwritten)])
-  const forUpdate = disableFields(definition.form, [...fixed, ...notAcceptedOn(definition, 'update', unwritten)])
+  // The host's copies of the form, one for each write (drawn-copies.ts): a
+  // new record keeps its copy through the updates after its create, since
+  // the engine is kept (0029). What this person writes in no operation is
+  // sent in no body: a renderer submits a disabled field, and a body that
+  // echoed it would carry the tenant a token alone carries (0117).
+  const copies = drawnCopies(definition, fixed)
+  const { unwritten } = copies
   const form = definition.form
-  // A saved record this person may not update is drawn with every field
-  // disabled, as the generator draws a field nothing may write: presentation
-  // only, the server refuses the update (UX-SPEC D19).
-  const readOnly = disableFields(
-    form,
-    form.model.fields.map((field) => field.key),
-  )
   const ids = namespace ?? form.id
   const allows = (operation: LookupOperation): boolean => definition.operations.includes(operation)
   const operationFor = (record: string | undefined): LookupOperation =>
@@ -274,28 +238,6 @@ export function createSession({ client, formId, definition, renderer, namespace,
   /** Read through a getter, so moving from create to update needs no new map -- in Angular, no new application. */
   const sources = lookupSources(client, formId, form, () => state.operation)
 
-  /** The fields a next version takes from the one it follows, and its end: never the person's (0115). */
-  const following = disableFields(forCreate, definition.versions === null ? [] : [...definition.versions.key, definition.versions.to])
-  /** Whether `record` is a version that has ended: history, drawn as nothing to write (0113). */
-  const ended = (record: FormRecord | undefined): boolean =>
-    definition.versions !== null && record !== undefined && (record.answers[definition.versions.to] ?? null) !== null
-
-  /**
-   * The state a record holds, as the policy spells its states (0127): text,
-   * a whole number as its digits, `null` for none; `undefined` where the
-   * person may not read the field, whose choice is then left as it is.
-   */
-  function stateOf(record: FormRecord): string | null | undefined {
-    const held = definition.moves === null ? undefined : record.answers[definition.moves.field]
-    return held === null ? null : typeof held === 'string' || typeof held === 'number' ? String(held) : undefined
-  }
-
-  /** The copy a saved record this person may update is drawn with: its state field as the moves from the state it holds (0127). */
-  function forUpdateOf(record: FormRecord | undefined): typeof forUpdate {
-    const from = record === undefined ? undefined : stateOf(record)
-    return from === undefined ? forUpdate : withMoves(forUpdate, definition.moves, from)
-  }
-
   /**
    * A new engine. Over `record`, its answers as handed in -- a record read,
    * a copy, a next version, a draft discarded back to -- and never a
@@ -305,14 +247,7 @@ export function createSession({ client, formId, definition, renderer, namespace,
    */
   function open(record?: FormRecord, follows?: SessionState['follows'], prefill?: Record<string, unknown>): FormEngine {
     const token = record?.record ?? undefined
-    const schema =
-      follows !== undefined
-        ? following
-        : token === undefined
-          ? withMoves(forCreate, definition.moves, null)
-          : !allows('update') || ended(record)
-            ? readOnly
-            : forUpdateOf(record)
+    const schema = copies.of(record, follows !== undefined)
     const initialValue = record !== undefined ? record.answers : prefill === undefined ? undefined : withDefaults(schema, prefill)
     const engine = createFormEngine({
       schema,
@@ -573,6 +508,8 @@ export function createSession({ client, formId, definition, renderer, namespace,
     release(by: HoldBy = 'delete'): void {
       holds.delete(by)
     },
+    /** What a press says while something holds this form's Save, as `hold` set it; undefined while nothing does: a grid's edit of the record waits as its Save does (0179). */
+    held: (): string | undefined => [...holds.values()][0],
     /** This form's last save whose outcome is unknown, if any. */
     unknown: (): UnknownWrite | undefined => lostHere()?.write,
     /**

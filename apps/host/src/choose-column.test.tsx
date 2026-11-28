@@ -10,8 +10,8 @@ import { createChosenRows } from './chosen-rows.js'
 import type { ChosenRows } from './chosen-rows.js'
 import type { ArrangedColumn } from './columns.js'
 import type { GridRow } from './grid-datasource.js'
+import type { OpenHow } from './grid-keys.js'
 import { columnDefsOf, gridOptionsFor } from './grid-options.js'
-import type { OpenHow } from './grid-options.js'
 import { audit, focusedName, unnamed } from './test-accessible.js'
 
 /*

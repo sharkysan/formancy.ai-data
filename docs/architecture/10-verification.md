@@ -405,6 +405,55 @@ No test holds the Drill down levels that hold a chosen record other than
 the open one: the fixture has no form that is its own child and may be
 deleted.
 
+The open record edited in its row of the Records grid
+([0179](../decisions/0179-a-grid-edits-the-open-records-cells-and-saves-its-row-when-it-is-left.md)) was written on 2026-11-27 without a database. What needs none ran
+and was watched failing with its rule taken out: which cells are edited
+where, read from the copy a pane draws the record with, the row's states
+and its mark, when leaving it saves, where Tab goes and the line's words
+(`apps/host/src/grid-edit.test.ts`); and AG Grid's editing as the page
+configures it, over a real session and engine with no server -- F2's
+editor, named and passing axe, Tab and Shift+Tab, Escape, no other key
+starting an edit, F2's why, the row's words, a lost save said on the row,
+an invalid one back in its editor, the keyboard kept in an editor when
+the form's error summary appears, Escape giving the row's state back, a
+double click editing as F2 does, and Drill down's cells the form's
+(`cell-editors.test.tsx`), each run
+with a configuration of its own that starts no database. On both engines
+-- F2, Tab, Shift+Tab, Enter and Escape in each renderer, a row saved in
+place, stale, invalid, declined, refused and lost each said on the row, a
+save out holding F2 and another row, Space on another row saving first,
+the keyboard kept in a cell retyped after a save in each renderer, the
+form's Save holding another row, a cell given up leaving the form's own
+typing to the guard, a row not stored left only through it, a double
+click on another row, the React form's draft under Both, a lookup's
+label after a save, and -- added after review, each watched failing
+before its fix -- a row asked for while a save is out going with the
+form New record replaces, and React's save out holding nothing once
+Angular is shown with React's draft discarded
+(`grid-editing.test.tsx`), the form's Save busy while a grid save is out
+(`in-flight.test.tsx`), F2 by the form's copy (`grid-keys.test.tsx`), axe
+in each state (`page.test.tsx`) -- and the browser gate's three states,
+axe run over the editor while it is open and over the row's Not saved
+mark while it is drawn
+(`apps/host/scripts/browser/editing.mjs`), run first in CI. That first run
+failed three, each mended since: a page turned back to listed while AG
+Grid still drew the page left, the row's words having asked the row model
+for the focused row of a page no longer shown (`actions.test.tsx`'s
+paging); Drill down's row words, which had not been told of F2
+(`drill.test.tsx`); and the live demo's gate, which took the grid showing
+a note typed in the form as its save stored -- the open row draws the
+draft -- and pressed New record while the save was out
+(`apps/host/scripts/browser/demo.mjs`, which waits for the form's line
+now). That wait is run by CI's live-demo job alone and has not run yet;
+`grid-editing.test.tsx` holds the page it rests on, not the wait itself:
+the form's own Save holding New record only until its answer, and one
+status in the record's region then reading Saved., as the gate's strict
+wait needs. On 2026-11-28 the database files among them ran on a machine
+with Docker, one at a time, and passed, and `grid-editing.test.tsx`,
+`cell-editors.test.tsx`, `in-flight.test.tsx`, `grid-keys.test.tsx` and
+`page.test.tsx` passed again after the review's fixes; the browser gates
+ran in CI alone.
+
 The host page's change of the records chosen and the studio's grant of it
 ([0176](../decisions/0176-the-host-page-changes-the-chosen-records-of-a-page-and-the-studio-grants-who-may-and-in-which-fields.md)) were written on 2026-11-22 without a database. What needs
 none ran and was watched failing with its rule taken out: the fields
