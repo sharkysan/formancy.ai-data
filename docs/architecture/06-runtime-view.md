@@ -1474,7 +1474,11 @@ request over the choice at a time (§11).
    notice opens without taking the keyboard. While it is out the row says
    Saving…, its cells take no edit and the next row waits for its answer;
    while the form's own Save of a row the grid edited is out, the next row
-   waits for that answer the same way.
+   waits for that answer the same way. The row's state and the wait are
+   the form's they were set in -- its session, record and generation: a
+   form replaced meanwhile, by New, Load or the other renderer shown with
+   its draft discarded, takes them with it, and the save answers as a
+   replaced form's.
 5. Stored, the row takes what is stored and its version in place
    (`rowNode.setData`) and no page is read again; a lookup it changed is
    asked for its label. Not stored, the row's first cell says so, the line

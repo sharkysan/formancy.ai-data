@@ -425,8 +425,11 @@ save out holding F2 and another row, Space on another row saving first,
 the keyboard kept in a cell retyped after a save in each renderer, the
 form's Save holding another row, a cell given up leaving the form's own
 typing to the guard, a row not stored left only through it, a double
-click on another row, the React form's draft under Both and a lookup's
-label after a save
+click on another row, the React form's draft under Both, a lookup's
+label after a save, and -- added after review, each watched failing
+before its fix -- a row asked for while a save is out going with the
+form New record replaces, and React's save out holding nothing once
+Angular is shown with React's draft discarded
 (`grid-editing.test.tsx`), the form's Save busy while a grid save is out
 (`in-flight.test.tsx`), F2 by the form's copy (`grid-keys.test.tsx`), axe
 in each state (`page.test.tsx`) -- and the browser gate's three states,
@@ -441,10 +444,15 @@ paging); Drill down's row words, which had not been told of F2
 a note typed in the form as its save stored -- the open row draws the
 draft -- and pressed New record while the save was out
 (`apps/host/scripts/browser/demo.mjs`, which waits for the form's line
-now), the form's own Save holding New record only until its answer held
-by `grid-editing.test.tsx`. On 2026-11-28 the database files among them
-ran on a machine with Docker, one at a time, and passed; the browser
-gates and the live demo's gate ran in CI alone.
+now). That wait is run by CI's live-demo job alone and has not run yet;
+`grid-editing.test.tsx` holds the page it rests on, not the wait itself:
+the form's own Save holding New record only until its answer, and one
+status in the record's region then reading Saved., as the gate's strict
+wait needs. On 2026-11-28 the database files among them ran on a machine
+with Docker, one at a time, and passed, and `grid-editing.test.tsx`,
+`cell-editors.test.tsx`, `in-flight.test.tsx`, `grid-keys.test.tsx` and
+`page.test.tsx` passed again after the review's fixes; the browser gates
+ran in CI alone.
 
 The host page's change of the records chosen and the studio's grant of it
 ([0176](../decisions/0176-the-host-page-changes-the-chosen-records-of-a-page-and-the-studio-grants-who-may-and-in-which-fields.md)) were written on 2026-11-22 without a database. What needs

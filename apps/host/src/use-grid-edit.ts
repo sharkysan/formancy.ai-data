@@ -56,7 +56,11 @@ import { DECLINED_BY } from './words.js'
  *   or Space on another -- waits for the answer, and goes on only where the
  *   row saved. The form's Save of a row the grid edited is the row's save:
  *   while it is out the next row waits for it the same way, and nothing is
- *   sent beside it. The rest of the grid moves and pages.
+ *   sent beside it. The rest of the grid moves and pages. A row's state and
+ *   a wait are the form's they were set in -- its session, its record and
+ *   the generation of its form: a form opened again (discarded, New, Load)
+ *   or the other renderer's shown starts clean, and what waited on the
+ *   form before goes with it, never opened by a later save.
  * - **Saved**, the row takes what is stored and its version in place, and
  *   no page is read, so no row moves under the keyboard: its sort places it
  *   once the page is read again. A lookup's label is asked for where the
@@ -113,6 +117,33 @@ export interface GridEditOptions {
 /** Whether two answers are the same value: answers are JSON, so their JSON is. */
 const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b)
 
+/** The open record, the session of the form the detail draws, and that form's engine and generation. */
+interface OpenRecord {
+  token: string
+  session: Session
+  engine: FormEngine
+  generation: number
+}
+
+/** The form a row's state or a wait was set in: its session, its record and the generation of its form. */
+interface FormAt {
+  session: Session
+  token: string
+  generation: number
+}
+
+const formAt = ({ session, token, generation }: OpenRecord): FormAt => ({ session, token, generation })
+
+/**
+ * Whether `held` was set in the form open now. Neither a generation nor a
+ * record says which session: two renderers' forms of one record are opened
+ * together, so their generations are the same number, and showing the
+ * other renderer, its draft discarded, is a form of its own.
+ */
+function isHere<T extends FormAt>(held: T | null, open: OpenRecord | null): held is T {
+  return held !== null && open !== null && held.session === open.session && held.token === open.token && held.generation === open.generation
+}
+
 /** The open record's edit in its row of the Records grid. */
 export function useGridEdit(options: GridEditOptions): GridEdit {
   const latest = useRef(options)
@@ -151,14 +182,14 @@ function createGridEdit(
   copies: ReturnType<typeof drawnCopies>,
 ): GridEdit & { refresh(): void; heard(result: SaveResult | null, from: SaveFrom): void } {
   let api: GridApi<GridRow> | null = null
-  /** The open row's state, for the record and the form it was set in: a form opened again -- discarded, loaded -- starts clean. */
-  let row: { token: string; generation: number; state: RowState } | null = null
+  /** The open row's state, for the form it was set in: a form opened again -- discarded, loaded, the other renderer's shown -- starts clean. */
+  let row: (FormAt & { state: RowState }) | null = null
   /** The field whose editor is open. */
   let editing: string | null = null
   /** The open row's state as the editor open now began: what Escape, which gives that cell's typing up, gives back. */
-  let began: { token: string; generation: number; state: RowState } | null = null
-  /** What waits for the open row's save to store: another row, opened. */
-  let pending: (() => void) | null = null
+  let began: (FormAt & { state: RowState }) | null = null
+  /** What waits for the open row's save to store: another row, opened -- from the form it was asked in, and only while that form is open. */
+  let pending: (FormAt & { go: () => void }) | null = null
   /** The record last drawn from its engine: drawn as listed again once another is open. */
   let drawnToken: string | null = null
 
@@ -167,7 +198,7 @@ function createGridEdit(
   /** The session the detail draws: the first renderer shown, React under Both. */
   const sessionShown = (): Session | undefined => now().sessions.find((each) => each.renderer === renderersOf(now().renderer)[0])
   /** The open record, its session and its engine, while that session holds it. */
-  function opened(): { token: string; session: Session; engine: FormEngine; generation: number } | null {
+  function opened(): OpenRecord | null {
     const open = now().openRef.current
     const session = sessionShown()
     if (open?.kind !== 'record' || session === undefined || session.state().record !== open.token) return null
@@ -175,10 +206,7 @@ function createGridEdit(
     return { token: open.token, session, engine: form.engine, generation: form.generation }
   }
   const nodeOf = (token: string): IRowNode<GridRow> | undefined => live()?.getRowNode(token)
-  const stateNow = (): RowState => {
-    const open = opened()
-    return open !== null && row?.token === open.token && row.generation === open.generation ? row.state : { kind: 'clean' }
-  }
+  const stateNow = (): RowState => (isHere(row, opened()) ? row.state : { kind: 'clean' })
   const labelOf = (field: string): string => {
     const def = now().definition.form.model.fields.find((each) => each.key === field)
     return def === undefined ? field : fieldHeading(def)
@@ -203,7 +231,7 @@ function createGridEdit(
   function setState(state: RowState): void {
     const open = opened()
     if (open === null) return
-    row = { token: open.token, generation: open.generation, state }
+    row = { ...formAt(open), state }
     refresh()
   }
 
@@ -261,7 +289,7 @@ function createGridEdit(
     grid.ensureIndexVisible(rowIndex)
     grid.setFocusedCell(rowIndex, field)
     editing = field
-    began = { token: open.token, generation: open.generation, state: stateNow() }
+    began = { ...formAt(open), state: stateNow() }
     grid.startEditingCell({ rowIndex, colKey: field })
   }
 
@@ -286,7 +314,7 @@ function createGridEdit(
   async function save(then?: () => void): Promise<void> {
     const open = opened()
     if (open === null) return
-    pending = then ?? null
+    pending = then === undefined ? null : { ...formAt(open), go: then }
     setState({ kind: 'saving' })
     tell([`Saving ${now().title} `, { code: open.token }, '…'], 'pending')
     const reach = reachOf(open.session)
@@ -301,7 +329,7 @@ function createGridEdit(
   }
 
   /** What is stored, in the open row in place, its version among it; a lookup it changed asked for its label. */
-  function stored(open: NonNullable<ReturnType<typeof opened>>): void {
+  function stored(open: OpenRecord): void {
     const node = nodeOf(open.token)
     if (node?.data === undefined) return
     const saved = open.session.saved()
@@ -326,9 +354,12 @@ function createGridEdit(
     // A press of the form's that sent nothing -- its engine refused it, a save was out, a create's loss held it, a row's form refused -- is
     // about that press, which the form says, not the draft's save; and a form replaced since is not the row's.
     if (from === 'form' && (result === null || result.kind === 'busy' || result.kind === 'held' || result.kind === 'rows')) return
-    if (result?.kind === 'replaced') return
     const open = opened()
-    const go = pending
+    // A row asked for in a form replaced since -- discarded, New, Load, the other renderer shown -- went with that form's draft.
+    if (!isHere(pending, open)) pending = null
+    // A replaced form's save: not the open form's, whose row and wait are its own save's to settle.
+    if (result?.kind === 'replaced') return
+    const go = pending?.go
     pending = null
     if (open === null) return
     setState(settled(result))
@@ -352,7 +383,7 @@ function createGridEdit(
   }
 
   /** An invalid save, by the engine or the server: the first invalid cell shown in its editor, the rest named on the line. */
-  function invalid(open: NonNullable<ReturnType<typeof opened>>, result: SaveResult | null): void {
+  function invalid(open: OpenRecord, result: SaveResult | null): void {
     const node = nodeOf(open.token)
     const { engine } = open
     // What the form shows as wrong; failing that, every field the engine holds a problem on -- a server's verdict among them.
@@ -388,7 +419,7 @@ function createGridEdit(
     }
     const decision = leaving(stateNow(), open.session.changed(), open.session.isSaving())
     if (decision === 'go') go()
-    else if (decision === 'wait') pending = go
+    else if (decision === 'wait') pending = { ...formAt(open), go }
     else void save(go)
   }
 
@@ -438,7 +469,7 @@ function createGridEdit(
     const leaves = (): boolean => leaving(stateNow(), open.session.changed(), open.session.isSaving()) === 'save'
     if (pressed === 'cancel') {
       // The cell's typing given up, and the row's state with it: a row the grid had not edited is not, and one not saved still says so.
-      if (began?.token === open.token && began.generation === open.generation && stateNow().kind !== 'saving') setState(began.state)
+      if (isHere(began, open) && stateNow().kind !== 'saving') setState(began.state)
       return end(rowIndex, field, true)
     }
     if (pressed === 'end') {

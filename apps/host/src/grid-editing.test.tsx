@@ -3,6 +3,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import { computeAccessibleDescription } from 'dom-accessibility-api'
 import { CHECK_IT, SAVE_WAITED, STALE_KEPT } from './grid-edit.js'
+import { REPLACED } from './session.js'
 import { focusedName, paragraphs } from './test-accessible.js'
 import {
   answer,
@@ -16,6 +17,7 @@ import {
   notice,
   paper,
   RENDERERS,
+  said,
   save,
   searchRecords,
   signIn,
@@ -38,7 +40,9 @@ import { DECLINED_BY } from './words.js'
  * in place, with no page read again; a stale, an invalid, a declined and a
  * refused save each said on the row and the line; a save out holding F2
  * and another row until its answer, and the form's own Save holding New
- * record until its answer; and Space on another row saving the row
+ * record until its answer; a row asked for, and the row's mark, going
+ * with a form replaced while the save is out -- by New, or by the other
+ * renderer shown; and Space on another row saving the row
  * first. The row and the record's form are one draft, so what a cell
  * types is the form's too, and the save is the form's own (pane-reach.ts).
  *
@@ -419,14 +423,84 @@ describe.each(ENGINES)('the open record edited in its row on $engine', (engine: 
     expect((await stored(formId, first))['group']).toBe('Held by the form')
   })
 
+  // A row asked for while the row's save is out waits for that save and no
+  // other: New record, with Discard and continue, replaces the form, so the
+  // save answers as a replaced form's and the row asked for goes with the
+  // draft. Kept waiting, it opened at the next Save another record's form
+  // stored -- a row the person had chosen to leave, asked for by nobody.
+  test('a row asked for while a save is out goes with the form New record replaces', async () => {
+    const notes = stamp('replaced')
+    const [first, second, third] = (await freshOrders(formId, notes, 3)) as [string, string, string]
+    const holding = holdingWrites(plane.fetch)
+    const user = await openedIn('React', formId, notes, [first, second, third], holding.fetch)
+    await edit(user, first, 'group', 'Group')
+    await retype(user, 'Replaced')
+    await user.keyboard('{Enter}')
+    await waitFor(() => expect(holding.held).toHaveLength(1), ARRIVES)
+    cellOf(second, 'group').focus()
+    await user.keyboard(' ')
+    await user.click(within(gridSection('Records')).getByRole('button', { name: 'New record' }))
+    await waitFor(() => expect(unsavedNotice()).not.toBeNull(), ARRIVES)
+    await user.click(within(unsavedNotice() as HTMLElement).getByRole('button', { name: 'Discard and continue' }))
+    await screen.findByRole('heading', { level: 3, name: 'New record' }, ARRIVES)
+    holding.answer()
+    await said('React', new RegExp(`^${REPLACED}`))
+
+    await user.click(cellOf(third, 'id'))
+    await screen.findByRole('heading', { level: 3, name: `Order ${third}` }, ARRIVES)
+    await answer(user, 'React', 'Notes', `${notes} saved in the form`)
+    const before = plane.sent.length
+    await save(user, 'React')
+    await waitFor(() => expect(holding.held).toHaveLength(1), ARRIVES)
+    holding.answer()
+    await waitFor(() => expect(statuses('React')).toContain('Saved.'), ARRIVES)
+    // The form's Save reads the page again once it stored; a row opened by its answer is read before that page is.
+    await waitFor(() => expect(listed(before)).toBeGreaterThan(0), ARRIVES)
+    const reads = plane.sent.slice(before).filter((request) => request.path.endsWith('/records/read') && (request.body ?? '').includes(second))
+    expect(reads).toEqual([])
+    expect(screen.getByRole('heading', { level: 3, name: `Order ${third}` })).toBeTruthy()
+  })
+
+  // The row is the draft of the form the detail shows. React's save out,
+  // Angular shown with Discard and continue: the row is Angular's form of
+  // the same record, which holds no save, so the row has no mark and
+  // another row opens on a press. A state kept by record and form
+  // generation alone carried React's Saving… across to Angular's form,
+  // whose generation is the same number, and held every row behind an
+  // answer the grid no longer hears.
+  test('a save out in React holds nothing once Angular is shown, React’s draft discarded', async () => {
+    const notes = stamp('renderer')
+    const [first, second] = (await freshOrders(formId, notes, 2)) as [string, string]
+    const holding = holdingWrites(plane.fetch)
+    const user = await openedIn('React', formId, notes, [first, second], holding.fetch)
+    await edit(user, first, 'group', 'Group')
+    await retype(user, 'Switched')
+    await user.keyboard('{Enter}')
+    await waitFor(() => expect(holding.held).toHaveLength(1), ARRIVES)
+    await waitFor(() => expect(markOf(first)).toBe('Saving…'), ARRIVES)
+    await chooseRenderer(user, 'Angular')
+    await waitFor(() => expect(unsavedNotice()).not.toBeNull(), ARRIVES)
+    await user.click(within(unsavedNotice() as HTMLElement).getByRole('button', { name: 'Discard and continue' }))
+    await within(paper('Angular')).findByRole('combobox', { name: 'Customer' }, ARRIVES)
+    holding.answer()
+    await waitFor(() => expect(holding.held).toHaveLength(0), ARRIVES)
+    await waitFor(() => expect(markOf(first)).toBe(''), ARRIVES)
+    cellOf(second, 'group').focus()
+    await user.keyboard(' ')
+    await screen.findByRole('heading', { level: 3, name: `Order ${second}` }, ARRIVES)
+  })
+
   // The live demo's journey: Notes typed in the record's form, its Save
   // pressed, and New record. The open row draws the draft, so it shows the
   // note before Save is pressed and is no sign the save stored: New record
   // pressed while the save is out is asked about, as a save out always is
   // (0047) -- the gate that waited for the grid pressed it there and met
   // the question. Once the form says Saved., nothing holds New: it empties
-  // the form at once (watched failing in the gate's order, New record
-  // never drawn, and with the save kept out past its answer).
+  // the form at once. That is the page the gate's wait rests on -- one
+  // status of the record's region reading Saved., which its strict wait
+  // needs -- and not the gate's wait itself, which only the live demo's
+  // job runs (the case written in the gate's old order fails here, New
+  // record never drawn; the region's count fails with a second Saved.).
   test('the form’s own Save holds New record only until its answer, whatever the row shows', async () => {
     const notes = stamp('form-saved')
     const [token] = (await freshOrders(formId, notes)) as [string]
@@ -443,6 +517,12 @@ describe.each(ENGINES)('the open record edited in its row on $engine', (engine: 
     await user.click(within(unsavedNotice() as HTMLElement).getByRole('button', { name: 'Keep editing' }))
     holding.answer()
     await waitFor(() => expect(statuses('React')).toContain('Saved.'), ARRIVES)
+    const region = screen.getByRole('region', { name: `Order ${token}` })
+    expect(
+      within(region)
+        .getAllByRole('status')
+        .filter((status) => status.textContent === 'Saved.'),
+    ).toHaveLength(1)
     await user.click(newRecord())
     await screen.findByRole('heading', { level: 3, name: 'New record' }, ARRIVES)
     expect(unsavedNotice()).toBeNull()

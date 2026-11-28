@@ -96,13 +96,28 @@
   in the form as its save stored -- the open row draws the draft -- and
   pressed New record while the save was out, which the guard asks about
   (`apps/host/scripts/browser/demo.mjs` waits for the form's Saved. now).
-  `grid-editing.test.tsx` holds the last: the form's own Save holds New
-  record only until its answer, whatever the row shows (watched failing
-  in the gate's order, and with the save kept out past its answer). Run
-  on 2026-11-28 on a machine with Docker, one file at a time, on both
-  engines: `actions.test.tsx`, `drill.test.tsx`, `grid-editing.test.tsx`,
-  `in-flight.test.tsx`, `grid-keys.test.tsx` and `page.test.tsx`, each
-  passing; the browser gates and the live demo's gate were not run there.
+  That wait is run by CI's live-demo job alone and has not run yet.
+  `grid-editing.test.tsx` holds the page it rests on, not the wait: the
+  form's own Save holds New record only until its answer, whatever the
+  row shows, and one status in the record's region then reads Saved., as
+  the gate's strict wait needs (the case written in the gate's old order
+  fails, New record never drawn; the count fails with a second Saved.
+  planted on the detail's line). Run on 2026-11-28 on a machine with
+  Docker, one file at a time, on both engines: `actions.test.tsx`,
+  `drill.test.tsx`, `grid-editing.test.tsx`, `in-flight.test.tsx`,
+  `grid-keys.test.tsx` and `page.test.tsx`, each passing; the browser
+  gates and the live demo's gate were not run there.
+  Added to `grid-editing.test.tsx` after review, each watched failing on
+  both engines before its fix: a row asked for while the row's save is
+  out goes with the form New record replaces, Discard and continue
+  pressed, and does not open at the next Save of another record's form
+  (failing: that row read once the other form stored); and React's save
+  out, Angular shown with React's draft discarded, leaves the row no mark
+  and another row opening on a press (failing: Saving… on Angular's row,
+  and no answer to end it). Run after the fix on 2026-11-28, one file at
+  a time on both engines: `grid-editing.test.tsx`,
+  `cell-editors.test.tsx`, `in-flight.test.tsx`, `grid-keys.test.tsx` and
+  `page.test.tsx`, each passing.
 
 ## Context
 
@@ -141,7 +156,13 @@ in the row in place with no page read again.
   save from either is the same create and update plan, route and outcomes
   (0015, 0029); the form's Save and the row's are each other's busy, and
   while the form's Save of a row the grid edited is out, another row asked
-  for waits for its answer as it waits for the row's own.
+  for waits for its answer as it waits for the row's own. A row's state
+  and a row waiting on its save are the form's they were set in -- its
+  session, its record and the generation of its form -- so a form
+  replaced while the save is out, by New, Load or the other renderer
+  shown with its draft discarded, takes both with it: the row asked for
+  is not opened by a later save, and the other renderer's form of the
+  record starts with no mark.
 - **The keyboard path is as before** -- arrows, Space, Enter, `=`, one Tab
   stop -- with F2 added. Typing a character starts nothing, since `=` is
   the filter's (0133) and a screen reader's quick keys would edit by
