@@ -432,7 +432,19 @@ label after a save
 in each state (`page.test.tsx`) -- and the browser gate's three states,
 axe run over the editor while it is open and over the row's Not saved
 mark while it is drawn
-(`apps/host/scripts/browser/editing.mjs`), run first in CI.
+(`apps/host/scripts/browser/editing.mjs`), run first in CI. That first run
+failed three, each mended since: a page turned back to listed while AG
+Grid still drew the page left, the row's words having asked the row model
+for the focused row of a page no longer shown (`actions.test.tsx`'s
+paging); Drill down's row words, which had not been told of F2
+(`drill.test.tsx`); and the live demo's gate, which took the grid showing
+a note typed in the form as its save stored -- the open row draws the
+draft -- and pressed New record while the save was out
+(`apps/host/scripts/browser/demo.mjs`, which waits for the form's line
+now), the form's own Save holding New record only until its answer held
+by `grid-editing.test.tsx`. On 2026-11-28 the database files among them
+ran on a machine with Docker, one at a time, and passed; the browser
+gates and the live demo's gate ran in CI alone.
 
 The host page's change of the records chosen and the studio's grant of it
 ([0176](../decisions/0176-the-host-page-changes-the-chosen-records-of-a-page-and-the-studio-grants-who-may-and-in-which-fields.md)) were written on 2026-11-22 without a database. What needs

@@ -170,7 +170,10 @@ export function keyOptions({ firstColumn, on }: { firstColumn: () => string; on:
       getLocaleText: ({ key, defaultValue, api }) => {
         const focused = api.getFocusedCell()
         const colId = focused?.column.getColId()
-        const row = focused === null || focused === undefined ? undefined : api.getDisplayedRowAtIndex(focused.rowIndex)?.data
+        // The focused row as drawn, never asked of the row model: asked for a row of a page no longer shown -- the keyboard was there
+        // before a page turn -- the infinite row model makes a block for it, which with one block in the cache left a page turned back
+        // to listed and the page left still drawn (actions.test.tsx's paging, 0179).
+        const row = focused === null || focused === undefined ? undefined : api.getRenderedNodes().find((node) => node.rowIndex === focused.rowIndex)?.data
         const how = colId === undefined || on.edits === undefined ? null : on.edits(row, colId)
         return rowWords(colId, on.drilling(), how)[key] ?? defaultValue
       },

@@ -86,6 +86,23 @@
   and Tab, Enter saving with the keyboard on the cell, Escape, and a stale
   save marked on its row, axe passing the page with the mark drawn and
   its contrast decided.
+  CI's first run of them (run 46067210291) failed three, each mended
+  since: `apps/host/src/actions.test.tsx`'s paging, a page turned back to
+  listed while AG Grid still drew the page left, because the row's words
+  asked the row model for the focused row of a page no longer shown,
+  which made a block for it (the row is now read from the rows drawn);
+  `apps/host/src/drill.test.tsx`'s row words, which had not been told of
+  F2; and the live demo's gate, which took the grid showing a note typed
+  in the form as its save stored -- the open row draws the draft -- and
+  pressed New record while the save was out, which the guard asks about
+  (`apps/host/scripts/browser/demo.mjs` waits for the form's Saved. now).
+  `grid-editing.test.tsx` holds the last: the form's own Save holds New
+  record only until its answer, whatever the row shows (watched failing
+  in the gate's order, and with the save kept out past its answer). Run
+  on 2026-11-28 on a machine with Docker, one file at a time, on both
+  engines: `actions.test.tsx`, `drill.test.tsx`, `grid-editing.test.tsx`,
+  `in-flight.test.tsx`, `grid-keys.test.tsx` and `page.test.tsx`, each
+  passing; the browser gates and the live demo's gate were not run there.
 
 ## Context
 

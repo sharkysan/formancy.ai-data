@@ -334,7 +334,11 @@ describe.each(ENGINES)('Drill down on $engine', (engine) => {
   // in the other layouts Space opens it and keeps the keyboard in the
   // grid. Said as the other layouts say it, a person at a screen reader
   // presses Space to look at a row and is taken away from the list
-  // (watched failing: the other layouts' sentence in Drill down).
+  // (watched failing: the other layouts' sentence in Drill down). After
+  // them, what F2 does on the cell (0179): the column the keyboard moves
+  // to is the Customer lookup's, which the record's form edits in every
+  // layout -- and in Drill down every cell is, the grid hidden once a
+  // record opens there.
   test('a row says what Space and Enter do in each layout', async () => {
     const user = await drilling(engine.formId)
     // AG Grid speaks of a row when it moves the keyboard itself -- an arrow
@@ -343,11 +347,11 @@ describe.each(ENGINES)('Drill down on $engine', (engine) => {
     const firstCell = (): HTMLElement => dataCell(within(gridSection('Records')).getByRole('grid', { name: 'Records' }))
     firstCell().focus()
     await user.keyboard('{ArrowRight}')
-    await waitFor(() => expect(rowSays('Records')).toBe('Space or Enter opens this record and moves to it.'), ARRIVES)
+    await waitFor(() => expect(rowSays('Records')).toBe("Space or Enter opens this record and moves to it. F2 edits it in the record's form."), ARRIVES)
     await user.click(screen.getByRole('radio', { name: 'Side by side' }))
     firstCell().focus()
     await user.keyboard('{ArrowRight}')
-    await waitFor(() => expect(rowSays('Records')).toBe('Space opens this record. Enter opens it and moves to it.'), ARRIVES)
+    await waitFor(() => expect(rowSays('Records')).toBe("Space opens this record. Enter opens it and moves to it. F2 edits it in the record's form."), ARRIVES)
   })
 
   // A crumb says what is stored, a delivery's by its carrier, its first

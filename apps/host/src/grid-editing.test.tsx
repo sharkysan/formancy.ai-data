@@ -20,6 +20,7 @@ import {
   searchRecords,
   signIn,
   stamp,
+  statuses,
   unsavedNotice,
 } from './test-host.js'
 import type { RendererName, User } from './test-host.js'
@@ -36,8 +37,9 @@ import { DECLINED_BY } from './words.js'
  * Tab, Shift+Tab, Enter and Escape moving and ending the edit; a row saved
  * in place, with no page read again; a stale, an invalid, a declined and a
  * refused save each said on the row and the line; a save out holding F2
- * and another row until its answer; and Space on another row saving the
- * row first. The row and the record's form are one draft, so what a cell
+ * and another row until its answer, and the form's own Save holding New
+ * record until its answer; and Space on another row saving the row
+ * first. The row and the record's form are one draft, so what a cell
  * types is the form's too, and the save is the form's own (pane-reach.ts).
  *
  * Found by role and accessible name. The reads the accessibility tree
@@ -415,6 +417,36 @@ describe.each(ENGINES)('the open record edited in its row on $engine', (engine: 
     holding.answer()
     await screen.findByRole('heading', { level: 3, name: `Order ${second}` }, ARRIVES)
     expect((await stored(formId, first))['group']).toBe('Held by the form')
+  })
+
+  // The live demo's journey: Notes typed in the record's form, its Save
+  // pressed, and New record. The open row draws the draft, so it shows the
+  // note before Save is pressed and is no sign the save stored: New record
+  // pressed while the save is out is asked about, as a save out always is
+  // (0047) -- the gate that waited for the grid pressed it there and met
+  // the question. Once the form says Saved., nothing holds New: it empties
+  // the form at once (watched failing in the gate's order, New record
+  // never drawn, and with the save kept out past its answer).
+  test('the form’s own Save holds New record only until its answer, whatever the row shows', async () => {
+    const notes = stamp('form-saved')
+    const [token] = (await freshOrders(formId, notes)) as [string]
+    const holding = holdingWrites(plane.fetch)
+    const user = await openedIn('React', formId, notes, [token], holding.fetch)
+    const changed = `${notes} changed in the form`
+    await answer(user, 'React', 'Notes', changed)
+    await waitFor(() => expect(cellOf(token, 'notes').textContent).toBe(changed), ARRIVES)
+    await save(user, 'React')
+    await waitFor(() => expect(holding.held).toHaveLength(1), ARRIVES)
+    const newRecord = (): HTMLElement => within(gridSection('Records')).getByRole('button', { name: 'New record' })
+    await user.click(newRecord())
+    await waitFor(() => expect(unsavedNotice()).not.toBeNull(), ARRIVES)
+    await user.click(within(unsavedNotice() as HTMLElement).getByRole('button', { name: 'Keep editing' }))
+    holding.answer()
+    await waitFor(() => expect(statuses('React')).toContain('Saved.'), ARRIVES)
+    await user.click(newRecord())
+    await screen.findByRole('heading', { level: 3, name: 'New record' }, ARRIVES)
+    expect(unsavedNotice()).toBeNull()
+    expect((await stored(formId, token))['notes']).toBe(changed)
   })
 
   // A cell typed in and given up with Escape leaves the row as the grid
